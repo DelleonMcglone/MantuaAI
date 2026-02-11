@@ -14,7 +14,27 @@
       "Bash(/home/runner/workspace/.config/.foundry/bin/forge build --contracts contracts/src/tokens/MockToken.sol)",
       "Bash(npm install:*)",
       "Bash(lsof:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(if [ -n \"$PRIVATE_KEY\" ])",
+      "Bash([ -n \"$BASE_SEPOLIA_RPC_URL\" ])",
+      "Bash([ -n \"$BASESCAN_API_KEY\" ])",
+      "Bash(then)",
+      "Bash(echo:*)",
+      "Bash(else)",
+      "Bash([ -z \"$PRIVATE_KEY\" ])",
+      "Bash([ -z \"$BASE_SEPOLIA_RPC_URL\" ])",
+      "Bash([ -z \"$BASESCAN_API_KEY\" ])",
+      "Bash(fi:*)",
+      "Bash(exit:*)",
+      "Bash(contracts/.env << 'EOF'\nPRIVATE_KEY=0x19b41f3b1d3d6fbbbe4fb2c77139e007a5ffdf46deb555eaec18f2e08de13b27\nBASE_SEPOLIA_RPC_URL=https://sepolia.base.org\nBASESCAN_API_KEY=placeholder\nEOF)",
+      "Bash(source:*)",
+      "Bash(/home/runner/workspace/.config/.foundry/bin/forge script:*)",
+      "Bash(tee:*)",
+      "Bash(/home/runner/workspace/.config/.foundry/bin/forge --version:*)",
+      "Bash(/home/runner/workspace/.config/.foundry/bin/cast wallet address:*)",
+      "Bash(/home/runner/workspace/.config/.foundry/bin/cast balance:*)",
+      "Bash(/home/runner/workspace/.config/.foundry/bin/cast from-wei:*)",
+      "Bash(contracts/.env << 'EOF'\nPRIVATE_KEY=0x19b41f3b1d3d6fbbbe4fb2c77139e007a5ffdf46deb555eaec18f2e08de13b27\nBASE_SEPOLIA_RPC_URL=https://base-sepolia-rpc.publicnode.com\nBASESCAN_API_KEY=placeholder\nEOF)"
     ]
   }
 }

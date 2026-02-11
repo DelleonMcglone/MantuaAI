@@ -1,0 +1,124 @@
+Here's the prompt for local deployment:
+
+---
+
+```markdown
+## Task: Deploy Mantua.AI Mock Tokens & Faucet to Base Sepolia
+
+### Context
+Deploy 21 mock ERC20 tokens and a unified faucet contract with 24-hour cooldown to Base Sepolia testnet from your local machine.
+
+### Prerequisites
+- macOS/Linux terminal
+- ~0.01 ETH on Base Sepolia for gas
+- A fresh deployer wallet (never share or reuse compromised keys)
+
+### Step 1: Install Foundry
+
+```bash
+curl -L https://foundry.paradigm.xyz | bash
+foundryup
+```
+
+### Step 2: Set Up Project
+
+```bash
+# Create and enter project directory
+mkdir mantua-contracts && cd mantua-contracts
+
+# Initialize Foundry project
+forge init
+
+# Install dependencies
+git init
+forge install OpenZeppelin/openzeppelin-contracts
+forge install foundry-rs/forge-std
+
+# Create directory structure
+mkdir -p src/tokens src/faucet script
+```
+
+### Step 3: Create Contract Files
+
+Copy these files from your Replit project into the local project:
+- `src/tokens/MockToken.sol`
+- `src/faucet/MantuaFaucet.sol`
+- `script/DeployMockTokens.s.sol`
+
+### Step 4: Configure Environment
+
+```bash
+# Create .env file (replace with YOUR private key - keep it secret!)
+cat > .env << 'EOF'
+PRIVATE_KEY=<your_private_key_without_0x_prefix>
+BASE_SEPOLIA_RPC_URL=https://sepolia.base.org
+EOF
+
+# Load environment variables
+source .env
+```
+
+⚠️ **SECURITY WARNING:** 
+- Never share your private key
+- Never commit .env to git
+- Use a dedicated testnet wallet
+
+### Step 5: Run Tests
+
+```bash
+forge test -vvv
+```
+
+Ensure all tests pass before deploying.
+
+### Step 6: Deploy to Base Sepolia
+
+```bash
+forge script script/DeployMockTokens.s.sol:DeployMockTokens \
+  --rpc-url $BASE_SEPOLIA_RPC_URL \
+  --broadcast \
+  -vvv
+```
+
+### Step 7: Save Deployed Addresses
+
+The deployment script will output all addresses. Save them:
+
+```
+==========================================
+       DEPLOYMENT SUMMARY
+==========================================
+
+FAUCET_ADDRESS: 0x...
+
+MOCK_TOKEN_ADDRESSES = {
+  mUSDC: 0x...,
+  mUSDT: 0x...,
+  mDAI: 0x...,
+  // ... all 21 tokens
+}
+==========================================
+```
+
+### Step 8: Update Frontend
+
+Share the deployed addresses to update `src/lib/contracts/tokens.ts` in your frontend.
+
+### Troubleshooting
+
+**"Insufficient funds"**: Fund your deployer wallet with testnet ETH from Base Sepolia faucet
+
+**"Nonce too low"**: Wait for pending transactions or reset account in wallet
+
+**Network error**: Verify RPC URL is correct: `https://sepolia.base.org`
+
+### Success Criteria
+- [ ] All 21 tokens deployed
+- [ ] Faucet contract deployed
+- [ ] All tokens registered with faucet
+- [ ] Addresses saved for frontend integration
+```
+
+---
+
+Copy this to your notes or a local markdown file for reference during deployment. Let me know once you have the deployed addresses!
