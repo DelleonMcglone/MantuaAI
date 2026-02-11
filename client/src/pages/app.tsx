@@ -13,6 +13,7 @@ import logoWhite from '@assets/Mantua_logo_white_1768946648374.png';
 import logoBlack from '@assets/Mantua_logo_black_1768946648374.png';
 import AnalysisCard from '../components/chat/AnalysisCard';
 import AddLiquidityModal from '../components/liquidity/AddLiquidityModal';
+import { FaucetButton } from '../components/FaucetButton';
 import { classifyQuery } from '../utils/queryClassifier';
 import { TrendingUp, BarChart2, PieChart as PieIcon, Activity } from 'lucide-react';
 import { ConnectButton } from '../components/wallet/ConnectButton';
@@ -2989,11 +2990,7 @@ export default function MantuaApp() {
           </div>
 
           {/* Faucet */}
-          <button
-            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', background: 'transparent', border: 'none', borderRadius: 8, color: theme.textPrimary, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
-          >
-            <DropletIcon /> Faucet
-          </button>
+          <FaucetButton theme={theme} />
 
           {/* Recent Chats */}
           <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${theme.border}`, display: 'flex', flexDirection: 'column', minHeight: 0 }}>

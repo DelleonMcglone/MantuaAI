@@ -3,7 +3,18 @@
     "allow": [
       "Bash(forge install:*)",
       "Bash(export PATH=\"$HOME/.foundry/bin:$PATH\")",
-      "Bash(foundryup:*)"
+      "Bash(foundryup:*)",
+      "Bash(test:*)",
+      "Bash(ls:*)",
+      "Bash(forge test:*)",
+      "Bash(curl:*)",
+      "Bash(bash)",
+      "Bash(export PATH=\"$PATH:/home/runner/.foundry/bin\")",
+      "Bash(/home/runner/workspace/.config/.foundry/bin/forge test:*)",
+      "Bash(/home/runner/workspace/.config/.foundry/bin/forge build --contracts contracts/src/tokens/MockToken.sol)",
+      "Bash(npm install:*)",
+      "Bash(lsof:*)",
+      "Bash(npm run:*)"
     ]
   }
 }
