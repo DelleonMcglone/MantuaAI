@@ -3369,7 +3369,7 @@ export default function MantuaApp() {
                 overflowY: 'auto', 
                 padding: '40px 20px 140px' // Bottom padding for fixed input
               }}>
-                <div style={{ width: '100%', maxWidth: showLiquidity ? '1200px' : 700, transition: 'max-width 0.3s ease', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 32 }}>
+                <div style={{ width: '100%', maxWidth: (showSwap || showLiquidity) ? '1200px' : 700, transition: 'max-width 0.3s ease', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 32 }}>
                   {!hasInteracted && !showSwap && !showLiquidity && !showAgentBuilder && (
                     <div style={{ textAlign: 'center' }}>
                       <h1 style={{ fontFamily: '"Outfit", sans-serif', fontSize: 'clamp(28px, 4vw, 40px)', fontWeight: 600, marginBottom: 12, letterSpacing: '-0.02em' }}>Hi, {truncatedAddress || 'there'}</h1>
@@ -3399,8 +3399,7 @@ export default function MantuaApp() {
                       marginBottom: 20,
                       display: 'flex',
                       justifyContent: 'center',
-                      alignItems: 'flex-start',
-                      padding: '0 20px',
+                      alignItems: 'center',
                     }}>
                       <SwapInterface
                         onClose={() => setShowSwap(false)}
