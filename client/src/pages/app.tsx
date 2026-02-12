@@ -150,11 +150,8 @@ const StatusBadge = ({ status, type = 'default' }) => {
     'Completed': { color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
     'Failed': { color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
     'Standard': { color: '#6b7280', bg: 'rgba(107, 114, 128, 0.1)' },
-    'Async Limit Order': { color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)' },
-    'Dynamic Fee': { color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
     'Stable Protection': { color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' },
-    'TWAMM Rebalance': { color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
-    'Yield Maximizer': { color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
+    'None': { color: '#6b7280', bg: 'rgba(107, 114, 128, 0.1)' },
   };
 
   const config = configs[status] || configs['default'];
@@ -708,7 +705,7 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected }) => {
   ] : [];
 
   const liquidityPositions = hasData ? [
-    { token1: 'ETH', token2: 'USDC', status: 'Active', hookName: 'Dynamic Fee', tvl: 2450.50, feesEarned: 124.50, feeTier: 0.05, rangeLow: 2800, rangeHigh: 3600 }
+    { token1: 'ETH', token2: 'USDC', status: 'Active', hookName: 'None', tvl: 2450.50, feesEarned: 124.50, feeTier: 0.05, rangeLow: 2800, rangeHigh: 3600 }
   ] : [];
 
   const activities = hasData ? [
@@ -1287,7 +1284,7 @@ const HookSelectorModal = ({ isOpen, onClose, hooks, selectedHook, onSelect, the
               <div>
                 <div style={{ fontWeight: '600', color: theme.textPrimary, marginBottom: '4px' }}>AI Recommendation</div>
                 <div style={{ fontSize: '13px', color: theme.textSecondary, lineHeight: '1.5' }}>
-                  Based on your trade size of <span style={{ fontWeight: '600', color: theme.textPrimary }}>$4,868</span>, we recommend <span style={{ fontWeight: '600', color: '#8b5cf6' }}>Async Limit Order</span> to prevent sandwich attacks.
+                  Based on your stablecoin swap, we recommend <span style={{ fontWeight: '600', color: '#3b82f6' }}>Stable Protection</span> to guard against depeg events.
                 </div>
               </div>
             </div>
@@ -1475,7 +1472,7 @@ const HookSelectorModal = ({ isOpen, onClose, hooks, selectedHook, onSelect, the
                     cursor: 'pointer'
                   }}>
                     <div>
-                      <div style={{ fontSize: '14px', fontWeight: '500', color: theme.textPrimary }}>TWAMM Hook</div>
+                      <div style={{ fontSize: '14px', fontWeight: '500', color: theme.textPrimary }}>Stable Protection Hook</div>
                       <div style={{ fontSize: '12px', color: theme.textSecondary, fontFamily: 'monospace' }}>0x1234...5678</div>
                     </div>
                     <div style={{ fontSize: '12px', color: theme.textMuted }}>2 days ago</div>
@@ -1534,7 +1531,7 @@ const HookSelectorModal = ({ isOpen, onClose, hooks, selectedHook, onSelect, the
 const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
   const { isConnected, address } = useAccount();
   const { openModal } = useWalletConnection();
-  const [selectedHook, setSelectedHook] = useState(swapDetails?.hook || 'alo');
+  const [selectedHook, setSelectedHook] = useState(swapDetails?.hook || 'sp');
   const [isHookModalOpen, setIsHookModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -1726,11 +1723,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
   };
 
   const hooks = [
-    { id: 'alo', name: 'Async Limit Order', abbr: 'ALO', description: 'Delayed execution with price targets protects against MEV', icon: <ShieldIcon />, benefit: 'Save ~0.3% on trades >$1k', recommended: true },
-    { id: 'df', name: 'Dynamic Fee', abbr: 'DF', description: 'Fees adjust based on volatility and market conditions', icon: <TrendIcon />, benefit: 'Lower fees in stable markets' },
-    { id: 'sp', name: 'Stable Protection', abbr: 'SP', description: 'Peg monitoring and depeg circuit breaker for stablecoins', icon: <LockIcon />, benefit: 'Protects against depeg events' },
-    { id: 'twamm', name: 'TWAMM Rebalance', abbr: 'TWAMM-R', description: 'Time-weighted execution spreads large trades over time', icon: <BoltIcon />, benefit: 'Better rates on large trades' },
-    { id: 'ym', name: 'Yield Maximizer', abbr: 'YM', description: 'Auto-compounds LP fees and rehypothecates idle liquidity', icon: <CoinsIcon />, benefit: 'Maximize LP returns' },
+    { id: 'sp', name: 'Stable Protection', abbr: 'SP', description: 'Peg monitoring and depeg circuit breaker for stablecoins', icon: <LockIcon />, benefit: 'Protects against depeg events', recommended: true },
     { id: 'none', name: 'No Hook', description: 'Standard Uniswap v4 swap without modifications', icon: <SwapIcon /> },
   ];
 
@@ -1744,7 +1737,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
   }, [swapDetails]);
 
   const getSelectedHookObj = () => {
-    return hooks.find(h => h.id === selectedHook) || hooks[4]; // Default to No Hook if not found
+    return hooks.find(h => h.id === selectedHook) || hooks[1]; // Default to No Hook if not found
   };
 
   const selectedHookObj = getSelectedHookObj();
@@ -1810,7 +1803,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
               Swapping {swapDetails.fromAmount} {swapDetails.fromToken} → {swapDetails.toToken}
             </div>
             <div style={{ color: theme.textSecondary, fontSize: '13px' }}>
-              Auto-selected <span style={{ color: '#8b5cf6', fontWeight: '600' }}>Async Limit Order</span> to save ~$14.60
+              Auto-selected <span style={{ color: '#3b82f6', fontWeight: '600' }}>Stable Protection</span> for safer stablecoin swaps
             </div>
           </div>
           <div style={{ paddingRight: '10px' }}>
@@ -2186,41 +2179,41 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
       token1: 'mUSDC', token2: 'mUSDT', type: 'Stable', hook: 'Stable Protection',
       volume: 80.55, fees: 0.40, liquidity: 971950.29, yield: '0.01'
     },
-    { 
+    {
       token1: 'mUSDC', token2: 'mDAI', type: 'Stable', hook: 'Stable Protection',
       volume: 0.00, fees: 0.00, liquidity: 4040.35, yield: '0.00'
     },
-    { 
-      token1: 'ETH', token2: 'mUSDC', type: 'Standard', hook: 'Dynamic Fee',
+    {
+      token1: 'ETH', token2: 'mUSDC', type: 'Standard', hook: 'None',
       volume: 59199.58, fees: 19.60, liquidity: 318789.34, yield: '2.24'
     },
-    { 
-      token1: 'mWBTC', token2: 'mUSDC', type: 'Standard', hook: 'Async Limit Order',
+    {
+      token1: 'mWBTC', token2: 'mUSDC', type: 'Standard', hook: 'None',
       volume: 4500.00, fees: 12.50, liquidity: 368081.08, yield: '1.85'
     },
-    { 
-      token1: 'mstETH', token2: 'ETH', type: 'Standard', hook: 'TWAMM Rebalance',
+    {
+      token1: 'mstETH', token2: 'ETH', type: 'Standard', hook: 'None',
       volume: 3195.71, fees: 1.20, liquidity: 1500.96, yield: '29.14'
     },
-    { 
-      token1: 'mcbETH', token2: 'ETH', type: 'Standard', hook: 'TWAMM Rebalance',
+    {
+      token1: 'mcbETH', token2: 'ETH', type: 'Standard', hook: 'None',
       volume: 4366.80, fees: 1.69, liquidity: 370896.77, yield: '0.17'
     },
-    { 
-      token1: 'mrETH', token2: 'ETH', type: 'Standard', hook: 'Async Limit Order',
+    {
+      token1: 'mrETH', token2: 'ETH', type: 'Standard', hook: 'None',
       volume: 1250.00, fees: 0.85, liquidity: 24750.85, yield: '1.12'
     },
-    { 
-      token1: 'mOUSG', token2: 'mUSDC', type: 'Standard', hook: 'Yield Maximizer',
+    {
+      token1: 'mOUSG', token2: 'mUSDC', type: 'Standard', hook: 'Stable Protection',
       volume: 15780.25, fees: 8.45, liquidity: 125000.00, yield: '3.45'
     },
-    { 
-      token1: 'mBUIDL', token2: 'mUSDC', type: 'Standard', hook: 'Yield Maximizer',
+    {
+      token1: 'mBUIDL', token2: 'mUSDC', type: 'Standard', hook: 'Stable Protection',
       volume: 8500.00, fees: 4.25, liquidity: 85000.00, yield: '2.15'
     },
   ];
 
-  const hookOptions = ['All', 'Async Limit Order', 'Dynamic Fee', 'Stable Protection', 'TWAMM Rebalance', 'Yield Maximizer', 'None'];
+  const hookOptions = ['All', 'Stable Protection', 'None'];
   const typeOptions = ['All', 'Standard', 'Stable'];
 
   // Filter and sort pools
@@ -2280,11 +2273,7 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
 
   const HookBadge = ({ hook }) => {
     const hookConfig = {
-      'Async Limit Order': { icon: <ShieldIcon />, color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)' },
-      'Dynamic Fee': { icon: <TrendIcon />, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
       'Stable Protection': { icon: <LockIcon />, color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' },
-      'TWAMM Rebalance': { icon: <BoltIcon />, color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
-      'Yield Maximizer': { icon: <CoinsIcon />, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
       'None': { icon: null, color: theme.textSecondary, bg: theme.bgSecondary },
     };
     const config = hookConfig[hook] || hookConfig['None'];
@@ -2348,7 +2337,7 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
         <div style={{ flex: 1 }}>
           <span style={{ color: theme.textSecondary, fontSize: '14px', lineHeight: '1.5' }}>
             <span style={{ color: theme.accent, fontWeight: '600' }}>Showing {filteredPools.length} liquidity pools</span>
-            {' '}• Pools with <strong>Async Limit Order</strong> hooks help shield your LP positions from sandwich attacks. 
+            {' '}• Pools with <strong>Stable Protection</strong> hooks help guard against stablecoin depeg events. 
           </span>
         </div>
       </div>
@@ -2846,7 +2835,7 @@ export default function MantuaApp() {
            case 'comparison':
              data = getComparisonData(['Nezlobin', 'JIT']);
              title = 'Fee Comparison';
-             summary = 'Dynamic Fee hooks demonstrated superior fee capture efficiency during high-volatility periods compared to TWAMM Rebalance.';
+             summary = 'Stable Protection hooks demonstrated superior protection during depeg events compared to standard pools.';
              chartType = 'bar';
              icon = <Activity size={20} />;
              insights = [
