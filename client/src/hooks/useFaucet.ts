@@ -4,6 +4,7 @@ import {
   useWriteContract,
   useWaitForTransactionReceipt,
   useReadContract,
+  useBalance,
 } from 'wagmi';
 import { MOCK_TOKEN_FACTORY } from '@/config/tokens';
 import { useTokenBalances } from './useTokenBalances';
@@ -51,6 +52,14 @@ export interface UseFaucetReturn {
 export function useFaucet(): UseFaucetReturn {
   const { address, isConnected } = useAccount();
   const { refetch: refetchBalances } = useTokenBalances();
+
+  // Also track ETH balance for refetching
+  const { refetch: refetchEthBalance } = useBalance({
+    address: address,
+    query: {
+      enabled: !!address,
+    },
+  });
 
   const [countdown, setCountdown] = useState<number>(0);
 
@@ -131,10 +140,11 @@ export function useFaucet(): UseFaucetReturn {
   useEffect(() => {
     if (isSuccess) {
       refetchBalances();
+      refetchEthBalance();
       refetchCanClaim();
       refetchTimeUntil();
     }
-  }, [isSuccess, refetchBalances, refetchCanClaim, refetchTimeUntil]);
+  }, [isSuccess, refetchBalances, refetchEthBalance, refetchCanClaim, refetchTimeUntil]);
 
   const claim = useCallback(async () => {
     if (!isConnected || !address) {

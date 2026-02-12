@@ -878,41 +878,41 @@ const PriceChart = ({ pair, theme }) => {
 };
 
 // Token Select Modal
-const TokenSelectModal = ({ isOpen, onClose, onSelect, theme, isDark }) => {
+const TokenSelectModal = ({ isOpen, onClose, onSelect, theme, isDark, getTokenBalance, calculateUsdValue }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
 
   if (!isOpen) return null;
 
-  // Full 22-token list organized by category
+  // Full 22-token list organized by category (without hardcoded balances)
   const allTokens = [
     // Native
-    { symbol: 'ETH', name: 'Ethereum', address: '0x0000...0000', balance: '0.00', usdValue: '$0.00', icon: 'Ξ', category: 'native' },
+    { symbol: 'ETH', name: 'Ethereum', address: '0x0000...0000', icon: 'Ξ', category: 'native' },
     // Stablecoins
-    { symbol: 'mUSDC', name: 'Mock USDC', address: '0x9F78...9b4d', balance: '0.00', usdValue: '$0.00', icon: '$', category: 'stablecoin' },
-    { symbol: 'mUSDT', name: 'Mock USDT', address: '0x7A3b...4c2e', balance: '0.00', usdValue: '$0.00', icon: '$', category: 'stablecoin' },
-    { symbol: 'mDAI', name: 'Mock DAI', address: '0x5d3a...8c2b', balance: '0.00', usdValue: '$0.00', icon: '◇', category: 'stablecoin' },
-    { symbol: 'mUSDe', name: 'Mock USDe', address: '0x4E2f...1a3d', balance: '0.00', usdValue: '$0.00', icon: '$', category: 'stablecoin' },
-    { symbol: 'mFRAX', name: 'Mock FRAX', address: '0x6B4c...9e2f', balance: '0.00', usdValue: '$0.00', icon: 'F', category: 'stablecoin' },
+    { symbol: 'mUSDC', name: 'Mock USDC', address: '0x9F78...9b4d', icon: '$', category: 'stablecoin' },
+    { symbol: 'mUSDT', name: 'Mock USDT', address: '0x7A3b...4c2e', icon: '$', category: 'stablecoin' },
+    { symbol: 'mDAI', name: 'Mock DAI', address: '0x5d3a...8c2b', icon: '◇', category: 'stablecoin' },
+    { symbol: 'mUSDe', name: 'Mock USDe', address: '0x4E2f...1a3d', icon: '$', category: 'stablecoin' },
+    { symbol: 'mFRAX', name: 'Mock FRAX', address: '0x6B4c...9e2f', icon: 'F', category: 'stablecoin' },
     // RWAs (Real World Assets)
-    { symbol: 'mOUSG', name: 'Mock OUSG', address: '0x1A2b...3c4d', balance: '0.00', usdValue: '$0.00', icon: 'O', category: 'rwa' },
-    { symbol: 'mUSDY', name: 'Mock USDY', address: '0x2B3c...4d5e', balance: '0.00', usdValue: '$0.00', icon: 'Y', category: 'rwa' },
-    { symbol: 'mBUIDL', name: 'Mock BUIDL', address: '0x3C4d...5e6f', balance: '0.00', usdValue: '$0.00', icon: 'B', category: 'rwa' },
-    { symbol: 'mTBILL', name: 'Mock TBILL', address: '0x4D5e...6f7a', balance: '0.00', usdValue: '$0.00', icon: 'T', category: 'rwa' },
-    { symbol: 'mSTEUR', name: 'Mock stEUR', address: '0x5E6f...7a8b', balance: '0.00', usdValue: '$0.00', icon: '€', category: 'rwa' },
+    { symbol: 'mOUSG', name: 'Mock OUSG', address: '0x1A2b...3c4d', icon: 'O', category: 'rwa' },
+    { symbol: 'mUSDY', name: 'Mock USDY', address: '0x2B3c...4d5e', icon: 'Y', category: 'rwa' },
+    { symbol: 'mBUIDL', name: 'Mock BUIDL', address: '0x3C4d...5e6f', icon: 'B', category: 'rwa' },
+    { symbol: 'mTBILL', name: 'Mock TBILL', address: '0x4D5e...6f7a', icon: 'T', category: 'rwa' },
+    { symbol: 'mSTEUR', name: 'Mock stEUR', address: '0x5E6f...7a8b', icon: '€', category: 'rwa' },
     // LSTs (Liquid Staking Tokens)
-    { symbol: 'mstETH', name: 'Mock stETH', address: '0x6F7a...8b9c', balance: '0.00', usdValue: '$0.00', icon: 'Ξ', category: 'lst' },
-    { symbol: 'mcbETH', name: 'Mock cbETH', address: '0x7A8b...9c0d', balance: '0.00', usdValue: '$0.00', icon: 'Ξ', category: 'lst' },
-    { symbol: 'mrETH', name: 'Mock rETH', address: '0x8B9c...0d1e', balance: '0.00', usdValue: '$0.00', icon: 'Ξ', category: 'lst' },
-    { symbol: 'mwstETH', name: 'Mock wstETH', address: '0x9C0d...1e2f', balance: '0.00', usdValue: '$0.00', icon: 'Ξ', category: 'lst' },
+    { symbol: 'mstETH', name: 'Mock stETH', address: '0x6F7a...8b9c', icon: 'Ξ', category: 'lst' },
+    { symbol: 'mcbETH', name: 'Mock cbETH', address: '0x7A8b...9c0d', icon: 'Ξ', category: 'lst' },
+    { symbol: 'mrETH', name: 'Mock rETH', address: '0x8B9c...0d1e', icon: 'Ξ', category: 'lst' },
+    { symbol: 'mwstETH', name: 'Mock wstETH', address: '0x9C0d...1e2f', icon: 'Ξ', category: 'lst' },
     // Wrapped Tokens
-    { symbol: 'mWBTC', name: 'Mock WBTC', address: '0x0D1e...2f3a', balance: '0.00', usdValue: '$0.00', icon: '₿', category: 'wrapped' },
-    { symbol: 'mWETH', name: 'Mock WETH', address: '0x1E2f...3a4b', balance: '0.00', usdValue: '$0.00', icon: 'Ξ', category: 'wrapped' },
-    { symbol: 'mWSOL', name: 'Mock WSOL', address: '0x2F3a...4b5c', balance: '0.00', usdValue: '$0.00', icon: 'S', category: 'wrapped' },
-    { symbol: 'mWAVAX', name: 'Mock WAVAX', address: '0x3A4b...5c6d', balance: '0.00', usdValue: '$0.00', icon: 'A', category: 'wrapped' },
-    { symbol: 'mWMATIC', name: 'Mock WMATIC', address: '0x4B5c...6d7e', balance: '0.00', usdValue: '$0.00', icon: 'M', category: 'wrapped' },
+    { symbol: 'mWBTC', name: 'Mock WBTC', address: '0x0D1e...2f3a', icon: '₿', category: 'wrapped' },
+    { symbol: 'mWETH', name: 'Mock WETH', address: '0x1E2f...3a4b', icon: 'Ξ', category: 'wrapped' },
+    { symbol: 'mWSOL', name: 'Mock WSOL', address: '0x2F3a...4b5c', icon: 'S', category: 'wrapped' },
+    { symbol: 'mWAVAX', name: 'Mock WAVAX', address: '0x3A4b...5c6d', icon: 'A', category: 'wrapped' },
+    { symbol: 'mWMATIC', name: 'Mock WMATIC', address: '0x4B5c...6d7e', icon: 'M', category: 'wrapped' },
     // Core
-    { symbol: 'mBTC', name: 'Mock BTC', address: '0x2b1a...7d9e', balance: '0.00', usdValue: '$0.00', icon: '₿', category: 'wrapped' },
+    { symbol: 'mBTC', name: 'Mock BTC', address: '0x2b1a...7d9e', icon: '₿', category: 'wrapped' },
   ];
 
   const categories = [
@@ -1112,8 +1112,8 @@ const TokenSelectModal = ({ isOpen, onClose, onSelect, theme, isDark }) => {
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
-                  <span style={{ color: theme.textPrimary, fontWeight: '600', fontSize: '16px' }}>{token.balance}</span>
-                  <span style={{ color: theme.textSecondary, fontSize: '13px' }}>{token.usdValue}</span>
+                  <span style={{ color: theme.textPrimary, fontWeight: '600', fontSize: '16px' }}>{getTokenBalance(token.symbol, token)}</span>
+                  <span style={{ color: theme.textSecondary, fontSize: '13px' }}>${calculateUsdValue(getTokenBalance(token.symbol, token), token.symbol)}</span>
                 </div>
               </button>
             ))
@@ -1612,13 +1612,15 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
   } = useSwapExecution();
 
   // Token balances hook (for ERC-20 tokens)
-  const { balancesBySymbol } = useTokenBalances();
+  const { balancesBySymbol, refetch: refetchTokenBalances } = useTokenBalances();
 
   // Native ETH balance hook
-  const { data: ethBalance } = useBalance({
+  const { data: ethBalance, refetch: refetchEthBalance } = useBalance({
     address: address,
     query: {
       enabled: !!address,
+      staleTime: 10_000, // 10 seconds
+      refetchInterval: 30_000, // Refetch every 30 seconds
     },
   });
 
@@ -1774,6 +1776,8 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
         onSelect={handleTokenSelect}
         theme={theme}
         isDark={isDark}
+        getTokenBalance={getTokenBalance}
+        calculateUsdValue={calculateUsdValue}
       />
 
       {/* AI Response Banner */}
