@@ -3192,18 +3192,14 @@ export default function MantuaApp() {
                       display: 'flex',
                       justifyContent: 'center',
                       alignItems: 'flex-start',
+                      padding: '0 20px',
                     }}>
-                      <div style={{
-                        width: '100%',
-                        maxWidth: '1200px',
-                      }}>
-                        <SwapInterface
-                          onClose={() => setShowSwap(false)}
-                          swapDetails={swapDetails}
-                          theme={theme}
-                          isDark={isDark}
-                        />
-                      </div>
+                      <SwapInterface
+                        onClose={() => setShowSwap(false)}
+                        swapDetails={swapDetails}
+                        theme={theme}
+                        isDark={isDark}
+                      />
                     </div>
                   )}
 
