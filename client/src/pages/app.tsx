@@ -174,31 +174,34 @@ const StatusBadge = ({ status, type = 'default' }) => {
   );
 };
 
-// Chain badge
-const ChainBadge = () => (
-  <div style={{
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '6px',
-    padding: '6px 12px',
-    borderRadius: '8px',
-    background: 'rgba(59, 130, 246, 0.1)',
-    color: '#3b82f6',
-    fontSize: '12px',
-    fontWeight: '600',
-  }}>
+// Chain badge - now accepts chain prop
+const ChainBadge = ({ chain }) => {
+  const chainConfig = chain || { name: 'Base Sepolia', color: '#3b82f6' };
+  return (
     <div style={{
-      width: '8px',
-      height: '8px',
-      borderRadius: '50%',
-      background: '#3b82f6',
-    }} />
-    Base Sepolia
-  </div>
-);
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '6px',
+      padding: '6px 12px',
+      borderRadius: '8px',
+      background: `${chainConfig.color}15`,
+      color: chainConfig.color,
+      fontSize: '12px',
+      fontWeight: '600',
+    }}>
+      <div style={{
+        width: '8px',
+        height: '8px',
+        borderRadius: '50%',
+        background: chainConfig.color,
+      }} />
+      {chainConfig.name}
+    </div>
+  );
+};
 
 // Portfolio Summary Card
-const PortfolioSummary = ({ data, theme }) => (
+const PortfolioSummary = ({ data, theme, currentChain }) => (
   <div style={{
     background: theme.bgCard,
     borderRadius: '16px',
@@ -213,7 +216,7 @@ const PortfolioSummary = ({ data, theme }) => (
             Portfolio Summary
           </h2>
         </div>
-        <ChainBadge />
+        <ChainBadge chain={currentChain} />
       </div>
       <div style={{ textAlign: 'right' }}>
         <div style={{ color: theme.textSecondary, fontSize: '13px', marginBottom: '4px' }}>Total Value</div>
@@ -672,7 +675,7 @@ const ActivityFeed = ({ activities, filter, setFilter, theme }) => {
 };
 
 // ============ PORTFOLIO INTERFACE ============
-const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected }) => {
+const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, currentChain }) => {
   const [activityFilter, setActivityFilter] = useState('All');
 
   // Mock data tailored for empty/filled states based on requirements
@@ -730,7 +733,7 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected }) => {
            </button>
         </div>
 
-        <PortfolioSummary data={portfolioData} theme={theme} />
+        <PortfolioSummary data={portfolioData} theme={theme} currentChain={currentChain} />
         <AssetsTable assets={assets} theme={theme} />
         <LiquidityPositions positions={liquidityPositions} theme={theme} />
         <ActivityFeed activities={activities} filter={activityFilter} setFilter={setActivityFilter} theme={theme} />
@@ -2608,6 +2611,184 @@ const AgentBuilderInterface = ({ onClose, theme, isDark }) => {
   );
 };
 
+// ============ CHAIN SELECTOR ============
+const ChainSelector = ({ selectedChain, chains, onSelect, theme, isDark }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = React.useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const currentChain = chains[selectedChain];
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative' }}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '8px 12px',
+          background: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)',
+          border: `1px solid ${theme.border}`,
+          borderRadius: '12px',
+          cursor: 'pointer',
+          transition: 'all 0.2s',
+          color: theme.textPrimary,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)';
+          e.currentTarget.style.borderColor = currentChain.color;
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)';
+          e.currentTarget.style.borderColor = theme.border;
+        }}
+      >
+        <div style={{
+          width: '8px',
+          height: '8px',
+          borderRadius: '50%',
+          background: currentChain.color,
+          boxShadow: `0 0 8px ${currentChain.color}60`,
+        }} />
+        <span style={{
+          fontSize: '13px',
+          fontWeight: '600',
+          color: theme.textPrimary,
+        }}>
+          {currentChain.shortName}
+        </span>
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          style={{
+            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s',
+            color: theme.textSecondary,
+          }}
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div style={{
+          position: 'absolute',
+          bottom: '100%',
+          left: '0',
+          marginBottom: '8px',
+          background: theme.bgCard,
+          border: `1px solid ${theme.border}`,
+          borderRadius: '12px',
+          boxShadow: isDark
+            ? '0 8px 32px rgba(0, 0, 0, 0.4)'
+            : '0 8px 32px rgba(0, 0, 0, 0.12)',
+          overflow: 'hidden',
+          minWidth: '200px',
+          zIndex: 1000,
+        }}>
+          <div style={{
+            padding: '12px 16px',
+            borderBottom: `1px solid ${theme.border}`,
+          }}>
+            <span style={{
+              fontSize: '11px',
+              fontWeight: '700',
+              color: theme.textMuted,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+            }}>
+              Select Network
+            </span>
+          </div>
+
+          {Object.entries(chains).map(([chainId, chain]) => (
+            <button
+              key={chainId}
+              onClick={() => {
+                onSelect(chainId);
+                setIsOpen(false);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                width: '100%',
+                padding: '12px 16px',
+                background: selectedChain === chainId
+                  ? (isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)')
+                  : 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => {
+                if (selectedChain !== chainId) {
+                  e.currentTarget.style.background = isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (selectedChain !== chainId) {
+                  e.currentTarget.style.background = 'transparent';
+                }
+              }}
+            >
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                background: `${chain.color}15`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '16px',
+              }}>
+                {chain.icon}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{
+                  color: theme.textPrimary,
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  marginBottom: '2px',
+                }}>
+                  {chain.name}
+                </div>
+                <div style={{
+                  color: theme.textMuted,
+                  fontSize: '12px',
+                }}>
+                  Testnet
+                </div>
+              </div>
+              {selectedChain === chainId && (
+                <div style={{ color: chain.color }}>
+                  <CheckIcon />
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ============ MAIN APP ============
 export default function MantuaApp() {
   const [location, setLocation] = useLocation();
@@ -2622,6 +2803,42 @@ export default function MantuaApp() {
   useEffect(() => {
     localStorage.setItem('mantua-theme', isDark ? 'dark' : 'light');
   }, [isDark]);
+
+  // Chain configuration
+  const SUPPORTED_CHAINS = {
+    'base-sepolia': {
+      id: 84532,
+      name: 'Base Sepolia',
+      shortName: 'Base',
+      icon: '🔵',
+      color: '#3b82f6',
+      rpcUrl: 'https://sepolia.base.org',
+      blockExplorer: 'https://sepolia.basescan.org',
+    },
+    'unichain-sepolia': {
+      id: 1301,
+      name: 'Unichain Sepolia',
+      shortName: 'Unichain',
+      icon: '🦄',
+      color: '#FF007A',
+      rpcUrl: 'https://sepolia.unichain.org',
+      blockExplorer: 'https://sepolia.uniscan.xyz',
+    },
+  };
+
+  const [selectedChain, setSelectedChain] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('mantua-selected-chain');
+      if (saved && SUPPORTED_CHAINS[saved]) return saved;
+    }
+    return 'base-sepolia';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('mantua-selected-chain', selectedChain);
+  }, [selectedChain]);
+
+  const currentChain = SUPPORTED_CHAINS[selectedChain];
 
   // Real wallet connection using AppKit
   const { isConnected, address, truncatedAddress } = useWalletConnection();
@@ -3129,11 +3346,13 @@ export default function MantuaApp() {
               justifyContent: 'center',
               padding: '20px'
             }}>
-                <PortfolioInterface 
-                  type={portfolioType} 
+                <PortfolioInterface
+                  type={portfolioType}
                   onClose={() => setShowPortfolioModal(false)}
                   theme={theme}
                   isDark={isDark}
+                  isConnected={isConnected}
+                  currentChain={currentChain}
                 />
             </div>
           )}
@@ -3250,7 +3469,7 @@ export default function MantuaApp() {
                 justifyContent: 'center'
               }}>
                 <div style={{ width: '100%', maxWidth: 700, background: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: 16, padding: '16px 20px', boxShadow: isDark ? 'none' : '0 2px 8px rgba(0,0,0,0.04)' }}>
-                  <input 
+                  <input
                     type="text"
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
@@ -3258,12 +3477,15 @@ export default function MantuaApp() {
                     placeholder="Ask Mantua - swap, analyze, add liquidity..."
                     style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontSize: 15, color: theme.textPrimary, marginBottom: 12 }}
                   />
-                  
+
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', background: theme.accentLight, borderRadius: 20 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6' }} />
-                      <span style={{ fontSize: 13, color: '#3b82f6', fontWeight: 500 }}>Base Sepolia</span>
-                    </div>
+                    <ChainSelector
+                      selectedChain={selectedChain}
+                      chains={SUPPORTED_CHAINS}
+                      onSelect={setSelectedChain}
+                      theme={theme}
+                      isDark={isDark}
+                    />
                     
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <button style={{ background: 'transparent', border: 'none', padding: 8, cursor: 'pointer', color: theme.textMuted, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8 }}>
