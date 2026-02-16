@@ -43,6 +43,11 @@ localPort = 31652
 externalPort = 4200
 exposeLocalhost = true
 
+[[ports]]
+localPort = 63839
+externalPort = 6000
+exposeLocalhost = true
+
 [env]
 PORT = "5000"
 

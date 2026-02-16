@@ -25,14 +25,15 @@ import { useTokenBalances } from '../hooks/useTokenBalances';
 import { PriceImpact, SwapButton, SwapButtonStyles, SwapConfirmation } from '../components/swap';
 import { parseTokenAmount, formatTokenAmount, isNativeEth, getZeroAddress, getHookAddress } from '../lib/swap-utils';
 import { ALL_TOKENS, NATIVE_ETH } from '../config/tokens';
-import { 
-  getPriceData, 
-  getVolumeData, 
-  getComparisonData, 
-  getPortfolioData, 
-  getPerformanceData, 
-  getTVLData 
+import {
+  getPriceData,
+  getVolumeData,
+  getComparisonData,
+  getPortfolioData,
+  getPerformanceData,
+  getTVLData
 } from '../utils/mockAnalyticsData';
+import { calculateUsdValue as calcUsdValue, getPriceBySymbol } from '../services/priceService';
 import {
   WalletIcon,
   TrendUpIcon,
@@ -1230,6 +1231,31 @@ const TokenSelect = ({ token, tokenData, balance, usdValue, side, amount, theme,
           <ChevronDownIcon />
         </button>
       </div>
+
+      {/* Token Price Display */}
+      <div style={{
+        marginTop: '12px',
+        paddingTop: '12px',
+        borderTop: theme ? `1px solid ${theme.border}` : '1px solid rgba(139, 92, 246, 0.1)',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <span style={{
+          color: theme ? theme.textMuted : '#9ca3af',
+          fontSize: '12px',
+          fontWeight: '500'
+        }}>
+          Current Price
+        </span>
+        <span style={{
+          color: theme ? theme.textSecondary : '#6b7280',
+          fontSize: '13px',
+          fontWeight: '600'
+        }}>
+          ${getPriceBySymbol(tokenSymbol).toFixed(2)}
+        </span>
+      </div>
     </div>
   );
 };
@@ -1634,35 +1660,9 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
     return balancesBySymbol[tokenSymbol]?.formatted || balancesBySymbol[tokenData.symbol]?.formatted || '0.00';
   };
 
-  // Helper function to calculate USD value (using rough estimates for now)
+  // Helper function to calculate USD value using centralized price service
   const calculateUsdValue = (amount: string, tokenSymbol: string) => {
-    if (!amount || amount === '' || parseFloat(amount) === 0) return '0.00';
-
-    // Rough price estimates (in production, these would come from a price oracle)
-    const prices: Record<string, number> = {
-      'ETH': 3245.50,
-      'mUSDC': 1.00,
-      'mUSDT': 1.00,
-      'mDAI': 1.00,
-      'mUSDe': 1.00,
-      'mFRAX': 1.00,
-      'mOUSG': 1.00,
-      'mUSDY': 1.00,
-      'mBUIDL': 1.00,
-      'mTBILL': 1.00,
-      'mSTEUR': 1.10,
-      'mstETH': 3245.50,
-      'mcbETH': 3245.50,
-      'mrETH': 3245.50,
-      'mwstETH': 3245.50,
-      'mWBTC': 95000.00,
-      'mWETH': 3245.50,
-      'mBTC': 95000.00,
-    };
-
-    const price = prices[tokenSymbol] || 0;
-    const value = parseFloat(amount) * price;
-    return value.toFixed(2);
+    return calcUsdValue(amount, tokenSymbol);
   };
 
   // Update toAmount when quote changes

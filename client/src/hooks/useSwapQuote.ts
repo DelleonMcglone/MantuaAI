@@ -19,6 +19,7 @@ import {
   FEE_TIERS,
   type PoolKey,
 } from '../lib/swap-utils';
+import { getExchangeRateBigInt } from '../services/priceService';
 
 export interface SwapQuote {
   inputAmount: bigint;
@@ -99,21 +100,21 @@ export function useSwapQuote({
       return null;
     }
 
-    const mockSpotPrice = BigInt(10 ** 18);
-    
+    // Get actual exchange rate from price service
+    const spotPriceFloat = getExchangeRateBigInt(tokenIn, tokenOut);
+    const mockSpotPrice = spotPriceFloat > BigInt(0)
+      ? spotPriceFloat
+      : BigInt(10 ** 18); // Fallback to 1:1 if no price data
+
+    // Deduct fee
     const feeAmount = (parsedAmountIn * BigInt(feeTier)) / BigInt(1000000);
     const amountAfterFee = parsedAmountIn - feeAmount;
-    
-    const decimalAdjustment = outputDecimals - inputDecimals;
-    let outputAmount: bigint;
-    
-    if (decimalAdjustment > 0) {
-      outputAmount = amountAfterFee * BigInt(10 ** decimalAdjustment);
-    } else if (decimalAdjustment < 0) {
-      outputAmount = amountAfterFee / BigInt(10 ** Math.abs(decimalAdjustment));
-    } else {
-      outputAmount = amountAfterFee;
-    }
+
+    // Apply exchange rate with decimal handling
+    // Formula: outputAmount = (inputAmount * spotPrice * 10^outputDecimals) / (10^inputDecimals * 10^18)
+    const numerator = amountAfterFee * mockSpotPrice * BigInt(10 ** outputDecimals);
+    const denominator = BigInt(10 ** inputDecimals) * BigInt(10 ** 18);
+    const outputAmount = numerator / denominator;
 
     const minimumReceived = calculateMinimumReceived(outputAmount, slippageTolerance);
 
@@ -127,10 +128,10 @@ export function useSwapQuote({
 
     const formattedIn = formatTokenAmount(parsedAmountIn, inputDecimals);
     const formattedOut = formatTokenAmount(outputAmount, outputDecimals);
-    
+
     const inNum = parseFloat(formattedIn) || 1;
     const outNum = parseFloat(formattedOut) || 0;
-    
+
     const exchangeRate = `1 = ${(outNum / inNum).toFixed(6)}`;
     const reverseExchangeRate = `1 = ${(inNum / outNum).toFixed(6)}`;
 
@@ -144,7 +145,7 @@ export function useSwapQuote({
       fee: feeAmount,
       poolKey,
     };
-  }, [poolKey, parsedAmountIn, feeTier, inputDecimals, outputDecimals, slippageTolerance]);
+  }, [poolKey, parsedAmountIn, feeTier, inputDecimals, outputDecimals, slippageTolerance, tokenIn, tokenOut]);
 
   const refetch = useCallback(() => {
     setDebouncedAmountIn(amountIn);
