@@ -1714,7 +1714,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
         setToAmount('');
     } else {
         setToToken(tokenSymbol);
-        setFromAmount('');
+        // Keep fromAmount so quote can recalculate with new token
         setToAmount('');
     }
     setIsTokenSelectorOpen(false);

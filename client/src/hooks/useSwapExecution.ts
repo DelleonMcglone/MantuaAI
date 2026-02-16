@@ -10,12 +10,12 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useWriteContract, useWaitForTransactionReceipt, useChainId } from 'wagmi';
 import { toast } from 'sonner';
 import type { Address } from 'viem';
 import {
   POOL_SWAP_TEST_ABI,
-  POOL_SWAP_TEST_ADDRESS,
+  getPoolSwapTestAddress,
   createPoolKey,
   createSwapParams,
   encodeHookData,
@@ -54,6 +54,7 @@ export function getExplorerLink(txHash: string): string {
 
 export function useSwapExecution(): UseSwapExecutionReturn {
   const { address: userAddress } = useAccount();
+  const chainId = useChainId();
   const [status, setStatus] = useState<SwapStatus>('idle');
   const [error, setError] = useState<Error | null>(null);
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
@@ -116,6 +117,21 @@ export function useSwapExecution(): UseSwapExecutionReturn {
     try {
       const { tokenIn, tokenOut, amountIn, hookAddress, hookId, feeTier = 3000 } = params;
 
+      // Get chain-specific contract address with validation
+      let contractAddress: Address;
+      try {
+        contractAddress = getPoolSwapTestAddress(chainId);
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Unsupported chain';
+        setError(new Error(errorMsg));
+        setStatus('failed');
+        toast.error('Swap Not Available', {
+          description: errorMsg,
+          duration: 0,
+        });
+        return;
+      }
+
       const poolKey = createPoolKey(
         tokenIn,
         tokenOut,
@@ -134,7 +150,7 @@ export function useSwapExecution(): UseSwapExecutionReturn {
       });
 
       const hash = await writeContractAsync({
-        address: POOL_SWAP_TEST_ADDRESS,
+        address: contractAddress,
         abi: POOL_SWAP_TEST_ABI,
         functionName: 'swap',
         args: [

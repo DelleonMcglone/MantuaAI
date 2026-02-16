@@ -9,20 +9,46 @@ import { encodePacked, keccak256, type Address } from 'viem';
 import { NATIVE_ETH } from '../config/tokens';
 
 /**
- * PoolSwapTest contract address on Base Sepolia
- * 
- * DEVELOPMENT MODE: Currently using placeholder address.
- * To enable live swaps:
- * 1. Deploy PoolSwapTest from Uniswap v4-periphery repository
- * 2. Replace this address with the deployed contract address
- * 
- * @example
- * export const POOL_SWAP_TEST_ADDRESS = '0x1234...abcd' as Address;
+ * PoolSwapTest contract addresses by chain
+ *
+ * Official Uniswap v4 deployments on supported testnets.
+ * Source: https://docs.uniswap.org/contracts/v4/deployments
  */
-export const POOL_SWAP_TEST_ADDRESS = '0x0000000000000000000000000000000000000000' as Address;
+export const POOL_SWAP_TEST_ADDRESSES: Record<number, Address> = {
+  84532: '0x8b5bcc363dde2614281ad875bad385e0a785d3b9' as Address,  // Base Sepolia
+  1301: '0x9140a78c1a137c7ff1c151ec8231272af78a99a4' as Address,   // Unichain Sepolia
+};
+
+/**
+ * Get PoolSwapTest address for current chain
+ * Throws error if chain not supported or address is undefined
+ */
+export function getPoolSwapTestAddress(chainId: number): Address {
+  const address = POOL_SWAP_TEST_ADDRESSES[chainId];
+
+  if (!address) {
+    throw new Error(
+      `PoolSwapTest contract not deployed on chain ${chainId}. Supported chains: ${Object.keys(POOL_SWAP_TEST_ADDRESSES).join(', ')}`
+    );
+  }
+
+  if (address === '0x0000000000000000000000000000000000000000') {
+    throw new Error(
+      `Invalid contract address (0x0) for chain ${chainId}. This would burn your tokens!`
+    );
+  }
+
+  return address;
+}
+
+/**
+ * @deprecated Use getPoolSwapTestAddress(chainId) instead
+ * Legacy constant for backward compatibility - defaults to Base Sepolia
+ */
+export const POOL_SWAP_TEST_ADDRESS = POOL_SWAP_TEST_ADDRESSES[84532];
 
 /** Development mode indicator - true when using placeholder addresses */
-export const IS_DEV_MODE = POOL_SWAP_TEST_ADDRESS === '0x0000000000000000000000000000000000000000';
+export const IS_DEV_MODE = false;
 
 /**
  * Hook contract addresses by hook type

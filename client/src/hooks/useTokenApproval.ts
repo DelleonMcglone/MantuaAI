@@ -9,9 +9,9 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useChainId } from 'wagmi';
 import type { Address } from 'viem';
-import { ERC20_ABI, isNativeEth, POOL_SWAP_TEST_ADDRESS } from '../lib/swap-utils';
+import { ERC20_ABI, isNativeEth, getPoolSwapTestAddress } from '../lib/swap-utils';
 
 export type ApprovalStatus = 'idle' | 'checking' | 'needs-approval' | 'approving' | 'approved' | 'error';
 
@@ -38,16 +38,26 @@ const MAX_UINT256 = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffff
 
 export function useTokenApproval({
   tokenAddress,
-  spenderAddress = POOL_SWAP_TEST_ADDRESS,
+  spenderAddress,
   amount,
   enabled = true,
 }: UseTokenApprovalOptions): UseTokenApprovalReturn {
   const { address: userAddress } = useAccount();
+  const chainId = useChainId();
   const [status, setStatus] = useState<ApprovalStatus>('idle');
   const [error, setError] = useState<Error | null>(null);
   const [approvalTxHash, setApprovalTxHash] = useState<`0x${string}` | undefined>();
 
   const isNative = isNativeEth(tokenAddress);
+
+  // Get chain-specific spender address if not provided
+  const resolvedSpenderAddress = spenderAddress || (() => {
+    try {
+      return getPoolSwapTestAddress(chainId);
+    } catch {
+      return undefined;
+    }
+  })();
 
   const {
     data: currentAllowance,
@@ -57,9 +67,9 @@ export function useTokenApproval({
     address: tokenAddress,
     abi: ERC20_ABI,
     functionName: 'allowance',
-    args: userAddress && spenderAddress ? [userAddress, spenderAddress] : undefined,
+    args: userAddress && resolvedSpenderAddress ? [userAddress, resolvedSpenderAddress] : undefined,
     query: {
-      enabled: enabled && !!userAddress && !!spenderAddress && !isNative,
+      enabled: enabled && !!userAddress && !!resolvedSpenderAddress && !isNative,
     },
   });
 
@@ -124,11 +134,15 @@ export function useTokenApproval({
 
       const approvalAmount = unlimited ? MAX_UINT256 : amount;
 
+      if (!resolvedSpenderAddress) {
+        throw new Error('Swap contract not available on this chain');
+      }
+
       const hash = await writeContractAsync({
         address: tokenAddress,
         abi: ERC20_ABI,
         functionName: 'approve',
-        args: [spenderAddress, approvalAmount],
+        args: [resolvedSpenderAddress, approvalAmount],
       });
 
       setApprovalTxHash(hash);
