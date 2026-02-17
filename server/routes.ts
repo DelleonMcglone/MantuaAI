@@ -1,8 +1,8 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { 
-  insertChatSessionSchema, 
+import {
+  insertChatSessionSchema,
   insertChatMessageSchema,
   insertUserSchema,
   insertUserPreferencesSchema,
@@ -11,6 +11,54 @@ import {
   insertHookEventSchema
 } from "../shared/schema";
 import { z } from "zod";
+import OpenAI, { toFile } from "openai";
+
+// ============ VOICE TRANSCRIPTION SETUP ============
+
+const openaiVoice = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+});
+
+// In-memory rate limiter: 10 requests per minute per session
+const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(sessionId: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitStore.get(sessionId);
+  if (!entry || now > entry.resetAt) {
+    rateLimitStore.set(sessionId, { count: 1, resetAt: now + 60_000 });
+    return true;
+  }
+  if (entry.count >= 10) return false;
+  entry.count += 1;
+  return true;
+}
+
+// Simple multipart/form-data parser for a single binary field
+function parseMultipartField(
+  body: Buffer,
+  boundary: string
+): { data: Buffer; contentType: string } | null {
+  const boundaryLine = Buffer.from(`--${boundary}`);
+  const start = body.indexOf(boundaryLine);
+  if (start === -1) return null;
+
+  const headerStart = start + boundaryLine.length + 2; // skip \r\n
+  const headerEnd = body.indexOf(Buffer.from('\r\n\r\n'), headerStart);
+  if (headerEnd === -1) return null;
+
+  const headerSection = body.slice(headerStart, headerEnd).toString('utf8');
+  const ctMatch = /content-type:\s*([^\r\n]+)/i.exec(headerSection);
+  const contentType = ctMatch ? ctMatch[1].trim() : 'application/octet-stream';
+
+  const dataStart = headerEnd + 4;
+  const nextBoundary = Buffer.from(`\r\n--${boundary}`);
+  const dataEnd = body.indexOf(nextBoundary, dataStart);
+  if (dataEnd === -1) return null;
+
+  return { data: body.slice(dataStart, dataEnd), contentType };
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -150,6 +198,89 @@ export async function registerRoutes(
       res.status(500).json({ error: "Failed to fetch messages" });
     }
   });
+
+  // ============ VOICE TRANSCRIPTION ============
+  // P1-041: POST /api/voice/transcribe
+  // Accepts multipart/form-data with field "audio", transcribes via Whisper-1
+  app.post(
+    "/api/voice/transcribe",
+    (req: Request, res: Response, next) => {
+      // Collect raw body for multipart parsing
+      const chunks: Buffer[] = [];
+      req.on('data', (chunk: Buffer) => chunks.push(chunk));
+      req.on('end', () => {
+        (req as Request & { rawBuffer: Buffer }).rawBuffer = Buffer.concat(chunks);
+        next();
+      });
+      req.on('error', () => res.status(500).json({ error: 'Failed to read request body' }));
+    },
+    async (req: Request, res: Response) => {
+      try {
+        // Rate limiting: use session cookie or IP as identifier
+        const sessionId: string =
+          (req.headers['x-session-id'] as string) ||
+          (req.socket.remoteAddress ?? 'unknown');
+        if (!checkRateLimit(sessionId)) {
+          return res.status(429).json({ error: 'Rate limit exceeded. Maximum 10 requests per minute.' });
+        }
+
+        // Parse multipart/form-data
+        const contentType = req.headers['content-type'] ?? '';
+        const boundaryMatch = /boundary=([^\s;]+)/.exec(contentType);
+        if (!boundaryMatch) {
+          return res.status(400).json({ error: 'Missing multipart boundary in Content-Type' });
+        }
+        const boundary = boundaryMatch[1];
+
+        const rawBuffer = (req as Request & { rawBuffer: Buffer }).rawBuffer;
+        if (!rawBuffer || rawBuffer.length === 0) {
+          return res.status(400).json({ error: 'Empty request body' });
+        }
+
+        const field = parseMultipartField(rawBuffer, boundary);
+        if (!field) {
+          return res.status(400).json({ error: 'Could not parse audio field from multipart body' });
+        }
+
+        // Validate content type is audio
+        if (!field.contentType.startsWith('audio/') && !field.contentType.startsWith('video/webm')) {
+          return res.status(400).json({ error: 'Uploaded file must be an audio type' });
+        }
+
+        if (field.data.length === 0) {
+          return res.status(400).json({ error: 'Audio data is empty' });
+        }
+
+        // Determine file extension from MIME type for Whisper
+        const ext = field.contentType.includes('ogg') ? 'ogg'
+          : field.contentType.includes('mp4') ? 'mp4'
+          : field.contentType.includes('mpeg') || field.contentType.includes('mp3') ? 'mp3'
+          : 'webm';
+
+        // Pass audio to Whisper in-memory (no disk writes)
+        const audioFile = await toFile(field.data, `audio.${ext}`, { type: field.contentType });
+
+        const transcription = await openaiVoice.audio.transcriptions.create({
+          model: 'whisper-1',
+          file: audioFile,
+        });
+
+        if (!transcription.text || transcription.text.trim() === '') {
+          return res.status(200).json({ transcript: '' });
+        }
+
+        return res.json({ transcript: transcription.text });
+      } catch (err: unknown) {
+        console.error('[voice/transcribe] Error:', err);
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        // Check for OpenAI API errors
+        if (message.includes('401') || message.includes('invalid_api_key')) {
+          return res.status(503).json({ error: 'Transcription service unavailable. Please try again later.' });
+        }
+        return res.status(500).json({ error: 'Voice transcription failed. Please try again.' });
+      }
+    }
+  );
 
   // ============ POSITIONS ============
   app.post("/api/positions", async (req, res) => {

@@ -36,7 +36,8 @@
       "Bash(/home/runner/workspace/.config/.foundry/bin/cast from-wei:*)",
       "Bash(contracts/.env << 'EOF'\nPRIVATE_KEY=0x19b41f3b1d3d6fbbbe4fb2c77139e007a5ffdf46deb555eaec18f2e08de13b27\nBASE_SEPOLIA_RPC_URL=https://base-sepolia-rpc.publicnode.com\nBASESCAN_API_KEY=placeholder\nEOF)",
       "WebFetch(domain:docs.uniswap.org)",
-      "WebFetch(domain:sepolia.basescan.org)"
+      "WebFetch(domain:sepolia.basescan.org)",
+      "Bash(node:*)"
     ]
   }
 }

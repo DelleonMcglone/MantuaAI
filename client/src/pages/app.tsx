@@ -13,6 +13,9 @@ import logoWhite from '@assets/Mantua_logo_white_1768946648374.png';
 import logoBlack from '@assets/Mantua_logo_black_1768946648374.png';
 import AnalysisCard from '../components/chat/AnalysisCard';
 import AddLiquidityModal from '../components/liquidity/AddLiquidityModal';
+import PushToTalkButton from '../components/voice/PushToTalkButton';
+import VoiceConfirmationModal from '../components/voice/VoiceConfirmationModal';
+import { parseVoiceCommand } from '@shared/voiceCommandParser';
 import { FaucetButton } from '../components/FaucetButton';
 import { classifyQuery } from '../utils/queryClassifier';
 import { TrendingUp, BarChart2, PieChart as PieIcon, Activity } from 'lucide-react';
@@ -2882,6 +2885,12 @@ export default function MantuaApp() {
   const [showAddLiquidityModal, setShowAddLiquidityModal] = useState(false);
   const [portfolioType, setPortfolioType] = useState('User');
   const [swapDetails, setSwapDetails] = useState(null);
+  // Voice command state
+  const [voiceModalOpen, setVoiceModalOpen] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [voiceParsedCommand, setVoiceParsedCommand] = useState(null);
+  // Ref to pass text directly into handleSend without stale-closure issues
+  const pendingVoiceTextRef = React.useRef(null);
   const [messages, setMessages] = useState([]);
   const [currentSessionId, setCurrentSessionId] = useState(null);
 
@@ -2922,9 +2931,56 @@ export default function MantuaApp() {
     return null;
   };
 
+  // ── Voice transcription handler ───────────────────────────────────────
+  // Called by PushToTalkButton for both voice and fallback text input.
+  // Parses with the shared parser; opens confirmation modal for DeFi commands.
+  const handleTranscription = (transcript) => {
+    const text = transcript.trim();
+    if (!text) return;
+
+    const parsed = parseVoiceCommand(text);
+
+    if (parsed) {
+      // Valid DeFi command — show confirmation modal before executing
+      setVoiceTranscript(text);
+      setVoiceParsedCommand(parsed);
+      setVoiceModalOpen(true);
+    } else {
+      // No DeFi command detected — inject as plain chat message via ref
+      pendingVoiceTextRef.current = text;
+      setInputValue(text);
+    }
+  };
+
+  const handleVoiceConfirm = () => {
+    setVoiceModalOpen(false);
+    if (voiceTranscript) {
+      pendingVoiceTextRef.current = voiceTranscript;
+      setInputValue(voiceTranscript);
+    }
+    setVoiceTranscript('');
+    setVoiceParsedCommand(null);
+  };
+
+  const handleVoiceCancel = () => {
+    setVoiceModalOpen(false);
+    setVoiceTranscript('');
+    setVoiceParsedCommand(null);
+  };
+
+  // Auto-send effect: fires when inputValue is updated by voice pipeline.
+  // The effect closes over the fresh `handleSend` and `inputValue` from the same render.
+  useEffect(() => {
+    if (pendingVoiceTextRef.current !== null && inputValue === pendingVoiceTextRef.current) {
+      pendingVoiceTextRef.current = null;
+      // Use a microtask so handleSend sees the fully committed state
+      Promise.resolve().then(() => handleSend());
+    }
+  }, [inputValue]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleSend = async () => {
     if (!inputValue.trim()) return;
-    
+
     setHasInteracted(true);
 
     const command = classifyQuery(inputValue);
@@ -3169,6 +3225,7 @@ export default function MantuaApp() {
   };
 
   return (
+    <>
     <div style={{ display: 'flex', minHeight: '100vh', fontFamily: '"DM Sans", -apple-system, BlinkMacSystemFont, sans-serif', background: theme.bgSecondary, color: theme.textPrimary, transition: 'all 0.3s ease' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap');
@@ -3515,9 +3572,10 @@ export default function MantuaApp() {
                     />
                     
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <button style={{ background: 'transparent', border: 'none', padding: 8, cursor: 'pointer', color: theme.textMuted, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8 }}>
-                        <MicIcon />
-                      </button>
+                      <PushToTalkButton
+                        onTranscription={handleTranscription}
+                        disabled={!isConnected}
+                      />
                       <button onClick={handleSend} style={{ background: 'transparent', border: 'none', padding: 8, cursor: 'pointer', color: theme.textMuted, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8 }}>
                         <SendIcon />
                       </button>
@@ -3540,5 +3598,15 @@ export default function MantuaApp() {
         </main>
       </div>
     </div>
+
+    {/* Voice Confirmation Modal — rendered outside the main layout */}
+    <VoiceConfirmationModal
+      isOpen={voiceModalOpen}
+      transcript={voiceTranscript}
+      command={voiceParsedCommand}
+      onConfirm={handleVoiceConfirm}
+      onCancel={handleVoiceCancel}
+    />
+    </>
   );
 }
