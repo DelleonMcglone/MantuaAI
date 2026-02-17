@@ -8,7 +8,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'wouter';
-import { useAccount, useBalance } from 'wagmi';
+import { useAccount, useBalance, useSwitchChain } from 'wagmi';
 import logoWhite from '@assets/Mantua_logo_white_1768946648374.png';
 import logoBlack from '@assets/Mantua_logo_black_1768946648374.png';
 import AnalysisCard from '../components/chat/AnalysisCard';
@@ -2843,6 +2843,34 @@ export default function MantuaApp() {
   // Real wallet connection using AppKit
   const { isConnected, address, truncatedAddress } = useWalletConnection();
 
+  // Chain switching hook
+  const { switchChain } = useSwitchChain();
+
+  // Handler to switch both wallet network AND UI state
+  const handleChainSwitch = async (chainKey: string) => {
+    const chain = SUPPORTED_CHAINS[chainKey];
+    if (!chain) return;
+
+    try {
+      // Update UI state immediately for better UX
+      setSelectedChain(chainKey);
+
+      // If wallet is connected, switch the actual network
+      if (isConnected && switchChain) {
+        await switchChain({ chainId: chain.id });
+      }
+    } catch (error) {
+      console.error('Failed to switch chain:', error);
+      // Revert UI state if network switch failed
+      const currentWalletChain = Object.entries(SUPPORTED_CHAINS).find(
+        ([_, c]) => c.id === chain.id
+      )?.[0];
+      if (currentWalletChain) {
+        setSelectedChain(currentWalletChain);
+      }
+    }
+  };
+
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [recentChatsOpen, setRecentChatsOpen] = useState(true);
   const [portfolioOpen, setPortfolioOpen] = useState(false);
@@ -3481,7 +3509,7 @@ export default function MantuaApp() {
                     <ChainSelector
                       selectedChain={selectedChain}
                       chains={SUPPORTED_CHAINS}
-                      onSelect={setSelectedChain}
+                      onSelect={handleChainSwitch}
                       theme={theme}
                       isDark={isDark}
                     />

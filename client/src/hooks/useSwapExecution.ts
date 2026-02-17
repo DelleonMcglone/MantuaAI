@@ -46,10 +46,14 @@ export interface UseSwapExecutionReturn {
   reset: () => void;
 }
 
-const BASE_SEPOLIA_EXPLORER = 'https://sepolia.basescan.org';
+const EXPLORERS: Record<number, string> = {
+  84532: 'https://sepolia.basescan.org',  // Base Sepolia
+  1301: 'https://sepolia.uniscan.xyz',    // Unichain Sepolia
+};
 
-export function getExplorerLink(txHash: string): string {
-  return `${BASE_SEPOLIA_EXPLORER}/tx/${txHash}`;
+export function getExplorerLink(txHash: string, chainId: number): string {
+  const explorer = EXPLORERS[chainId] || EXPLORERS[84532];
+  return `${explorer}/tx/${txHash}`;
 }
 
 export function useSwapExecution(): UseSwapExecutionReturn {
@@ -82,7 +86,7 @@ export function useSwapExecution(): UseSwapExecutionReturn {
         description: 'Your swap has been executed successfully.',
         action: txHash ? {
           label: 'View',
-          onClick: () => window.open(getExplorerLink(txHash), '_blank'),
+          onClick: () => window.open(getExplorerLink(txHash, chainId), '_blank'),
         } : undefined,
         duration: 5000,
       });
@@ -170,7 +174,7 @@ export function useSwapExecution(): UseSwapExecutionReturn {
         description: 'Waiting for confirmation...',
         action: {
           label: 'View',
-          onClick: () => window.open(`${BASE_SEPOLIA_EXPLORER}/tx/${hash}`, '_blank'),
+          onClick: () => window.open(getExplorerLink(hash, chainId), '_blank'),
         },
         duration: 10000,
       });

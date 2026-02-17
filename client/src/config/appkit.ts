@@ -13,6 +13,7 @@ import { createAppKit } from '@reown/appkit/react';
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
 import { baseSepolia } from '@reown/appkit/networks';
 import type { AppKitNetwork } from '@reown/appkit/networks';
+import { defineChain } from 'viem';
 
 // Get project ID - REQUIRED for WalletConnect QR code
 const projectId = import.meta.env.VITE_REOWN_PROJECT_ID || 'ad3378514000476f8321eef10f16882e';
@@ -33,10 +34,28 @@ const metadata = {
   icons: ['https://mantua.ai/favicon.png'],
 };
 
-// Supported networks - ONLY Base Sepolia (no network switching)
-// Single network configuration prevents network selection UI from appearing
+// Unichain Sepolia custom chain definition
+const unichainSepolia = defineChain({
+  id: 1301,
+  name: 'Unichain Sepolia',
+  nativeCurrency: {
+    name: 'Ether',
+    symbol: 'ETH',
+    decimals: 18,
+  },
+  rpcUrls: {
+    default: { http: ['https://sepolia.unichain.org'] },
+  },
+  blockExplorers: {
+    default: { name: 'Uniscan', url: 'https://sepolia.uniscan.xyz' },
+  },
+  testnet: true,
+});
+
+// Supported networks - Base Sepolia and Unichain Sepolia
 const networks: [AppKitNetwork, ...AppKitNetwork[]] = [
-  baseSepolia,  // ONLY network - auto-defaults here, no switching needed
+  baseSepolia,
+  unichainSepolia as AppKitNetwork,
 ];
 
 // Initialize Wagmi adapter
@@ -53,10 +72,9 @@ export const appKit = createAppKit({
   metadata,
 
   // DEFAULT NETWORK CONFIGURATION
-  // This ensures ALL wallet connections default to Base Sepolia
-  // Single network = no network selection UI appears
+  // Defaults to Base Sepolia but allows switching to Unichain Sepolia
   defaultNetwork: baseSepolia,
-  allowUnsupportedChain: false,           // Prevent connections to other networks
+  allowUnsupportedChain: false,           // Only allow configured testnets
 
   // Theme configuration - follows system preference by default
   // DO NOT hardcode 'dark' or 'light' - let it be dynamic
