@@ -12,6 +12,9 @@ import { useAccount, useBalance, useSwitchChain } from 'wagmi';
 import logoWhite from '@assets/Mantua_logo_white_1768946648374.png';
 import logoBlack from '@assets/Mantua_logo_black_1768946648374.png';
 import AnalysisCard from '../components/chat/AnalysisCard';
+import { ChatMessageList } from '../components/chat/ChatMessageList';
+import { ChatInput } from '../components/chat/ChatInput';
+import { useChat } from '../hooks/useChat';
 import AddLiquidityModal from '../components/liquidity/AddLiquidityModal';
 import PushToTalkButton from '../components/voice/PushToTalkButton';
 import VoiceConfirmationModal from '../components/voice/VoiceConfirmationModal';
@@ -2877,7 +2880,6 @@ export default function MantuaApp() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [recentChatsOpen, setRecentChatsOpen] = useState(true);
   const [portfolioOpen, setPortfolioOpen] = useState(false);
-  const [inputValue, setInputValue] = useState('');
   const [showSwap, setShowSwap] = useState(false);
   const [showLiquidity, setShowLiquidity] = useState(false);
   const [showAgentBuilder, setShowAgentBuilder] = useState(false);
@@ -2889,10 +2891,8 @@ export default function MantuaApp() {
   const [voiceModalOpen, setVoiceModalOpen] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState('');
   const [voiceParsedCommand, setVoiceParsedCommand] = useState(null);
-  // Ref to pass text directly into handleSend without stale-closure issues
-  const pendingVoiceTextRef = React.useRef(null);
-  const [messages, setMessages] = useState([]);
-  const [currentSessionId, setCurrentSessionId] = useState(null);
+  // Persistent chat state from useChat hook
+  const { messages: chatMessages, sendMessage, isSending, isLoading: chatIsLoading } = useChat();
 
   const walletAddress = truncatedAddress || '0xbaac...DC87';
   const walletBalance = '0.0021 ETH'; // TODO: Fetch real balance
@@ -2932,32 +2932,22 @@ export default function MantuaApp() {
   };
 
   // ── Voice transcription handler ───────────────────────────────────────
-  // Called by PushToTalkButton for both voice and fallback text input.
-  // Parses with the shared parser; opens confirmation modal for DeFi commands.
   const handleTranscription = (transcript) => {
     const text = transcript.trim();
     if (!text) return;
-
     const parsed = parseVoiceCommand(text);
-
     if (parsed) {
-      // Valid DeFi command — show confirmation modal before executing
       setVoiceTranscript(text);
       setVoiceParsedCommand(parsed);
       setVoiceModalOpen(true);
     } else {
-      // No DeFi command detected — inject as plain chat message via ref
-      pendingVoiceTextRef.current = text;
-      setInputValue(text);
+      handleChatSubmit(text);
     }
   };
 
   const handleVoiceConfirm = () => {
     setVoiceModalOpen(false);
-    if (voiceTranscript) {
-      pendingVoiceTextRef.current = voiceTranscript;
-      setInputValue(voiceTranscript);
-    }
+    if (voiceTranscript) handleChatSubmit(voiceTranscript);
     setVoiceTranscript('');
     setVoiceParsedCommand(null);
   };
@@ -2968,17 +2958,9 @@ export default function MantuaApp() {
     setVoiceParsedCommand(null);
   };
 
-  // Auto-send effect: fires when inputValue is updated by voice pipeline.
-  // The effect closes over the fresh `handleSend` and `inputValue` from the same render.
-  useEffect(() => {
-    if (pendingVoiceTextRef.current !== null && inputValue === pendingVoiceTextRef.current) {
-      pendingVoiceTextRef.current = null;
-      // Use a microtask so handleSend sees the fully committed state
-      Promise.resolve().then(() => handleSend());
-    }
-  }, [inputValue]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleSend = async () => {
+  // Main chat submission — called by ChatInput and voice pipeline
+  const handleChatSubmit = async (text) => {
+    const inputValue = text;
     if (!inputValue.trim()) return;
 
     setHasInteracted(true);
@@ -3003,63 +2985,24 @@ export default function MantuaApp() {
        return;
     }
 
-    let sessionId = currentSessionId;
-    if (!sessionId) {
-      try {
-        const title = inputValue.slice(0, 50);
-        const session = await fetch('/api/chat/sessions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title }),
-        }).then(res => res.json());
-        sessionId = session.id;
-        setCurrentSessionId(session.id);
-        
-        const sessions = await fetch('/api/chat/sessions').then(res => res.json());
-        setRecentChats(sessions);
-      } catch (error) {
-        console.error('Failed to create session:', error);
-      }
-    }
-
-    const saveMessage = async (content, role = 'user', metadata = null) => {
-      if (sessionId) {
-        try {
-          await fetch('/api/chat/messages', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sessionId: sessionId, role, content, metadata }),
-          });
-        } catch (error) {
-          console.error('Failed to save message:', error);
-        }
-      }
-    };
-
     if (command.type === 'addLiquidity') {
        resetModals();
        setShowAddLiquidityModal(true);
-       setMessages([...messages, { role: 'user', content: inputValue }]);
-       await saveMessage(inputValue);
-       setInputValue('');
+       sendMessage(inputValue);
        return;
     }
 
     if (command.type === 'liquidityList') {
        resetModals();
        setShowLiquidity(true);
-       setMessages([...messages, { role: 'user', content: inputValue }]);
-       await saveMessage(inputValue);
-       setInputValue('');
+       sendMessage(inputValue);
        return;
     }
 
     if (command.type === 'agent') {
        resetModals();
        setShowAgentBuilder(true);
-       setMessages([...messages, { role: 'user', content: inputValue }]);
-       await saveMessage(inputValue);
-       setInputValue('');
+       sendMessage(inputValue);
        return;
     }
 
@@ -3072,9 +3015,7 @@ export default function MantuaApp() {
             setPortfolioType('User');
             setShowPortfolioModal(true);
         }
-        setMessages([...messages, { role: 'user', content: inputValue }]);
-        await saveMessage(inputValue);
-        setInputValue('');
+        sendMessage(inputValue);
         return;
     }
 
@@ -3082,9 +3023,7 @@ export default function MantuaApp() {
       resetModals();
       setSwapDetails(command.params);
       setShowSwap(true);
-      setMessages([...messages, { role: 'user', content: inputValue }]);
-      await saveMessage(inputValue);
-      setInputValue('');
+      sendMessage(inputValue);
       return;
     }
 
@@ -3191,37 +3130,11 @@ export default function MantuaApp() {
              break;
          }
 
-         setMessages([...messages, 
-           { role: 'user', content: inputValue },
-           { 
-             role: 'assistant', 
-             content: (
-               <AnalysisCard 
-                 title={title}
-                 icon={icon}
-                 timeRange={`Last ${command.timeRange}`}
-                 chartType={chartType}
-                 chartData={data}
-                 summary={summary}
-                 insights={insights}
-                 source="Testnet Simulated Data"
-                 theme={theme}
-                 isDark={isDark}
-               />
-             )
-           }
-         ]);
-         await saveMessage(inputValue);
+         // Persist via useChat; AI will respond with text about the analysis
+         sendMessage(inputValue);
     } else {
-      // Regular message
-      setMessages([...messages, { role: 'user', content: inputValue }]);
-      await saveMessage(inputValue);
+      sendMessage(inputValue);
     }
-    setInputValue('');
-  };
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') handleSend();
   };
 
   return (
@@ -3244,7 +3157,6 @@ export default function MantuaApp() {
               setShowAgentBuilder(false);
               setShowPortfolioModal(false);
               setShowAddLiquidityModal(false);
-              setMessages([]);
               setHasInteracted(false);
             }}
             style={{
@@ -3462,19 +3374,11 @@ export default function MantuaApp() {
                     </div>
                   )}
 
-                  {messages.map((msg, idx) => (
-                    <div key={idx} style={{ 
-                      alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                      background: msg.role === 'user' ? theme.accentLight : theme.bgCard,
-                      padding: '12px 16px',
-                      borderRadius: 12,
-                      maxWidth: '80%',
-                      marginBottom: 12,
-                      border: `1px solid ${theme.border}`
-                    }}>
-                      {msg.content}
-                    </div>
-                  ))}
+                  <ChatMessageList
+                    messages={chatMessages}
+                    isLoading={chatIsLoading}
+                    isDark={isDark}
+                  />
 
                   {/* Swap Overlay - centered within content area */}
                   {showSwap && !showLiquidity && !showAgentBuilder && (
@@ -3541,28 +3445,24 @@ export default function MantuaApp() {
               </div>
 
               {/* Fixed Chat Input Area */}
-              <div style={{ 
-                position: 'absolute', 
-                bottom: 0, 
-                left: 0, 
-                right: 0, 
-                padding: '20px 40px 40px', 
+              <div style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                padding: '20px 40px 40px',
                 background: `linear-gradient(to top, ${theme.bgPrimary} 80%, transparent)`,
                 zIndex: 100,
                 display: 'flex',
                 justifyContent: 'center'
               }}>
                 <div style={{ width: '100%', maxWidth: 700, background: theme.bgCard, border: `1px solid ${theme.border}`, borderRadius: 16, padding: '16px 20px', boxShadow: isDark ? 'none' : '0 2px 8px rgba(0,0,0,0.04)' }}>
-                  <input
-                    type="text"
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    placeholder="Ask Mantua - swap, analyze, add liquidity..."
-                    style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', fontSize: 15, color: theme.textPrimary, marginBottom: 12 }}
+                  <ChatInput
+                    onSubmit={handleChatSubmit}
+                    disabled={isSending}
                   />
 
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
                     <ChainSelector
                       selectedChain={selectedChain}
                       chains={SUPPORTED_CHAINS}
@@ -3570,15 +3470,12 @@ export default function MantuaApp() {
                       theme={theme}
                       isDark={isDark}
                     />
-                    
+
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <PushToTalkButton
                         onTranscription={handleTranscription}
                         disabled={!isConnected}
                       />
-                      <button onClick={handleSend} style={{ background: 'transparent', border: 'none', padding: 8, cursor: 'pointer', color: theme.textMuted, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8 }}>
-                        <SendIcon />
-                      </button>
                     </div>
                   </div>
                 </div>

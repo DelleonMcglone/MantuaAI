@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { runMigrations } from "./db/migrate";
 
 const app = express();
 const httpServer = createServer(app);
@@ -60,6 +61,13 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Run DB migrations on startup (idempotent — safe to re-run)
+  try {
+    await runMigrations();
+  } catch (err) {
+    console.error("Migration error (continuing):", err);
+  }
+
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {

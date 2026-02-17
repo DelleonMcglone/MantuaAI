@@ -26,7 +26,7 @@ import pkg from "pg";
 const { Pool } = pkg;
 import { eq, desc, and } from "drizzle-orm";
 
-const pool = new Pool({
+export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
@@ -45,6 +45,7 @@ export interface IStorage {
   // Chat Sessions
   createChatSession(session: InsertChatSession): Promise<ChatSession>;
   getChatSession(id: string): Promise<ChatSession | undefined>;
+  getChatSessionsByUserId(userId: string): Promise<ChatSession[]>;
   getRecentChatSessions(limit?: number, walletAddress?: string): Promise<ChatSession[]>;
   deleteChatSession(id: string): Promise<void>;
   updateChatSessionTimestamp(id: string): Promise<void>;
@@ -109,6 +110,14 @@ export class DbStorage implements IStorage {
   async getChatSession(id: string): Promise<ChatSession | undefined> {
     const [session] = await db.select().from(chatSessions).where(eq(chatSessions.id, id));
     return session;
+  }
+
+  async getChatSessionsByUserId(userId: string): Promise<ChatSession[]> {
+    return db
+      .select()
+      .from(chatSessions)
+      .where(eq(chatSessions.userId, userId))
+      .orderBy(desc(chatSessions.updatedAt));
   }
 
   async getRecentChatSessions(limit: number = 20, walletAddress?: string): Promise<ChatSession[]> {

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, jsonb, integer, numeric, bigint, boolean, uuid, check } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, jsonb, integer, numeric, bigint, boolean, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -37,6 +37,7 @@ export type UserPreferences = typeof userPreferences.$inferSelect;
 export const chatSessions = pgTable("chat_sessions", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   walletAddress: text("wallet_address").references(() => users.walletAddress, { onDelete: 'cascade' }),
+  userId: varchar("user_id", { length: 64 }),
   title: text("title").default('New Chat'),
   context: jsonb("context").default({}),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -59,6 +60,7 @@ export const chatMessages = pgTable("chat_messages", {
   role: text("role").notNull(),
   content: text("content").notNull(),
   inputType: text("input_type").default('text'),
+  metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
