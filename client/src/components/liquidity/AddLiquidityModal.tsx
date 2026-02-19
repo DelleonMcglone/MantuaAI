@@ -4,6 +4,7 @@ import { getTokenBySymbol, type Token } from '../../config/tokens';
 import PoolActivityChart from './PoolActivityChart';
 import HookSelector from './HookSelector';
 import { AddLiquidityForm } from './AddLiquidityForm';
+import { LiquidityTokenModal } from './LiquidityTokenModal';
 
 export interface LiquidityPool {
   token1: string;
@@ -21,17 +22,21 @@ interface AddLiquidityModalProps {
 }
 
 const HOOKS = [
-  { id: 'mev',        name: 'MEV Protection',  icon: <ShieldIcon />, benefit: 'Save ~0.3% on trades >$1k',       color: '#8b5cf6', description: 'Randomized execution timing protects against sandwich attacks', recommended: true },
-  { id: 'directional',name: 'Directional Fee',  icon: <TrendIcon />,  benefit: 'Reduce IL by ~15% on trending',  color: '#f59e0b', description: 'Dynamic fees based on trade direction (Nezlobin algorithm)' },
-  { id: 'jit',        name: 'JIT Rebalancing',  icon: <BoltIcon />,   benefit: 'Optimize fee capture',           color: '#10b981', description: 'Concentrates liquidity around your trade for better execution' },
-  { id: 'none',       name: 'No Hook',          icon: <SwapIcon />,   benefit: 'Standard execution',             color: '#6b7280', description: 'Standard Uniswap v4 swap without modifications' },
+  { id: 'mev',        name: 'MEV Protection',  icon: <ShieldIcon />, benefit: 'Save ~0.3% on trades >$1k',      color: '#8b5cf6', description: 'Randomized execution timing protects against sandwich attacks', recommended: true },
+  { id: 'directional',name: 'Directional Fee',  icon: <TrendIcon />,  benefit: 'Reduce IL by ~15% on trending', color: '#f59e0b', description: 'Dynamic fees based on trade direction (Nezlobin algorithm)' },
+  { id: 'jit',        name: 'JIT Rebalancing',  icon: <BoltIcon />,   benefit: 'Optimize fee capture',          color: '#10b981', description: 'Concentrates liquidity around your trade for better execution' },
+  { id: 'none',       name: 'No Hook',          icon: <SwapIcon />,   benefit: 'Standard execution',            color: '#6b7280', description: 'Standard Uniswap v4 swap without modifications' },
 ];
+
+const tokenGrad = (s?: string) => !s ? 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)' : s.includes('ETH') ? 'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)' : s.includes('BTC') ? 'linear-gradient(135deg, #F7931A 0%, #FFAB4A 100%)' : (s.includes('USD') || s.includes('DAI')) ? 'linear-gradient(135deg, #2775CA 0%, #4A9FE8 100%)' : 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)';
+const tokenGlyph = (s?: string) => !s ? '?' : s.includes('ETH') ? 'Ξ' : s.includes('BTC') ? '₿' : (s.includes('USD') || s.includes('DAI')) ? '$' : s.charAt(0);
 
 const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
   onClose, theme, isDark, pool, mode = 'add',
 }) => {
   const [selectedHook, setSelectedHook] = useState('jit');
   const [isHookModalOpen, setIsHookModalOpen] = useState(false);
+  const [tokenSelectorTarget, setTokenSelectorTarget] = useState<'A' | 'B' | null>(null);
   const [tokenA, setTokenA] = useState<Token | null>(null);
   const [tokenB, setTokenB] = useState<Token | null>(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -43,7 +48,6 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Pre-populate tokens from pool data; clear for "create" mode
   useEffect(() => {
     if (mode === 'add' && pool) {
       setTokenA(getTokenBySymbol(pool.token1) ?? null);
@@ -70,6 +74,14 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
         theme={theme}
         isDark={isDark}
       />
+      <LiquidityTokenModal
+        isOpen={tokenSelectorTarget !== null}
+        onClose={() => setTokenSelectorTarget(null)}
+        onSelect={(token) => { if (tokenSelectorTarget === 'A') setTokenA(token); else setTokenB(token); setTokenSelectorTarget(null); }}
+        excludeToken={tokenSelectorTarget === 'A' ? tokenB : tokenA}
+        theme={theme}
+        isDark={isDark}
+      />
 
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '20px', width: '100%', position: 'relative', zIndex: 10 }}>
 
@@ -80,8 +92,8 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
               <button onClick={onClose} style={{ background: theme.bgSecondary, border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: theme.textSecondary }}>←</button>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: '600', color: 'white', marginRight: '-12px', zIndex: 2, border: `3px solid ${theme.bgCard}` }}>Ξ</div>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #F7931A 0%, #FFAB4A 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: '700', color: 'white', border: `3px solid ${theme.bgCard}` }}>₿</div>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: tokenGrad(tokenA?.symbol), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: '600', color: 'white', marginRight: '-12px', zIndex: 2, border: `3px solid ${theme.bgCard}` }}>{tokenGlyph(tokenA?.symbol)}</div>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: tokenGrad(tokenB?.symbol), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: '700', color: 'white', border: `3px solid ${theme.bgCard}` }}>{tokenGlyph(tokenB?.symbol)}</div>
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -101,7 +113,7 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
           <div style={{ flex: 1, padding: '24px', display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', gap: '4px', marginBottom: '20px' }}>
               {['Dynamic Fee', 'Volume', 'TVL'].map((tab, i) => (
-                <button key={tab} style={{ padding: '6px 12px', borderRadius: '8px', background: i === 1 ? theme.bgSecondary : 'transparent', color: i === 1 ? theme.textPrimary : theme.textSecondary, border: 'none', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>{tab}</button>
+                <button key={tab} style={{ padding: '6px 12px', borderRadius: '8px', background: i === 0 ? theme.bgSecondary : 'transparent', color: i === 0 ? theme.textPrimary : theme.textSecondary, border: 'none', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>{tab}</button>
               ))}
             </div>
             <div style={{ flex: 1, minHeight: '250px' }}>
@@ -118,6 +130,8 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
           tokenB={tokenB}
           onTokenAChange={setTokenA}
           onTokenBChange={setTokenB}
+          onTokenAClick={() => setTokenSelectorTarget('A')}
+          onTokenBClick={() => setTokenSelectorTarget('B')}
           selectedHook={selectedHook}
           hookObj={hookObj}
           hookColor={hookColor}
