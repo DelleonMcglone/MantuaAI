@@ -6,7 +6,7 @@
  * chat interface, and swap functionality for DeFi interactions.
  */
 
-import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { useLocation } from 'wouter';
 import { useAccount, useBalance, useSwitchChain } from 'wagmi';
 import logoWhite from '@assets/Mantua_logo_white_1768946648374.png';
