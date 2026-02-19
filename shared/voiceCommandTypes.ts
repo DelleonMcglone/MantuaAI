@@ -23,6 +23,17 @@ export interface LiquidityCommand {
   hook?: HookType;
 }
 
+export interface PredictionCommand {
+  type: 'prediction';
+  action: 'show' | 'bet' | 'odds' | 'arbitrage' | 'positions';
+  /** Target market keyword(s) for odds/bet queries */
+  query?: string;
+  /** YES or NO for bet commands */
+  side?: 'yes' | 'no';
+  /** USDC amount for bet commands */
+  amount?: string;
+}
+
 /** Token alias map — normalises user-spoken tokens to canonical symbols. */
 export const TOKEN_ALIASES: Record<string, string> = {
   ether: 'ETH', ethereum: 'ETH', eth: 'ETH', meth: 'mETH',

@@ -41,7 +41,9 @@
       "Bash(npx vitest:*)",
       "Bash(npx tsc:*)",
       "Bash(npx tsx:*)",
-      "Bash(npx vite build:*)"
+      "Bash(npx vite build:*)",
+      "Bash(wc:*)",
+      "Bash(git -C /home/runner/workspace status --short)"
     ]
   }
 }
