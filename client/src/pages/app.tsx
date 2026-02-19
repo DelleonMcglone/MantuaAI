@@ -2885,6 +2885,8 @@ export default function MantuaApp() {
   const [showAgentBuilder, setShowAgentBuilder] = useState(false);
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const [showAddLiquidityModal, setShowAddLiquidityModal] = useState(false);
+  const [selectedPool, setSelectedPool] = useState(null);
+  const [addLiquidityMode, setAddLiquidityMode] = useState<'add' | 'create'>('add');
   const [portfolioType, setPortfolioType] = useState('User');
   const [swapDetails, setSwapDetails] = useState(null);
   // Voice command state
@@ -3366,7 +3368,7 @@ export default function MantuaApp() {
                 overflowY: 'auto', 
                 padding: '40px 20px 140px' // Bottom padding for fixed input
               }}>
-                <div style={{ width: '100%', maxWidth: (showSwap || showLiquidity) ? '1200px' : 700, transition: 'max-width 0.3s ease', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 32 }}>
+                <div style={{ width: '100%', maxWidth: (showSwap || showLiquidity || showAddLiquidityModal) ? '1200px' : 700, transition: 'max-width 0.3s ease', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 32 }}>
                   {!hasInteracted && !showSwap && !showLiquidity && !showAgentBuilder && (
                     <div style={{ textAlign: 'center' }}>
                       <h1 style={{ fontFamily: '"Outfit", sans-serif', fontSize: 'clamp(28px, 4vw, 40px)', fontWeight: 600, marginBottom: 12, letterSpacing: '-0.02em' }}>Hi, {truncatedAddress || 'there'}</h1>
@@ -3407,12 +3409,14 @@ export default function MantuaApp() {
                         theme={theme} 
                         isDark={isDark} 
                         onAddLiquidity={(pool) => {
+                           setSelectedPool(pool);
+                           setAddLiquidityMode('add');
                            setShowLiquidity(false);
                            setShowAddLiquidityModal(true);
-                           // In a real app we'd pass the pool data too
-                           console.log('Adding liquidity to:', pool);
                         }}
                         onCreatePool={() => {
+                           setSelectedPool(null);
+                           setAddLiquidityMode('create');
                            setShowLiquidity(false);
                            setShowAddLiquidityModal(true);
                         }}
@@ -3422,11 +3426,13 @@ export default function MantuaApp() {
 
                   {/* Add Liquidity Modal Overlay */}
                   {showAddLiquidityModal && !showSwap && !showAgentBuilder && !showLiquidity && (
-                    <div style={{ width: '100%', marginTop: 20, marginBottom: 20 }}>
-                      <AddLiquidityModal 
-                        onClose={() => setShowAddLiquidityModal(false)} 
-                        theme={theme} 
-                        isDark={isDark} 
+                    <div style={{ width: '100%', marginTop: 20, marginBottom: 20, display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
+                      <AddLiquidityModal
+                        onClose={() => { setShowAddLiquidityModal(false); setSelectedPool(null); }}
+                        theme={theme}
+                        isDark={isDark}
+                        pool={selectedPool}
+                        mode={addLiquidityMode}
                       />
                     </div>
                   )}

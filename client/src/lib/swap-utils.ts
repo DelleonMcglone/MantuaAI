@@ -47,6 +47,37 @@ export function getPoolSwapTestAddress(chainId: number): Address {
  */
 export const POOL_SWAP_TEST_ADDRESS = POOL_SWAP_TEST_ADDRESSES[84532];
 
+/**
+ * PoolModifyLiquidityTest contract addresses by chain
+ *
+ * Official Uniswap v4 deployments on supported testnets.
+ * Source: https://docs.uniswap.org/contracts/v4/deployments
+ * TODO: Replace placeholder addresses with actual deployed addresses.
+ */
+export const POOL_MODIFY_LIQUIDITY_TEST_ADDRESSES: Record<number, Address> = {
+  84532: '0x0000000000000000000000000000000000000000' as Address,  // Base Sepolia — update with actual address
+  1301: '0x0000000000000000000000000000000000000000' as Address,   // Unichain Sepolia — update with actual address
+};
+
+/**
+ * Get PoolModifyLiquidityTest address for current chain
+ * Throws error if chain not supported or address is zero (placeholder)
+ */
+export function getPoolModifyLiquidityTestAddress(chainId: number): Address {
+  const address = POOL_MODIFY_LIQUIDITY_TEST_ADDRESSES[chainId];
+  if (!address) {
+    throw new Error(
+      `PoolModifyLiquidityTest not deployed on chain ${chainId}. Supported: ${Object.keys(POOL_MODIFY_LIQUIDITY_TEST_ADDRESSES).join(', ')}`
+    );
+  }
+  if (address === '0x0000000000000000000000000000000000000000') {
+    throw new Error(
+      `PoolModifyLiquidityTest address not configured for chain ${chainId}. Update POOL_MODIFY_LIQUIDITY_TEST_ADDRESSES in swap-utils.ts.`
+    );
+  }
+  return address;
+}
+
 /** Development mode indicator - true when using placeholder addresses */
 export const IS_DEV_MODE = false;
 
