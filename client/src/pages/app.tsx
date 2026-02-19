@@ -22,6 +22,10 @@ import { parseVoiceCommand } from '@shared/voiceCommandParser';
 import { FaucetButton } from '../components/FaucetButton';
 import { classifyQuery } from '../utils/queryClassifier';
 import { TrendingUp, BarChart2, PieChart as PieIcon, Activity, Layers } from 'lucide-react';
+import { isAnalyticsQuery, generateAnalyticsQuery } from '../lib/analyticsEngine';
+import { gqlQuery } from '../lib/graphql';
+import { normalizeForChart } from '../lib/normalizeSubgraphData';
+import { QueryLibrary } from '../components/analytics/QueryLibrary';
 import { PredictionsView } from '../components/predictions/PredictionsView';
 import { VaultsView }      from '../components/vaults/VaultsView';
 import { ConnectButton } from '../components/wallet/ConnectButton';
@@ -2899,6 +2903,12 @@ export default function MantuaApp() {
   const [voiceParsedCommand, setVoiceParsedCommand] = useState(null);
   // Persistent chat state from useChat hook
   const { messages: chatMessages, sendMessage, isSending, isLoading: chatIsLoading } = useChat();
+  const [analyticsMessages, setAnalyticsMessages] = useState<any[]>([]);
+  const allMessages = useMemo(() => {
+    const combined = [...chatMessages, ...analyticsMessages];
+    combined.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    return combined;
+  }, [chatMessages, analyticsMessages]);
 
   const walletAddress = truncatedAddress || '0xbaac...DC87';
   const walletBalance = '0.0021 ETH'; // TODO: Fetch real balance
@@ -2971,6 +2981,67 @@ export default function MantuaApp() {
 
     setHasInteracted(true);
 
+    if (isAnalyticsQuery(inputValue)) {
+      const placeholderId = 'chart-' + Date.now();
+      const chartMsg = {
+        id: placeholderId,
+        sessionId: '',
+        role: 'assistant' as const,
+        content: '',
+        chart: {
+          chartType: 'stat' as const,
+          title: 'Querying on-chain data...',
+          description: inputValue,
+          data: [],
+          isLoading: true,
+          error: null,
+        },
+        createdAt: new Date().toISOString(),
+      };
+      setAnalyticsMessages(prev => [...prev, {
+        id: 'user-' + Date.now(),
+        sessionId: '',
+        role: 'user' as const,
+        content: inputValue,
+        createdAt: new Date().toISOString(),
+      }, chartMsg]);
+
+      try {
+        const analyticsResult = await generateAnalyticsQuery(inputValue);
+        if (analyticsResult) {
+          const subgraphResult = await gqlQuery(analyticsResult.graphql, analyticsResult.variables ?? {});
+          const normalized = normalizeForChart(subgraphResult.merged ?? {}, analyticsResult.chartType);
+          setAnalyticsMessages(prev => prev.map(m => m.id === placeholderId ? {
+            ...m,
+            chart: {
+              chartType: analyticsResult.chartType,
+              title: analyticsResult.title,
+              description: analyticsResult.description,
+              data: normalized,
+              isLoading: false,
+              error: null,
+            },
+          } : m));
+        } else {
+          setAnalyticsMessages(prev => prev.map(m => m.id === placeholderId ? {
+            ...m,
+            content: "I couldn't generate a query for that. Try rephrasing your question.",
+            chart: null,
+          } : m));
+        }
+      } catch (err) {
+        setAnalyticsMessages(prev => prev.map(m => m.id === placeholderId ? {
+          ...m,
+          chart: {
+            ...m.chart!,
+            isLoading: false,
+            error: 'Failed to query subgraph. The subgraph may not be deployed yet.',
+          },
+        } : m));
+      }
+      return;
+    }
+
     const command = classifyQuery(inputValue);
 
     // Reset modals helper
@@ -2984,7 +3055,7 @@ export default function MantuaApp() {
 
     if (command.type === 'newChat') {
        resetModals();
-       setMessages([]);
+       setAnalyticsMessages([]);
        setCurrentSessionId(null);
        setHasInteracted(false);
        setInputValue('');
@@ -3439,9 +3510,10 @@ export default function MantuaApp() {
                   )}
 
                   <ChatMessageList
-                    messages={chatMessages}
+                    messages={allMessages}
                     isLoading={chatIsLoading}
                     isDark={isDark}
+                    theme={theme}
                   />
 
                   {/* Swap Overlay - centered within content area */}
@@ -3529,6 +3601,14 @@ export default function MantuaApp() {
                     onSubmit={handleChatSubmit}
                     disabled={isSending}
                   />
+
+                  {!hasInteracted && (
+                    <QueryLibrary
+                      onSelect={handleChatSubmit}
+                      theme={theme}
+                      isDark={isDark}
+                    />
+                  )}
 
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
                     <ChainSelector

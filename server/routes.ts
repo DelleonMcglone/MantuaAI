@@ -447,5 +447,61 @@ export async function registerRoutes(
     }
   });
 
+  // ============ ANALYTICS QUERY GENERATION ============
+  const analyticsOutputSchema = z.object({
+    graphql:     z.string(),
+    chartType:   z.enum(['line', 'bar', 'pie', 'table', 'stat']),
+    title:       z.string(),
+    description: z.string(),
+    variables:   z.record(z.string()).optional().default({}),
+  });
+
+  const ANALYTICS_SCHEMA_CONTEXT = `You are a GraphQL query generator for the Mantua.AI subgraph.
+Available entities: Protocol, Swap, SwapHourData, Pool, Token, Position, Vault, VaultDeposit, VaultDayData, PredictionMarket, PredictionBet, PredictionClaim, ProtocolDayData.
+Return ONLY a JSON object with: graphql (query string), chartType (line|bar|pie|table|stat), title, description, variables (object).`;
+
+  app.post("/api/analytics/generate-query", async (req: Request, res: Response) => {
+    try {
+      const { message } = req.body;
+      if (!message || typeof message !== 'string' || message.length > 500) {
+        return res.status(400).json({ error: "message is required (max 500 chars)" });
+      }
+
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        max_tokens: 1000,
+        messages: [
+          { role: "system", content: ANALYTICS_SCHEMA_CONTEXT },
+          { role: "user", content: message },
+        ],
+      });
+
+      const text = completion.choices?.[0]?.message?.content ?? '';
+      const clean = text.replace(/```json|```/g, '').trim();
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(clean);
+      } catch {
+        return res.status(422).json({ error: "AI returned invalid JSON" });
+      }
+
+      const validated = analyticsOutputSchema.safeParse(parsed);
+      if (!validated.success) {
+        return res.status(422).json({ error: "AI output did not match expected schema" });
+      }
+
+      res.json(validated.data);
+    } catch (err) {
+      console.error("[analytics] Query generation error:", err);
+      res.status(500).json({ error: "Failed to generate analytics query" });
+    }
+  });
+
   return httpServer;
 }

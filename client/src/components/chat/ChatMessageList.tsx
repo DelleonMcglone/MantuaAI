@@ -3,11 +3,13 @@ import React, { useEffect, useRef, useState } from "react";
 import { formatDistanceToNow, isAfter, subHours } from "date-fns";
 import type { Message } from "../../types/chat";
 import CommandInterpretationCard from "./CommandInterpretationCard";
+import { ChartMessage } from "../analytics/ChartMessage";
 
 interface ChatMessageListProps {
   messages: Message[];
   isLoading: boolean;
   isDark?: boolean;
+  theme?: any;
 }
 
 function formatTime(iso: string): string {
@@ -65,6 +67,7 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
   messages,
   isLoading,
   isDark = true,
+  theme = {},
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -164,6 +167,18 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
             >
               {msg.content}
             </div>
+            {msg.chart && (
+              <ChartMessage
+                title={msg.chart.title}
+                description={msg.chart.description}
+                chartType={msg.chart.chartType}
+                data={msg.chart.data}
+                isLoading={msg.chart.isLoading ?? false}
+                error={msg.chart.error ?? null}
+                theme={theme}
+                isDark={isDark}
+              />
+            )}
             {msg.metadata?.command && (
               <CommandInterpretationCard command={msg.metadata.command} isDark={isDark} />
             )}

@@ -9,6 +9,15 @@ export interface CommandMetadata {
 }
 
 /** A persisted chat message returned from the API. */
+export interface ChartMetadata {
+  chartType: 'line' | 'bar' | 'pie' | 'table' | 'stat';
+  title: string;
+  description: string;
+  data: any[];
+  isLoading?: boolean;
+  error?: string | null;
+}
+
 export interface Message {
   id: string;
   sessionId: string;
@@ -16,6 +25,8 @@ export interface Message {
   content: string;
   /** Present on assistant messages when a DeFi command was detected. */
   metadata?: CommandMetadata | null;
+  /** Present on assistant messages containing analytics chart data */
+  chart?: ChartMetadata | null;
   createdAt: string; // ISO-8601
 }
 

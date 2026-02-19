@@ -1,0 +1,45 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "name": "marketId", "type": "uint256"},
+      {"indexed": false, "name": "question", "type": "string"},
+      {"indexed": false, "name": "category", "type": "string"},
+      {"indexed": false, "name": "endTime", "type": "uint256"},
+      {"indexed": false, "name": "creator", "type": "address"}
+    ],
+    "name": "MarketCreated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "name": "marketId", "type": "uint256"},
+      {"indexed": true, "name": "user", "type": "address"},
+      {"indexed": false, "name": "isYes", "type": "bool"},
+      {"indexed": false, "name": "amount", "type": "uint256"},
+      {"indexed": false, "name": "shares", "type": "uint256"}
+    ],
+    "name": "SharesBought",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "name": "marketId", "type": "uint256"},
+      {"indexed": false, "name": "outcome", "type": "bool"}
+    ],
+    "name": "MarketResolved",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "name": "marketId", "type": "uint256"},
+      {"indexed": true, "name": "user", "type": "address"},
+      {"indexed": false, "name": "payout", "type": "uint256"}
+    ],
+    "name": "WinningsClaimed",
+    "type": "event"
+  }
+]

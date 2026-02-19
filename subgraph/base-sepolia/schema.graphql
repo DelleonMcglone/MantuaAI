@@ -1,0 +1,188 @@
+# ─── SWAP ENTITIES ──────────────────────────────────────────
+
+type Swap @entity(immutable: true) {
+  id:          Bytes!
+  pool:        Pool!
+  sender:      Bytes!
+  recipient:   Bytes!
+  amount0:     BigDecimal!
+  amount1:     BigDecimal!
+  amountUSD:   BigDecimal!
+  sqrtPriceX96: BigInt!
+  tick:        Int!
+  timestamp:   BigInt!
+  blockNumber: BigInt!
+  txHash:      Bytes!
+}
+
+type SwapHourData @entity {
+  id:          String!
+  pool:        Pool!
+  hourStartUnix: BigInt!
+  volumeUSD:   BigDecimal!
+  volumeToken0: BigDecimal!
+  volumeToken1: BigDecimal!
+  txCount:     BigInt!
+}
+
+# ─── POOL ENTITIES ──────────────────────────────────────────
+
+type Pool @entity {
+  id:           Bytes!
+  token0:       Token!
+  token1:       Token!
+  feeTier:      BigInt!
+  hooks:        Bytes!
+  liquidity:    BigInt!
+  sqrtPrice:    BigInt!
+  tick:         Int!
+  tvlUSD:       BigDecimal!
+  volumeUSD:    BigDecimal!
+  feesUSD:      BigDecimal!
+  txCount:      BigInt!
+  createdAt:    BigInt!
+  positions:    [Position!]! @derivedFrom(field: "pool")
+  swaps:        [Swap!]!      @derivedFrom(field: "pool")
+  hourData:     [SwapHourData!]! @derivedFrom(field: "pool")
+}
+
+type Token @entity {
+  id:           Bytes!
+  symbol:       String!
+  name:         String!
+  decimals:     Int!
+  derivedETH:   BigDecimal!
+  totalValueLocked: BigDecimal!
+  volume:       BigDecimal!
+  txCount:      BigInt!
+}
+
+# ─── POSITION ENTITIES ──────────────────────────────────────
+
+type Position @entity {
+  id:               Bytes!
+  owner:            Bytes!
+  pool:             Pool!
+  tickLower:        Int!
+  tickUpper:        Int!
+  liquidity:        BigInt!
+  depositedToken0:  BigDecimal!
+  depositedToken1:  BigDecimal!
+  withdrawnToken0:  BigDecimal!
+  withdrawnToken1:  BigDecimal!
+  collectedFeesToken0: BigDecimal!
+  collectedFeesToken1: BigDecimal!
+  createdAt:        BigInt!
+  transaction:      Bytes!
+}
+
+# ─── VAULT ENTITIES ──────────────────────────────────────────
+
+type Vault @entity {
+  id:            Bytes!
+  name:          String!
+  symbol:        String!
+  asset:         Bytes!
+  strategy:      Int!
+  totalAssets:   BigDecimal!
+  totalShares:   BigDecimal!
+  apyBps:        BigInt!
+  deposits:      [VaultDeposit!]!    @derivedFrom(field: "vault")
+  withdrawals:   [VaultWithdrawal!]! @derivedFrom(field: "vault")
+  dailyData:     [VaultDayData!]!    @derivedFrom(field: "vault")
+}
+
+type VaultDeposit @entity(immutable: true) {
+  id:         Bytes!
+  vault:      Vault!
+  sender:     Bytes!
+  owner:      Bytes!
+  assets:     BigDecimal!
+  shares:     BigDecimal!
+  timestamp:  BigInt!
+  blockNumber: BigInt!
+  txHash:     Bytes!
+}
+
+type VaultWithdrawal @entity(immutable: true) {
+  id:         Bytes!
+  vault:      Vault!
+  sender:     Bytes!
+  receiver:   Bytes!
+  owner:      Bytes!
+  assets:     BigDecimal!
+  shares:     BigDecimal!
+  timestamp:  BigInt!
+  txHash:     Bytes!
+}
+
+type VaultDayData @entity {
+  id:          String!
+  vault:       Vault!
+  dayStartUnix: BigInt!
+  totalAssets: BigDecimal!
+  totalShares: BigDecimal!
+  dailyDeposits: BigDecimal!
+  dailyWithdrawals: BigDecimal!
+  apyBps:      BigInt!
+}
+
+# ─── PREDICTION MARKET ENTITIES ──────────────────────────────
+
+type PredictionMarket @entity {
+  id:             Bytes!
+  contractId:     BigInt!
+  question:       String!
+  category:       String!
+  endTime:        BigInt!
+  resolved:       Boolean!
+  outcome:        Boolean
+  totalYesShares: BigDecimal!
+  totalNoShares:  BigDecimal!
+  bets:           [PredictionBet!]! @derivedFrom(field: "market")
+  claims:         [PredictionClaim!]! @derivedFrom(field: "market")
+  createdAt:      BigInt!
+}
+
+type PredictionBet @entity(immutable: true) {
+  id:         Bytes!
+  market:     PredictionMarket!
+  user:       Bytes!
+  isYes:      Boolean!
+  amount:     BigDecimal!
+  shares:     BigDecimal!
+  timestamp:  BigInt!
+  txHash:     Bytes!
+}
+
+type PredictionClaim @entity(immutable: true) {
+  id:         Bytes!
+  market:     PredictionMarket!
+  user:       Bytes!
+  payout:     BigDecimal!
+  timestamp:  BigInt!
+  txHash:     Bytes!
+}
+
+# ─── GLOBAL STATS ────────────────────────────────────────────
+
+type Protocol @entity {
+  id:                  String!
+  totalVolumeUSD:      BigDecimal!
+  totalFeesUSD:        BigDecimal!
+  totalTvlUSD:         BigDecimal!
+  totalSwaps:          BigInt!
+  totalPools:          BigInt!
+  totalVaultDeposits:  BigDecimal!
+  totalBetsUSD:        BigDecimal!
+  updatedAt:           BigInt!
+}
+
+type ProtocolDayData @entity {
+  id:           String!
+  dayStartUnix: BigInt!
+  volumeUSD:    BigDecimal!
+  feesUSD:      BigDecimal!
+  tvlUSD:       BigDecimal!
+  txCount:      BigInt!
+}

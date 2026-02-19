@@ -1,0 +1,13 @@
+{
+  "name": "mantua-unichain-sepolia",
+  "version": "1.0.0",
+  "scripts": {
+    "codegen": "graph codegen",
+    "build": "graph build",
+    "deploy": "graph deploy --studio mantua-unichain-sepolia"
+  },
+  "dependencies": {
+    "@graphprotocol/graph-cli": "0.81.0",
+    "@graphprotocol/graph-ts": "0.35.1"
+  }
+}

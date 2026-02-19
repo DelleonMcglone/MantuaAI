@@ -38,9 +38,21 @@ Preferred communication style: Simple, everyday language.
   - `chat_messages`: Stores individual messages with role, content, and metadata (linked to sessions via foreign key with cascade delete)
 - **Migrations**: Generated to `./migrations` directory using `drizzle-kit push`
 
+### On-Chain Analytics (The Graph)
+- **Subgraph Schemas**: Dual-chain GraphQL subgraphs for Base Sepolia and Unichain Sepolia (`subgraph/base-sepolia/`, `subgraph/unichain-sepolia/`)
+- **18 Entity Types**: Pool, Swap, Token, Position, Vault, VaultDeposit, VaultWithdrawal, VaultDayData, SwapHourData, PredictionMarket, PredictionBet, PredictionClaim, Protocol, ProtocolDayData
+- **GraphQL Client**: `client/src/lib/graphql.ts` — multi-chain federated query client with auto-merge
+- **Query Hooks**: `client/src/hooks/useSubgraphData.ts` — 8 pre-built hooks (useProtocolStats, useSwapVolume, usePoolTvl, usePoolLeaderboard, useUserPositions, usePredictionMarkets, useRecentSwaps, useVaultTvl)
+- **Analytics Engine**: `client/src/lib/analyticsEngine.ts` — NL query detection + OpenAI-powered GraphQL generation via `/api/analytics/generate-query`
+- **Data Normalizer**: `client/src/lib/normalizeSubgraphData.ts` — transforms raw subgraph results into chart-ready arrays
+- **Chart Components**: `client/src/components/analytics/ChartMessage.tsx` (line/bar/pie/table/stat) + `QueryLibrary.tsx` (quick-query chips)
+- **Subgraph Deployment**: Placeholder contract addresses in subgraph.yaml; replace after deploying contracts. Deploy with: `graph auth --studio <KEY>`, `graph codegen`, `graph build`, `graph deploy --studio`
+- **Environment Variables**: Set `VITE_SUBGRAPH_BASE_SEPOLIA` and `VITE_SUBGRAPH_UNICHAIN` after subgraph deployment
+
 ### Key Design Patterns
 - **Chat-First UX**: The chatbot is always visible; DeFi modals layer on top without unmounting chat
 - **Query Classification**: Natural language inputs are classified to trigger appropriate modals or actions (`queryClassifier.ts`)
+- **Analytics Detection**: `isAnalyticsQuery()` detects analytics queries before command classification; renders inline charts in chat
 - **Theme-Aware Components**: All components receive `theme` and `isDark` props for consistent styling
 - **Shared Types**: Schema types exported from `shared/schema.ts` for frontend/backend type safety
 
