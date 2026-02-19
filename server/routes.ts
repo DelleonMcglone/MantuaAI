@@ -13,6 +13,7 @@ import {
 import { z } from "zod";
 import OpenAI, { toFile } from "openai";
 import { registerChatRoutes } from "./routes/chat";
+import { registerAgentRoutes } from "./routes/agent";
 
 // ============ VOICE TRANSCRIPTION SETUP ============
 
@@ -67,6 +68,9 @@ export async function registerRoutes(
 ): Promise<Server> {
   // Register new userId-based chat routes first (they fall through for legacy requests)
   registerChatRoutes(app);
+
+  // Register AgentKit routes
+  registerAgentRoutes(app);
 
   // ============ USERS ============
   app.post("/api/users", async (req, res) => {

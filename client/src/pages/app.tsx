@@ -2451,174 +2451,386 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
 
 
 // ============ AGENT BUILDER INTERFACE ============
-const AgentBuilderInterface = ({ onClose, theme, isDark }) => {
-  const promptOptions = [
-    {
-      title: 'Create a wallet agent',
-      subtitle: 'that creates and manages wallets automatically',
-    },
-    {
-      title: 'Build a balance tracker',
-      subtitle: 'to monitor token balances across accounts',
-    },
-    {
-      title: 'Create a swap agent',
-      subtitle: 'that executes test swaps on Base Sepolia',
-    },
-    {
-      title: 'Build a liquidity agent',
-      subtitle: 'to provision and manage LP positions',
-    },
-    {
-      title: 'Create an NFT agent',
-      subtitle: 'to mint, transfer, and trade NFTs',
-    },
-    {
-      title: 'Build a transfer agent',
-      subtitle: 'that automates token transfers with retry logic',
-    },
-  ];
 
-  const handlePromptClick = (prompt) => {
-    console.log('Selected:', prompt.title, prompt.subtitle);
-    // Handle prompt selection - for now just log
+// Sub-panel: Wallet Management
+const AgentWalletPanel = ({ theme, isDark, address, balance }) => {
+  const [agentWalletAddress, setAgentWalletAddress] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+  const [created, setCreated] = useState(false);
+
+  const handleCreateWallet = async () => {
+    setIsCreating(true);
+    try {
+      const res = await fetch('/api/agent/wallet', { method: 'POST' });
+      const data = await res.json();
+      if (data.address) {
+        setAgentWalletAddress(data.address);
+        setCreated(true);
+      }
+    } catch (e) {
+      console.error('Failed to create agent wallet:', e);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
-  const PromptCard = ({ title, subtitle, onClick }) => (
-    <button
-      onClick={onClick}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'flex-start',
-        padding: '20px',
-        background: theme.bgCard,
-        border: `1px solid ${theme.border}`,
-        borderRadius: '12px',
-        cursor: 'pointer',
-        textAlign: 'left',
-        transition: 'all 0.2s',
-        minHeight: '90px',
-        width: '100%',
-        boxSizing: 'border-box'
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = `${theme.accent}66`;
-        e.currentTarget.style.boxShadow = `0 4px 12px ${theme.accent}1A`;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = theme.border;
-        e.currentTarget.style.boxShadow = 'none';
-      }}
-    >
-      <div style={{ 
-        color: theme.textPrimary, 
-        fontWeight: '600', 
-        fontSize: '15px',
-        marginBottom: '6px',
-        lineHeight: '1.4',
-      }}>
-        {title}
+  const fieldStyle = {
+    padding: '16px',
+    background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
+    borderRadius: '10px',
+    border: `1px solid ${theme.border}`,
+    marginBottom: '12px',
+  };
+
+  return (
+    <div style={{ padding: '24px', background: theme.bgCard, borderRadius: '14px', border: `1px solid ${theme.border}` }}>
+      <h3 style={{ color: theme.textPrimary, fontSize: '16px', fontWeight: '600', marginBottom: '20px', margin: '0 0 20px 0' }}>Wallet Management</h3>
+      <div style={fieldStyle}>
+        <div style={{ fontSize: '11px', color: theme.textMuted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>Connected Wallet</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontFamily: 'monospace', fontSize: '13px', color: theme.textPrimary }}>
+            {address ? `${address.slice(0, 10)}...${address.slice(-8)}` : 'Not connected'}
+          </div>
+          <div style={{ fontSize: '14px', color: theme.textPrimary, fontWeight: '600' }}>
+            {balance ? `${parseFloat(balance.formatted).toFixed(4)} ${balance.symbol}` : '—'}
+          </div>
+        </div>
+        <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981' }} />
+          <span style={{ fontSize: '12px', color: '#10b981' }}>Active on Base Sepolia</span>
+        </div>
       </div>
-      <div style={{ 
-        color: theme.textSecondary, 
-        fontSize: '14px',
-        lineHeight: '1.4',
-      }}>
-        {subtitle}
+
+      <div style={fieldStyle}>
+        <div style={{ fontSize: '11px', color: theme.textMuted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>AgentKit Wallet (CDP)</div>
+        {created && agentWalletAddress ? (
+          <div>
+            <div style={{ fontFamily: 'monospace', fontSize: '13px', color: theme.textPrimary, marginBottom: '8px' }}>
+              {`${agentWalletAddress.slice(0, 10)}...${agentWalletAddress.slice(-8)}`}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981' }} />
+              <span style={{ fontSize: '12px', color: '#10b981' }}>Wallet created successfully</span>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div style={{ fontSize: '13px', color: theme.textMuted, marginBottom: '14px', lineHeight: '1.5' }}>
+              Create a Coinbase Developer Platform managed wallet for autonomous onchain operations.
+            </div>
+            <button
+              onClick={handleCreateWallet}
+              disabled={isCreating}
+              style={{ padding: '10px 22px', background: 'linear-gradient(135deg, #3b82f6, #6366f1)', border: 'none', borderRadius: '8px', color: 'white', fontSize: '14px', fontWeight: '600', cursor: isCreating ? 'not-allowed' : 'pointer', opacity: isCreating ? 0.7 : 1 }}
+            >
+              {isCreating ? 'Creating...' : 'Create AgentKit Wallet'}
+            </button>
+          </div>
+        )}
       </div>
-    </button>
+
+      <div style={{ padding: '12px 16px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.06)', border: '1px solid rgba(59, 130, 246, 0.15)', fontSize: '12px', color: theme.textSecondary, lineHeight: '1.5' }}>
+        💡 AgentKit wallets are server-managed via Coinbase CDP and can execute transactions autonomously without requiring manual signing.
+      </div>
+    </div>
   );
+};
+
+// Sub-panel: Token Transfer
+const AgentTransferPanel = ({ theme, isDark }) => {
+  const { address } = useAccount();
+  const [toAddress, setToAddress] = useState('');
+  const [selectedToken, setSelectedToken] = useState('ETH');
+  const [amount, setAmount] = useState('');
+  const [txStatus, setTxStatus] = useState(null);
+  const [txHash, setTxHash] = useState('');
+
+  const quickTokens = ['ETH', 'mUSDC', 'mUSDT', 'mDAI', 'mWBTC', 'mWETH'];
+
+  const handleTransfer = async () => {
+    if (!toAddress || !amount || !address) return;
+    setTxStatus('pending');
+    try {
+      const res = await fetch('/api/agent/transfer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: address, to: toAddress, token: selectedToken, amount }),
+      });
+      const data = await res.json();
+      if (data.txHash) {
+        setTxHash(data.txHash);
+        setTxStatus('success');
+      } else {
+        setTxStatus('error');
+      }
+    } catch {
+      setTxStatus('error');
+    }
+  };
+
+  const inputStyle = {
+    width: '100%',
+    padding: '12px 16px',
+    background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)',
+    border: `1px solid ${theme.border}`,
+    borderRadius: '8px',
+    color: theme.textPrimary,
+    fontSize: '14px',
+    outline: 'none',
+    boxSizing: 'border-box' as const,
+  };
+
+  const labelStyle = { display: 'block', fontSize: '11px', color: theme.textMuted, fontWeight: '700', textTransform: 'uppercase' as const, letterSpacing: '0.1em', marginBottom: '8px' };
+
+  return (
+    <div style={{ padding: '24px', background: theme.bgCard, borderRadius: '14px', border: `1px solid ${theme.border}` }}>
+      <h3 style={{ color: theme.textPrimary, fontSize: '16px', fontWeight: '600', margin: '0 0 20px 0' }}>Send Tokens</h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div>
+          <label style={labelStyle}>Recipient Address</label>
+          <input type="text" value={toAddress} onChange={e => setToAddress(e.target.value)} placeholder="0x..." style={{ ...inputStyle, fontFamily: 'monospace' }} />
+        </div>
+        <div>
+          <label style={labelStyle}>Token</label>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {quickTokens.map(t => (
+              <button key={t} onClick={() => setSelectedToken(t)} style={{ padding: '6px 14px', borderRadius: '20px', border: `1px solid ${selectedToken === t ? '#10b981' : theme.border}`, background: selectedToken === t ? 'rgba(16, 185, 129, 0.1)' : 'transparent', color: selectedToken === t ? '#10b981' : theme.textSecondary, fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <label style={labelStyle}>Amount</label>
+          <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.0" min="0" style={inputStyle} />
+        </div>
+        <button
+          onClick={handleTransfer}
+          disabled={!toAddress || !amount || txStatus === 'pending'}
+          style={{ padding: '14px', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', borderRadius: '10px', color: 'white', fontSize: '15px', fontWeight: '600', cursor: (!toAddress || !amount || txStatus === 'pending') ? 'not-allowed' : 'pointer', opacity: (!toAddress || !amount || txStatus === 'pending') ? 0.7 : 1 }}
+        >
+          {txStatus === 'pending' ? 'Sending...' : `Send ${selectedToken}`}
+        </button>
+        {txStatus === 'success' && (
+          <div style={{ padding: '12px 16px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', color: '#10b981', fontSize: '13px' }}>
+            ✓ Transaction submitted!{txHash && <> &nbsp;<a href={`https://sepolia.basescan.org/tx/${txHash}`} target="_blank" rel="noopener noreferrer" style={{ color: '#10b981' }}>View on explorer ↗</a></>}
+          </div>
+        )}
+        {txStatus === 'error' && (
+          <div style={{ padding: '12px 16px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#ef4444', fontSize: '13px' }}>
+            Transfer failed. Check the details and try again.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Sub-panel: Onchain Analytics Query
+const AgentAnalyticsPanel = ({ theme, isDark }) => {
+  const [query, setQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const exampleQueries = ['Show ETH/USDC pool TVL', 'Top pools by volume today', 'Recent swap transactions', 'Token price history'];
+
+  const handleQuery = async (q?: string) => {
+    const queryText = q || query;
+    if (!queryText) return;
+    if (q) setQuery(q);
+    setIsLoading(true);
+    setResult(null);
+    try {
+      const res = await fetch('/api/agent/analytics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: queryText }),
+      });
+      const data = await res.json();
+      setResult(data);
+    } catch {
+      setResult({ error: 'Failed to fetch analytics data' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ padding: '24px', background: theme.bgCard, borderRadius: '14px', border: `1px solid ${theme.border}` }}>
+      <h3 style={{ color: theme.textPrimary, fontSize: '16px', fontWeight: '600', margin: '0 0 20px 0' }}>Query Onchain Data</h3>
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
+        <input
+          type="text"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleQuery()}
+          placeholder="Ask about pools, volumes, token prices..."
+          style={{ flex: 1, padding: '12px 16px', background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)', border: `1px solid ${theme.border}`, borderRadius: '8px', color: theme.textPrimary, fontSize: '14px', outline: 'none' }}
+        />
+        <button onClick={() => handleQuery()} disabled={!query || isLoading} style={{ padding: '12px 20px', background: 'linear-gradient(135deg, #06b6d4, #0891b2)', border: 'none', borderRadius: '8px', color: 'white', fontSize: '14px', fontWeight: '600', cursor: (!query || isLoading) ? 'not-allowed' : 'pointer', opacity: (!query || isLoading) ? 0.7 : 1, whiteSpace: 'nowrap' }}>
+          {isLoading ? 'Querying...' : 'Query'}
+        </button>
+      </div>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' }}>
+        {exampleQueries.map(q => (
+          <button key={q} onClick={() => handleQuery(q)} style={{ padding: '4px 12px', borderRadius: '14px', border: `1px solid ${theme.border}`, background: 'transparent', color: theme.textSecondary, fontSize: '12px', cursor: 'pointer' }}>
+            {q}
+          </button>
+        ))}
+      </div>
+      {isLoading && <div style={{ padding: '20px', textAlign: 'center', color: theme.textMuted, fontSize: '14px' }}>Fetching onchain data...</div>}
+      {result && !result.error && (
+        <div style={{ padding: '16px', borderRadius: '10px', background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)', border: `1px solid ${theme.border}`, maxHeight: '300px', overflowY: 'auto' }}>
+          <pre style={{ color: theme.textPrimary, fontSize: '12px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', margin: 0 }}>{JSON.stringify(result, null, 2)}</pre>
+        </div>
+      )}
+      {result?.error && <div style={{ padding: '12px 16px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#ef4444', fontSize: '13px' }}>{result.error}</div>}
+    </div>
+  );
+};
+
+// Sub-panel: Navigate card (swap / liquidity / bets)
+const AgentNavPanel = ({ theme, title, description, features, cta, onNavigate, accentColor }) => (
+  <div style={{ padding: '24px', background: theme.bgCard, borderRadius: '14px', border: `1px solid ${theme.border}` }}>
+    <h3 style={{ color: theme.textPrimary, fontSize: '16px', fontWeight: '600', margin: '0 0 8px 0' }}>{title}</h3>
+    <p style={{ color: theme.textSecondary, fontSize: '14px', lineHeight: '1.6', margin: '0 0 16px 0' }}>{description}</p>
+    <div style={{ marginBottom: '20px' }}>
+      {features.map((f, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: accentColor, flexShrink: 0 }} />
+          <span style={{ color: theme.textSecondary, fontSize: '13px' }}>{f}</span>
+        </div>
+      ))}
+    </div>
+    <button onClick={onNavigate} style={{ padding: '12px 24px', background: `linear-gradient(135deg, ${accentColor}dd, ${accentColor}99)`, border: 'none', borderRadius: '8px', color: 'white', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+      {cta}
+    </button>
+  </div>
+);
+
+// Main AgentBuilder component
+const AgentBuilderInterface = ({ onClose, theme, isDark, onNavigate }) => {
+  const [activeAction, setActiveAction] = useState(null);
+  const { address } = useAccount();
+  const { data: balance } = useBalance({ address });
+
+  const actions = [
+    { id: 'wallet',    color: '#3b82f6', emoji: '💼', title: 'Create / Manage Wallet',     subtitle: 'CDP-managed wallets for autonomous agents', tag: null },
+    { id: 'transfer',  color: '#10b981', emoji: '📤', title: 'Send Tokens',                subtitle: 'Transfer tokens to any address on Base',    tag: null },
+    { id: 'swap',      color: '#f59e0b', emoji: '🔄', title: 'Swap Tokens',                subtitle: 'Execute swaps via Uniswap v4 hooks',        tag: null },
+    { id: 'liquidity', color: '#8b5cf6', emoji: '💧', title: 'Add / Remove Liquidity',     subtitle: 'Manage LP positions across pools',          tag: null },
+    { id: 'bets',      color: '#ef4444', emoji: '🎯', title: 'Place Bets',                 subtitle: 'Participate in prediction markets',         tag: 'NEW' },
+    { id: 'analytics', color: '#06b6d4', emoji: '🔍', title: 'Query Onchain Data',         subtitle: 'Analyze on-chain metrics and pool data',    tag: null },
+  ];
+
+  const renderPanel = () => {
+    switch (activeAction) {
+      case 'wallet':
+        return <AgentWalletPanel theme={theme} isDark={isDark} address={address} balance={balance} />;
+      case 'transfer':
+        return <AgentTransferPanel theme={theme} isDark={isDark} />;
+      case 'swap':
+        return (
+          <AgentNavPanel
+            theme={theme}
+            title="Swap Tokens via AgentKit"
+            description="Execute token swaps through Uniswap v4 with intelligent hook selection. The agent analyzes pool liquidity and routes through the optimal path automatically."
+            features={['Automatic route optimization across liquidity pools', 'Support for 20+ tokens on Base Sepolia', 'Hook-aware swapping: ALO, TWAMM, Stable Protection', 'Real-time price impact analysis before execution']}
+            cta="Open Swap Interface →"
+            onNavigate={() => onNavigate('swap')}
+            accentColor="#f59e0b"
+          />
+        );
+      case 'liquidity':
+        return (
+          <AgentNavPanel
+            theme={theme}
+            title="Manage Liquidity Positions"
+            description="Add or remove liquidity from Uniswap v4 pools with customizable tick ranges and hook configurations for enhanced yield strategies."
+            features={['Full-range and concentrated liquidity support', 'Create new pools with custom hook configurations', 'Real-time APY estimates and fee projections', 'Yield-maximizing hooks for auto-compounding']}
+            cta="Open Liquidity Interface →"
+            onNavigate={() => onNavigate('liquidity')}
+            accentColor="#8b5cf6"
+          />
+        );
+      case 'bets':
+        return (
+          <AgentNavPanel
+            theme={theme}
+            title="Prediction Markets"
+            description="Place bets on crypto, sports, politics, and real-world events. Powered by on-chain markets with transparent, trustless settlement."
+            features={['Live prediction markets with real-time odds', 'On-chain settlement via smart contracts', 'Supports ETH and USDC for betting', 'Full market history, analytics, and leaderboards']}
+            cta="Open Predictions →"
+            onNavigate={() => onNavigate('predictions')}
+            accentColor="#ef4444"
+          />
+        );
+      case 'analytics':
+        return <AgentAnalyticsPanel theme={theme} isDark={isDark} />;
+      default:
+        return null;
+    }
+  };
 
   return (
     <div style={{ width: '100%', fontFamily: '"DM Sans", sans-serif' }}>
-      {/* Welcome Card */}
-      <div style={{
-        background: theme.bgCard,
-        borderRadius: '16px',
-        border: `1px solid ${theme.border}`,
-        padding: '32px',
-        marginBottom: '32px',
-        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
-        position: 'relative'
-      }}>
-        <button onClick={onClose} style={{ position: 'absolute', top: '24px', right: '24px', background: 'transparent', border: 'none', color: theme.textMuted, cursor: 'pointer', padding: '8px', borderRadius: '50%' }}>
-            <CloseIcon />
+      {/* Header */}
+      <div style={{ background: theme.bgCard, borderRadius: '16px', border: `1px solid ${theme.border}`, padding: '28px 32px', marginBottom: '20px', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: 0, right: 0, width: '220px', height: '100%', background: 'linear-gradient(135deg, transparent, rgba(139, 92, 246, 0.06))', pointerEvents: 'none' }} />
+        <button onClick={onClose} style={{ position: 'absolute', top: '20px', right: '20px', background: 'transparent', border: 'none', color: theme.textMuted, cursor: 'pointer', padding: '8px', borderRadius: '50%', zIndex: 1 }}>
+          <CloseIcon />
         </button>
-
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '16px',
-          marginBottom: '16px',
-        }}>
-          <div style={{
-            width: '48px',
-            height: '48px',
-            borderRadius: '12px',
-            background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-          }}>
-            <BotIcon />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
+          <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>
+            🤖
           </div>
           <div>
-            <h1 style={{ 
-              color: theme.textPrimary, 
-              fontSize: '24px', 
-              fontWeight: '700', 
-              margin: '0 0 4px 0',
-            }}>
-              Welcome to Agent Builder
-            </h1>
-            <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 12px',
-                borderRadius: '20px',
-                background: 'rgba(59, 130, 246, 0.1)',
-                color: '#3b82f6',
-                fontSize: '12px',
-                fontWeight: '600',
-            }}>
-                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3b82f6' }} />
-                Base Sepolia
+            <h1 style={{ color: theme.textPrimary, fontSize: '22px', fontWeight: '700', margin: '0 0 6px 0' }}>AgentKit</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 10px', borderRadius: '20px', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', fontSize: '11px', fontWeight: '600' }}>
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#3b82f6' }} /> Coinbase CDP
+              </div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 10px', borderRadius: '20px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', fontSize: '11px', fontWeight: '600' }}>
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} /> Base Sepolia
+              </div>
             </div>
           </div>
         </div>
-        
-        <p style={{ 
-          color: theme.textSecondary, 
-          fontSize: '15px', 
-          lineHeight: '1.6',
-          margin: 0,
-          maxWidth: '600px'
-        }}>
-          Create AI-powered agents that automate your Web3 operations on testnet. 
-          Agents can manage wallets, execute swaps, provide liquidity, and handle NFT 
-          operations with built-in error recovery and transaction monitoring.
+        <p style={{ color: theme.textSecondary, fontSize: '14px', lineHeight: '1.6', margin: 0 }}>
+          AI-powered agents that autonomously execute DeFi operations — wallet management, token transfers, swaps, liquidity provisioning, and more.
         </p>
       </div>
 
-      {/* Prompt Grid */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(2, 1fr)',
-        gap: '16px',
-        marginBottom: '32px',
-      }}>
-        {promptOptions.map((prompt, index) => (
-          <PromptCard
-            key={index}
-            title={prompt.title}
-            subtitle={prompt.subtitle}
-            onClick={() => handlePromptClick(prompt)}
-          />
-        ))}
+      {/* Action Cards Grid — 3 columns */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', marginBottom: activeAction ? '20px' : '0' }}>
+        {actions.map(action => {
+          const isActive = activeAction === action.id;
+          return (
+            <button
+              key={action.id}
+              onClick={() => setActiveAction(isActive ? null : action.id)}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '20px', background: isActive ? `${action.color}12` : theme.bgCard, border: `1.5px solid ${isActive ? action.color : theme.border}`, borderRadius: '14px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s', position: 'relative', overflow: 'hidden' }}
+              onMouseEnter={e => { if (!isActive) { e.currentTarget.style.borderColor = `${action.color}55`; e.currentTarget.style.background = `${action.color}08`; } }}
+              onMouseLeave={e => { if (!isActive) { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.background = theme.bgCard; } }}
+            >
+              {action.tag && !isActive && (
+                <span style={{ position: 'absolute', top: '10px', right: '10px', fontSize: '9px', fontWeight: '700', background: '#7c3aed', color: 'white', padding: '2px 6px', borderRadius: '10px' }}>{action.tag}</span>
+              )}
+              {isActive && <div style={{ position: 'absolute', top: '12px', right: '12px', width: '8px', height: '8px', borderRadius: '50%', background: action.color }} />}
+              <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: `${action.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', marginBottom: '12px' }}>
+                {action.emoji}
+              </div>
+              <div style={{ color: theme.textPrimary, fontWeight: '600', fontSize: '13px', marginBottom: '4px', lineHeight: '1.4' }}>{action.title}</div>
+              <div style={{ color: theme.textMuted, fontSize: '11px', lineHeight: '1.4' }}>{action.subtitle}</div>
+            </button>
+          );
+        })}
       </div>
+
+      {/* Active Action Panel */}
+      {activeAction && (
+        <div>{renderPanel()}</div>
+      )}
     </div>
   );
 };
@@ -3340,9 +3552,10 @@ export default function MantuaApp() {
               setShowAddLiquidityModal(false);
               setHasInteracted(true);
             }}
-            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', background: 'transparent', border: 'none', borderRadius: 8, color: theme.textPrimary, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', background: showAgentBuilder ? `${theme.accent}20` : 'transparent', border: 'none', borderRadius: 8, color: showAgentBuilder ? theme.accent : theme.textPrimary, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
           >
             <BotIcon /> Agent
+            <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', color: 'white', padding: '1px 6px', borderRadius: 10 }}>AI</span>
           </button>
 
           {/* Portfolio */}
@@ -3578,6 +3791,14 @@ export default function MantuaApp() {
                         onClose={() => setShowAgentBuilder(false)}
                         theme={theme}
                         isDark={isDark}
+                        onNavigate={(view) => {
+                          setShowAgentBuilder(false);
+                          setHasInteracted(true);
+                          if (view === 'swap') setShowSwap(true);
+                          if (view === 'liquidity') setShowLiquidity(true);
+                          if (view === 'predictions') setShowPredictions(true);
+                          if (view === 'vaults') setShowVaults(true);
+                        }}
                       />
                     </div>
                   )}
