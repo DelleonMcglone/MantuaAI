@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
+import cookieParser from "cookie-parser";
 import { storage } from "./storage";
 import {
   insertChatSessionSchema,
@@ -14,6 +15,10 @@ import { z } from "zod";
 import OpenAI, { toFile } from "openai";
 import { registerChatRoutes } from "./routes/chat";
 import { registerAgentRoutes } from "./routes/agent";
+import { generalLimiter, agentLimiter } from "./lib/rateLimiter";
+import authRouter          from "./routes/auth";
+import analyticsRouter     from "./routes/analytics";
+import analyticsQueryRouter from "./routes/analyticsQuery";
 
 // ============ VOICE TRANSCRIPTION SETUP ============
 
@@ -66,6 +71,18 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Cookie parser needed for wallet auth sessions
+  app.use(cookieParser());
+
+  // Rate limiting — general /api limit, then stricter /api/agent limit
+  app.use('/api', generalLimiter);
+  app.use('/api/agent', agentLimiter);
+
+  // Auth and analytics routes
+  app.use('/api/auth',      authRouter);
+  app.use('/api/analytics', analyticsRouter);
+  app.use('/api/analytics', analyticsQueryRouter);
+
   // Register new userId-based chat routes first (they fall through for legacy requests)
   registerChatRoutes(app);
 

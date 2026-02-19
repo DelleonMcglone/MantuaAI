@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, jsonb, integer, numeric, bigint, boolean, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, jsonb, integer, numeric, bigint, boolean, uuid, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -278,3 +278,21 @@ export const insertVaultPerformanceSchema = createInsertSchema(vaultPerformance)
 
 export type InsertVaultPerformance = z.infer<typeof insertVaultPerformanceSchema>;
 export type VaultPerformance       = typeof vaultPerformance.$inferSelect;
+
+// ============ ANALYTICS EVENTS ============
+/**
+ * analytics_events table
+ * Stores all product analytics events.
+ * Wallet addresses are hashed (SHA-256) before storage — no PII stored raw.
+ */
+export const analyticsEvents = pgTable('analytics_events', {
+  id:         serial('id').primaryKey(),
+  event:      varchar('event', { length: 100 }).notNull(),
+  walletHash: varchar('wallet_hash', { length: 64 }),    // SHA-256 hash — not reversible
+  properties: jsonb('properties'),
+  sessionId:  varchar('session_id', { length: 100 }),
+  createdAt:  timestamp('created_at').defaultNow().notNull(),
+});
+
+export type AnalyticsEvent    = typeof analyticsEvents.$inferSelect;
+export type NewAnalyticsEvent = typeof analyticsEvents.$inferInsert;

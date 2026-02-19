@@ -21,5 +21,16 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist", "public"),
     emptyOutDir: true,
+    chunkSizeWarningLimit: 500,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react':     ['react', 'react-dom'],
+          'vendor-wagmi':     ['wagmi', 'viem', '@wagmi/core'],
+          'vendor-reown':     ['@reown/appkit', '@reown/appkit-adapter-wagmi'],
+          'vendor-recharts':  ['recharts'],
+        },
+      },
+    },
   },
 });

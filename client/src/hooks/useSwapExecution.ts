@@ -13,6 +13,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useChainId } from 'wagmi';
 import { toast } from 'sonner';
 import type { Address } from 'viem';
+import { trackEvent } from '../lib/trackEvent';
 import {
   POOL_SWAP_TEST_ABI,
   getPoolSwapTestAddress,
@@ -82,6 +83,15 @@ export function useSwapExecution(): UseSwapExecutionReturn {
     if (isConfirmed && status === 'confirming' && !hasShownConfirmToast.current) {
       hasShownConfirmToast.current = true;
       setStatus('confirmed');
+      // Track swap analytics — hookId is stored in lastParams
+      if (lastParams) {
+        const hasHook = !!lastParams.hookId && lastParams.hookId !== 'none';
+        trackEvent(
+          hasHook ? 'swap_with_hook' : 'swap_executed',
+          userAddress,
+          hasHook ? { hookName: lastParams.hookId } : undefined
+        );
+      }
       toast.success('Swap Confirmed!', {
         description: 'Your swap has been executed successfully.',
         action: txHash ? {

@@ -7,15 +7,16 @@ const { Pool } = pkg;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+const MIGRATIONS = ['001_chat_schema.sql', '002_analytics_events.sql'];
+
 export async function runMigrations(): Promise<void> {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   try {
-    const sql = readFileSync(
-      join(__dirname, "migrations", "001_chat_schema.sql"),
-      "utf8"
-    );
-    await pool.query(sql);
-    console.log("[migrate] Chat schema migration applied successfully");
+    for (const file of MIGRATIONS) {
+      const sql = readFileSync(join(__dirname, 'migrations', file), 'utf8');
+      await pool.query(sql);
+      console.log(`[migrate] Applied: ${file}`);
+    }
   } catch (err) {
     console.error("[migrate] Migration failed:", err);
     throw err;

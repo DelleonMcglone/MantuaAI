@@ -6,7 +6,7 @@
  * chat interface, and swap functionality for DeFi interactions.
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { useLocation } from 'wouter';
 import { useAccount, useBalance, useSwitchChain } from 'wagmi';
 import logoWhite from '@assets/Mantua_logo_white_1768946648374.png';
@@ -26,10 +26,14 @@ import { isAnalyticsQuery, generateAnalyticsQuery } from '../lib/analyticsEngine
 import { gqlQuery } from '../lib/graphql';
 import { normalizeForChart } from '../lib/normalizeSubgraphData';
 import { QueryLibrary } from '../components/analytics/QueryLibrary';
-import { PredictionsView } from '../components/predictions/PredictionsView';
-import { VaultsView }      from '../components/vaults/VaultsView';
+// Heavy views loaded lazily for bundle splitting
+const PredictionsView   = lazy(() => import('../components/predictions/PredictionsView').then(m => ({ default: m.PredictionsView })));
+const VaultsView        = lazy(() => import('../components/vaults/VaultsView').then(m => ({ default: m.VaultsView })));
+const AnalyticsDashboard = lazy(() => import('../components/analytics/AnalyticsDashboard').then(m => ({ default: m.AnalyticsDashboard })));
 import { TxHistoryPanel }  from '../components/portfolio/TxHistoryPanel';
 import { useTxHistory }    from '../hooks/useTxHistory';
+import { sanitizeInput }   from '../lib/sanitize';
+import { trackEvent }      from '../lib/trackEvent';
 import { ConnectButton } from '../components/wallet/ConnectButton';
 import { useWalletConnection } from '../hooks/useWalletConnection';
 import { useTokenApproval } from '../hooks/useTokenApproval';
@@ -3138,8 +3142,9 @@ export default function MantuaApp() {
   const [showAgentBuilder, setShowAgentBuilder] = useState(false);
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const [showAddLiquidityModal, setShowAddLiquidityModal] = useState(false);
-  const [showPredictions, setShowPredictions] = useState(false);
-  const [showVaults,      setShowVaults]      = useState(false);
+  const [showPredictions,  setShowPredictions]  = useState(false);
+  const [showVaults,       setShowVaults]       = useState(false);
+  const [showAnalytics,    setShowAnalytics]    = useState(false);
   const [selectedPool, setSelectedPool] = useState(null);
   const [addLiquidityMode, setAddLiquidityMode] = useState<'add' | 'create' | 'remove'>('add');
   const [portfolioType, setPortfolioType] = useState('User');
@@ -3148,6 +3153,7 @@ export default function MantuaApp() {
   const [voiceModalOpen, setVoiceModalOpen] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState('');
   const [voiceParsedCommand, setVoiceParsedCommand] = useState(null);
+  const isVoiceSubmitRef = useRef(false);
   // Persistent chat state from useChat hook
   const { messages: chatMessages, sendMessage, isSending, isLoading: chatIsLoading } = useChat();
   const [analyticsMessages, setAnalyticsMessages] = useState<any[]>([]);
@@ -3159,7 +3165,14 @@ export default function MantuaApp() {
 
   const walletAddress = truncatedAddress || '0xbaac...DC87';
   const walletBalance = '0.0021 ETH'; // TODO: Fetch real balance
-  
+
+  // Track wallet connection event
+  useEffect(() => {
+    if (isConnected && address) {
+      trackEvent('wallet_connected', address);
+    }
+  }, [isConnected, address]);
+
   const [recentChats, setRecentChats] = useState([]);
 
   useEffect(() => {
@@ -3198,6 +3211,9 @@ export default function MantuaApp() {
   const handleTranscription = (transcript) => {
     const text = transcript.trim();
     if (!text) return;
+    // Track voice command usage
+    trackEvent('voice_command', address, { commandLength: text.length });
+    isVoiceSubmitRef.current = true;
     const parsed = parseVoiceCommand(text);
     if (parsed) {
       setVoiceTranscript(text);
@@ -3210,7 +3226,7 @@ export default function MantuaApp() {
 
   const handleVoiceConfirm = () => {
     setVoiceModalOpen(false);
-    if (voiceTranscript) handleChatSubmit(voiceTranscript);
+    if (voiceTranscript) { isVoiceSubmitRef.current = true; handleChatSubmit(voiceTranscript); }
     setVoiceTranscript('');
     setVoiceParsedCommand(null);
   };
@@ -3223,8 +3239,14 @@ export default function MantuaApp() {
 
   // Main chat submission — called by ChatInput and voice pipeline
   const handleChatSubmit = async (text) => {
-    const inputValue = text;
+    const inputValue = sanitizeInput(text, 'chatMessage');
     if (!inputValue.trim()) return;
+
+    // Track text vs voice command (voice sets isVoiceSubmitRef before calling this)
+    if (!isVoiceSubmitRef.current) {
+      trackEvent('text_command', address);
+    }
+    isVoiceSubmitRef.current = false;
 
     setHasInteracted(true);
 
@@ -3298,6 +3320,7 @@ export default function MantuaApp() {
        setShowAgentBuilder(false);
        setShowAddLiquidityModal(false);
        setShowPortfolioModal(false);
+       setShowAnalytics(false);
     };
 
     if (command.type === 'newChat') {
@@ -3628,6 +3651,22 @@ export default function MantuaApp() {
             <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', color: 'white', padding: '1px 6px', borderRadius: 10 }}>AI</span>
           </button>
 
+          {/* Analytics — dev/admin only */}
+          {import.meta.env.DEV && (
+            <button
+              onClick={() => {
+                setShowAnalytics(true);
+                setShowAgentBuilder(false); setShowPredictions(false); setShowVaults(false);
+                setShowSwap(false); setShowLiquidity(false);
+                setShowPortfolioModal(false); setShowAddLiquidityModal(false);
+                setHasInteracted(true);
+              }}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', background: showAnalytics ? `${theme.accent}20` : 'transparent', border: 'none', borderRadius: 8, color: showAnalytics ? theme.accent : theme.textPrimary, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
+            >
+              <BarChart2 size={16} /> Analytics
+            </button>
+          )}
+
           {/* Portfolio */}
           <div style={{ marginBottom: 8 }}>
             <button
@@ -3734,14 +3773,27 @@ export default function MantuaApp() {
           {/* Predictions — full-page sibling, not inside chat scroll container */}
           {showPredictions && !showSwap && !showLiquidity && !showAgentBuilder && !showAddLiquidityModal && (
             <div style={{ position: 'absolute', inset: 0, zIndex: 110, overflow: 'auto', background: '#030712' }}>
-              <PredictionsView />
+              <Suspense fallback={<div style={{ padding: 40, color: '#6b7280' }}>Loading…</div>}>
+                <PredictionsView />
+              </Suspense>
             </div>
           )}
 
           {/* Vaults — full-page sibling, not inside chat scroll container */}
           {showVaults && !showSwap && !showLiquidity && !showAgentBuilder && !showAddLiquidityModal && !showPredictions && (
             <div style={{ position: 'absolute', inset: 0, zIndex: 110, overflow: 'auto', background: '#030712' }}>
-              <VaultsView />
+              <Suspense fallback={<div style={{ padding: 40, color: '#6b7280' }}>Loading…</div>}>
+                <VaultsView />
+              </Suspense>
+            </div>
+          )}
+
+          {/* Analytics Dashboard — dev only */}
+          {showAnalytics && (
+            <div style={{ position: 'absolute', inset: 0, zIndex: 110, overflow: 'auto', background: '#030712' }}>
+              <Suspense fallback={<div style={{ padding: 40, color: '#6b7280' }}>Loading…</div>}>
+                <AnalyticsDashboard />
+              </Suspense>
             </div>
           )}
 
