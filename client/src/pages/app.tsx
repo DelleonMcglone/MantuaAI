@@ -3292,24 +3292,6 @@ export default function MantuaApp() {
             <DropletsIcon /> Liquidity
           </button>
 
-          {/* Predictions */}
-          <button
-            onClick={() => {
-              setShowPredictions(true);
-              setShowSwap(false);
-              setShowLiquidity(false);
-              setShowAgentBuilder(false);
-              setShowVaults(false);
-              setShowPortfolioModal(false);
-              setShowAddLiquidityModal(false);
-              setHasInteracted(true);
-            }}
-            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', background: showPredictions ? `${theme.accent}20` : 'transparent', border: 'none', borderRadius: 8, color: showPredictions ? theme.accent : theme.textPrimary, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
-          >
-            <TrendingUp size={16} /> Predictions
-            <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, background: '#7c3aed', color: 'white', padding: '1px 6px', borderRadius: 10 }}>NEW</span>
-          </button>
-
           {/* Vaults */}
           <button
             onClick={() => {
@@ -3325,6 +3307,24 @@ export default function MantuaApp() {
             style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', background: showVaults ? `${theme.accent}20` : 'transparent', border: 'none', borderRadius: 8, color: showVaults ? theme.accent : theme.textPrimary, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
           >
             <Layers size={16} /> Vaults
+            <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, background: '#7c3aed', color: 'white', padding: '1px 6px', borderRadius: 10 }}>NEW</span>
+          </button>
+
+          {/* Predictions */}
+          <button
+            onClick={() => {
+              setShowPredictions(true);
+              setShowSwap(false);
+              setShowLiquidity(false);
+              setShowAgentBuilder(false);
+              setShowVaults(false);
+              setShowPortfolioModal(false);
+              setShowAddLiquidityModal(false);
+              setHasInteracted(true);
+            }}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', background: showPredictions ? `${theme.accent}20` : 'transparent', border: 'none', borderRadius: 8, color: showPredictions ? theme.accent : theme.textPrimary, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
+          >
+            <TrendingUp size={16} /> Predictions
             <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, background: '#7c3aed', color: 'white', padding: '1px 6px', borderRadius: 10 }}>NEW</span>
           </button>
 
