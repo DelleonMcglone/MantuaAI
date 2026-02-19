@@ -217,3 +217,64 @@ export const insertArbitrageOpportunitySchema = createInsertSchema(arbitrageOppo
 
 export type InsertArbitrageOpportunity = z.infer<typeof insertArbitrageOpportunitySchema>;
 export type ArbitrageOpportunity = typeof arbitrageOpportunities.$inferSelect;
+
+// ============ VAULTS ============
+export const vaults = pgTable("vaults", {
+  id:          varchar("id", { length: 50 }).primaryKey(),           // e.g. "eth-usdc-lp"
+  name:        text("name").notNull(),
+  strategy:    varchar("strategy", { length: 20 }).notNull(),        // "stable" | "lp" | "multi"
+  risk:        varchar("risk", { length: 10 }).notNull(),            // "low" | "medium" | "high"
+  apyBps:      integer("apy_bps").notNull(),
+  chainId:     integer("chain_id").notNull(),
+  address:     varchar("address", { length: 42 }).notNull(),
+  assetAddress:varchar("asset_address", { length: 42 }).notNull(),
+  totalAssets: numeric("total_assets", { precision: 30, scale: 18 }).default('0'),
+  totalSupply: numeric("total_supply", { precision: 30, scale: 18 }).default('0'),
+  isPaused:    boolean("is_paused").default(false),
+  updatedAt:   timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const insertVaultSchema = createInsertSchema(vaults).omit({ updatedAt: true });
+
+export type InsertVault = z.infer<typeof insertVaultSchema>;
+export type Vault       = typeof vaults.$inferSelect;
+
+// ============ VAULT POSITIONS ============
+export const vaultPositions = pgTable("vault_positions", {
+  id:                 integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  vaultId:            varchar("vault_id", { length: 50 }).notNull().references(() => vaults.id),
+  userAddress:        varchar("user_address", { length: 42 }).notNull(),
+  chainId:            integer("chain_id").notNull(),
+  sharesBalance:      numeric("shares_balance",      { precision: 30, scale: 18 }).default('0'),
+  depositedAssets:    numeric("deposited_assets",    { precision: 30, scale: 18 }).default('0'),
+  currentAssets:      numeric("current_assets",      { precision: 30, scale: 18 }).default('0'),
+  unrealizedYield:    numeric("unrealized_yield",    { precision: 30, scale: 18 }).default('0'),
+  updatedAt:          timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const insertVaultPositionSchema = createInsertSchema(vaultPositions).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertVaultPosition = z.infer<typeof insertVaultPositionSchema>;
+export type VaultPosition       = typeof vaultPositions.$inferSelect;
+
+// ============ VAULT PERFORMANCE ============
+export const vaultPerformance = pgTable("vault_performance", {
+  id:          integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  vaultId:     varchar("vault_id", { length: 50 }).notNull().references(() => vaults.id),
+  chainId:     integer("chain_id").notNull(),
+  totalAssets: numeric("total_assets", { precision: 30, scale: 18 }).notNull(),
+  pricePerShare: numeric("price_per_share", { precision: 30, scale: 18 }).notNull(),
+  apyBps:      integer("apy_bps").notNull(),
+  recordedAt:  timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const insertVaultPerformanceSchema = createInsertSchema(vaultPerformance).omit({
+  id: true,
+  recordedAt: true,
+});
+
+export type InsertVaultPerformance = z.infer<typeof insertVaultPerformanceSchema>;
+export type VaultPerformance       = typeof vaultPerformance.$inferSelect;

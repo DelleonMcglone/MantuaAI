@@ -34,6 +34,15 @@ export interface PredictionCommand {
   amount?: string;
 }
 
+export interface VaultCommand {
+  type: 'vault';
+  action: 'show' | 'deposit' | 'withdraw' | 'performance' | 'deposits';
+  /** Vault keyword or pair e.g. "eth usdc" */
+  query?: string;
+  /** Amount for deposit/withdraw */
+  amount?: string;
+}
+
 /** Token alias map — normalises user-spoken tokens to canonical symbols. */
 export const TOKEN_ALIASES: Record<string, string> = {
   ether: 'ETH', ethereum: 'ETH', eth: 'ETH', meth: 'mETH',

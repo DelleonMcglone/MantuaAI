@@ -21,8 +21,9 @@ import VoiceConfirmationModal from '../components/voice/VoiceConfirmationModal';
 import { parseVoiceCommand } from '@shared/voiceCommandParser';
 import { FaucetButton } from '../components/FaucetButton';
 import { classifyQuery } from '../utils/queryClassifier';
-import { TrendingUp, BarChart2, PieChart as PieIcon, Activity } from 'lucide-react';
+import { TrendingUp, BarChart2, PieChart as PieIcon, Activity, Layers } from 'lucide-react';
 import { PredictionsView } from '../components/predictions/PredictionsView';
+import { VaultsView }      from '../components/vaults/VaultsView';
 import { ConnectButton } from '../components/wallet/ConnectButton';
 import { useWalletConnection } from '../hooks/useWalletConnection';
 import { useTokenApproval } from '../hooks/useTokenApproval';
@@ -2887,6 +2888,7 @@ export default function MantuaApp() {
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const [showAddLiquidityModal, setShowAddLiquidityModal] = useState(false);
   const [showPredictions, setShowPredictions] = useState(false);
+  const [showVaults,      setShowVaults]      = useState(false);
   const [selectedPool, setSelectedPool] = useState(null);
   const [addLiquidityMode, setAddLiquidityMode] = useState<'add' | 'create'>('add');
   const [portfolioType, setPortfolioType] = useState('User');
@@ -3160,6 +3162,7 @@ export default function MantuaApp() {
               setShowLiquidity(false);
               setShowAgentBuilder(false);
               setShowPredictions(false);
+              setShowVaults(false);
               setShowPortfolioModal(false);
               setShowAddLiquidityModal(false);
               setHasInteracted(false);
@@ -3190,6 +3193,7 @@ export default function MantuaApp() {
               setShowLiquidity(false);
               setShowAgentBuilder(false);
               setShowPredictions(false);
+              setShowVaults(false);
               setShowPortfolioModal(false);
               setShowAddLiquidityModal(false);
               setSwapDetails(null);
@@ -3207,6 +3211,7 @@ export default function MantuaApp() {
               setShowSwap(false);
               setShowAgentBuilder(false);
               setShowPredictions(false);
+              setShowVaults(false);
               setShowPortfolioModal(false);
               setShowAddLiquidityModal(false);
               setHasInteracted(true);
@@ -3223,6 +3228,7 @@ export default function MantuaApp() {
               setShowSwap(false);
               setShowLiquidity(false);
               setShowAgentBuilder(false);
+              setShowVaults(false);
               setShowPortfolioModal(false);
               setShowAddLiquidityModal(false);
               setHasInteracted(true);
@@ -3233,11 +3239,30 @@ export default function MantuaApp() {
             <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, background: '#7c3aed', color: 'white', padding: '1px 6px', borderRadius: 10 }}>NEW</span>
           </button>
 
+          {/* Vaults */}
+          <button
+            onClick={() => {
+              setShowVaults(true);
+              setShowPredictions(false);
+              setShowSwap(false);
+              setShowLiquidity(false);
+              setShowAgentBuilder(false);
+              setShowPortfolioModal(false);
+              setShowAddLiquidityModal(false);
+              setHasInteracted(true);
+            }}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', background: showVaults ? `${theme.accent}20` : 'transparent', border: 'none', borderRadius: 8, color: showVaults ? theme.accent : theme.textPrimary, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
+          >
+            <Layers size={16} /> Vaults
+            <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, background: '#7c3aed', color: 'white', padding: '1px 6px', borderRadius: 10 }}>NEW</span>
+          </button>
+
           {/* Agent */}
           <button
             onClick={() => {
               setShowAgentBuilder(true);
               setShowPredictions(false);
+              setShowVaults(false);
               setShowSwap(false);
               setShowLiquidity(false);
               setShowPortfolioModal(false);
@@ -3356,6 +3381,13 @@ export default function MantuaApp() {
           {showPredictions && !showSwap && !showLiquidity && !showAgentBuilder && !showAddLiquidityModal && (
             <div style={{ position: 'absolute', inset: 0, zIndex: 110, overflow: 'auto', background: '#030712' }}>
               <PredictionsView />
+            </div>
+          )}
+
+          {/* Vaults — full-page sibling, not inside chat scroll container */}
+          {showVaults && !showSwap && !showLiquidity && !showAgentBuilder && !showAddLiquidityModal && !showPredictions && (
+            <div style={{ position: 'absolute', inset: 0, zIndex: 110, overflow: 'auto', background: '#030712' }}>
+              <VaultsView />
             </div>
           )}
 

@@ -4,9 +4,9 @@
  * Imported by both server (validation) and client (modal preview via @shared alias).
  */
 import { normalizeToken, detectHook } from './voiceCommandTypes';
-import type { SwapCommand, LiquidityCommand, PredictionCommand } from './voiceCommandTypes';
+import type { SwapCommand, LiquidityCommand, PredictionCommand, VaultCommand } from './voiceCommandTypes';
 
-export type { SwapCommand, LiquidityCommand, PredictionCommand };
+export type { SwapCommand, LiquidityCommand, PredictionCommand, VaultCommand };
 export { normalizeToken } from './voiceCommandTypes';
 export type { HookType } from './voiceCommandTypes';
 
@@ -114,11 +114,38 @@ export function parsePredictionCommand(text: string): PredictionCommand | null {
   return null;
 }
 
+// ── Vault parsing ─────────────────────────────────────────────────────────
+const VAULT_VERBS     = /\bvault[s]?\b/i;
+const SHOW_VAULTS     = /\b(show|open|view|display)\b.*\bvaults?\b|\bvaults?\b.*\b(tab|page|view)\b/i;
+const DEPOSIT_VAULT   = /\bdeposit\b.*\bvault[s]?\b|\bvault[s]?\b.*\bdeposit\b/i;
+const WITHDRAW_VAULT  = /\b(withdraw|redeem)\b.*\bvault[s]?\b|\bvault[s]?\b.*\b(withdraw|redeem)\b/i;
+const PERF_VAULT      = /\bperformance\b.*\bvault[s]?\b|\bvault[s]?\b.*\bperformance\b/i;
+const MY_DEPOSITS     = /\bmy\s+(vault\s+)?deposits?\b/i;
+const VAULT_AMOUNT    = /\b(\d+(?:\.\d+)?)\b/;
+
+export function parseVaultCommand(text: string): VaultCommand | null {
+  if (!VAULT_VERBS.test(text) && !MY_DEPOSITS.test(text)) return null;
+  if (PERF_VAULT.test(text))  return { type: 'vault', action: 'performance' };
+  if (MY_DEPOSITS.test(text)) return { type: 'vault', action: 'deposits' };
+  if (SHOW_VAULTS.test(text)) return { type: 'vault', action: 'show' };
+
+  if (DEPOSIT_VAULT.test(text)) {
+    const amt = VAULT_AMOUNT.exec(text);
+    return { type: 'vault', action: 'deposit', amount: amt?.[1] };
+  }
+  if (WITHDRAW_VAULT.test(text)) {
+    const amt = VAULT_AMOUNT.exec(text);
+    return { type: 'vault', action: 'withdraw', amount: amt?.[1] };
+  }
+  if (VAULT_VERBS.test(text)) return { type: 'vault', action: 'show' };
+  return null;
+}
+
 // ── Unified entry point ───────────────────────────────────────────────────
 export function parseVoiceCommand(
   transcript: string,
-): SwapCommand | LiquidityCommand | PredictionCommand | null {
+): SwapCommand | LiquidityCommand | PredictionCommand | VaultCommand | null {
   const text = transcript.trim();
   if (!text) return null;
-  return parsePredictionCommand(text) ?? parseLiquidityCommand(text) ?? parseSwapCommand(text);
+  return parseVaultCommand(text) ?? parsePredictionCommand(text) ?? parseLiquidityCommand(text) ?? parseSwapCommand(text);
 }
