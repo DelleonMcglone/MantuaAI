@@ -3,6 +3,7 @@ import { useAccount, useChainId } from 'wagmi';
 import type { Token } from '../../config/tokens';
 import { getPriceBySymbol } from '../../services/priceService';
 import { SettingsIcon, ArrowLeftRightIcon } from '../icons';
+import { parseError } from '../../lib/errorMessages';
 import { useAddLiquidity } from '../../hooks/useAddLiquidity';
 import { createPoolKey, getHookAddress } from '../../lib/swap-utils';
 import { LiquidityTokenInput } from './LiquidityTokenInput';
@@ -138,7 +139,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
         )}
         {error && (
           <div style={{ marginTop: '8px', padding: '10px 12px', borderRadius: '10px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontSize: '13px' }}>
-            {String(error.message).slice(0, 120)}
+            {parseError(error)}
           </div>
         )}
       </div>

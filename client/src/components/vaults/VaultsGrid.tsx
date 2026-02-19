@@ -9,6 +9,7 @@ import { VaultCard }        from './VaultCard';
 import { VaultDetailModal } from './VaultDetailModal';
 import type { VaultData }   from '../../hooks/useVaults.ts';
 import type { VaultStrategy } from '../../config/vaults.ts';
+import { SkeletonBox, SkeletonLine } from '../ui/skeleton';
 
 type Filter = 'all' | VaultStrategy;
 const FILTERS: Filter[] = ['all', 'stable', 'lp', 'multi'];
@@ -35,12 +36,27 @@ export function VaultsGrid({ vaults, isLoading }: Props) {
 
   if (isLoading && vaults.length === 0) {
     return (
-      <div className="flex items-center justify-center h-48 text-gray-500">
-        <div className="flex items-center gap-3">
-          <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent
-                          rounded-full animate-spin" />
-          <span className="text-sm">Loading vaults…</span>
-        </div>
+      <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="p-5 bg-gray-900 border border-gray-800 rounded-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <SkeletonBox className="w-10 h-10 rounded-xl" />
+                <div className="space-y-2">
+                  <SkeletonLine className="w-28" />
+                  <SkeletonLine className="w-16 h-3" />
+                </div>
+              </div>
+              <SkeletonLine className="w-16 h-6 rounded-full" />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <SkeletonLine className="h-12 rounded-lg" />
+              <SkeletonLine className="h-12 rounded-lg" />
+              <SkeletonLine className="h-12 rounded-lg" />
+            </div>
+            <SkeletonBox className="w-full h-9 rounded-xl" />
+          </div>
+        ))}
       </div>
     );
   }

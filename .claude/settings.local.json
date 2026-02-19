@@ -44,7 +44,19 @@
       "Bash(npx vite build:*)",
       "Bash(wc:*)",
       "Bash(git -C /home/runner/workspace status --short)",
-      "WebFetch(domain:replit.com)"
+      "WebFetch(domain:replit.com)",
+      "Bash(__NEW_LINE_36793fc75524c65e__ echo \"=== RATE LIMITING ===\")",
+      "Bash(__NEW_LINE_36793fc75524c65e__ echo \"=== WALLET AUTH SERVER ===\")",
+      "Bash(__NEW_LINE_36793fc75524c65e__ echo \"=== WALLET AUTH CLIENT ===\")",
+      "Bash(__NEW_LINE_36793fc75524c65e__ echo \"=== INPUT VALIDATION ===\")",
+      "Bash(__NEW_LINE_0dc20dc00badeb3b__ echo \"=== VITE CONFIG ===\")",
+      "Bash(__NEW_LINE_f3e65d3400baa11d__ echo \"=== PACKAGE JSON DEPS \\(client\\) ===\")",
+      "Bash(__NEW_LINE_f3e65d3400baa11d__ echo \"=== PACKAGE JSON DEPS \\(root\\) ===\")",
+      "Bash(cd /home/runner/workspace echo \"=== ANALYTICS EXISTING ===\" grep -rn \"analytics\\\\|Analytics\\\\|track\\\\|posthog\\\\|mixpanel\\\\|amplitude\" client/src/ --include=\"*.ts\" -l echo \"=== WALLET CONNECT EVENTS ===\" grep -rn \"connected\\\\|walletConnect\\\\|onConnect\" client/src/ --include=\"*.tsx\" -l echo \"=== VOICE COMMAND ===\" grep -rn \"voiceCommand\\\\|whisper\\\\|transcript\" client/src/ --include=\"*.tsx\" -l echo \"=== HOOK SELECT ===\" grep -rn \"hook\\\\|hookSelect\\\\|selectedHook\" client/src/ --include=\"*.tsx\" -l)",
+      "Bash(__NEW_LINE_2264f930196b279e__ echo \"=== ANALYTICS EXISTING ===\")",
+      "Bash(__NEW_LINE_2264f930196b279e__ echo \"=== WALLET CONNECT EVENTS ===\")",
+      "Bash(__NEW_LINE_2264f930196b279e__ echo \"=== VOICE COMMAND ===\")",
+      "Bash(__NEW_LINE_2264f930196b279e__ echo \"=== HOOK SELECT ===\")"
     ]
   }
 }

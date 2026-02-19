@@ -4,6 +4,7 @@ import { getTokenBySymbol, type Token } from '../../config/tokens';
 import PoolActivityChart from './PoolActivityChart';
 import HookSelector from './HookSelector';
 import { AddLiquidityForm } from './AddLiquidityForm';
+import { RemoveLiquidityForm } from './RemoveLiquidityForm';
 import { LiquidityTokenModal } from './LiquidityTokenModal';
 
 export interface LiquidityPool {
@@ -18,7 +19,7 @@ interface AddLiquidityModalProps {
   theme: any;
   isDark: boolean;
   pool?: LiquidityPool | null;
-  mode?: 'add' | 'create';
+  mode?: 'add' | 'create' | 'remove';
 }
 
 const HOOKS = [
@@ -49,7 +50,7 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
   }, []);
 
   useEffect(() => {
-    if (mode === 'add' && pool) {
+    if ((mode === 'add' || mode === 'remove') && pool) {
       setTokenA(getTokenBySymbol(pool.token1) ?? null);
       setTokenB(getTokenBySymbol(pool.token2) ?? null);
     } else {
@@ -62,6 +63,7 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
   const hookColor = hookObj.color;
   const displayA = tokenA?.symbol ?? (mode === 'create' ? 'Token A' : 'ETH');
   const displayB = tokenB?.symbol ?? (mode === 'create' ? 'Token B' : 'mBTC');
+  const modeLabel = mode === 'remove' ? 'Remove Liquidity' : mode === 'create' ? 'Create Pool' : 'Add Liquidity';
 
   return (
     <div style={{ width: '100%', maxWidth: '1200px', margin: '0 auto', position: 'relative', fontFamily: '"DM Sans", sans-serif', padding: '20px', boxSizing: 'border-box' }}>
@@ -122,22 +124,36 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
           </div>
         </div>
 
-        {/* RIGHT PANEL: Form */}
-        <AddLiquidityForm
-          theme={theme}
-          isDark={isDark}
-          tokenA={tokenA}
-          tokenB={tokenB}
-          onTokenAChange={setTokenA}
-          onTokenBChange={setTokenB}
-          onTokenAClick={() => setTokenSelectorTarget('A')}
-          onTokenBClick={() => setTokenSelectorTarget('B')}
-          selectedHook={selectedHook}
-          hookObj={hookObj}
-          hookColor={hookColor}
-          onOpenHookSelector={() => setIsHookModalOpen(true)}
-          isMobile={isMobile}
-        />
+        {/* RIGHT PANEL: Add or Remove form */}
+        {mode === 'remove' ? (
+          <RemoveLiquidityForm
+            theme={theme}
+            isDark={isDark}
+            tokenA={tokenA}
+            tokenB={tokenB}
+            selectedHook={selectedHook}
+            hookObj={hookObj}
+            hookColor={hookColor}
+            onOpenHookSelector={() => setIsHookModalOpen(true)}
+            isMobile={isMobile}
+          />
+        ) : (
+          <AddLiquidityForm
+            theme={theme}
+            isDark={isDark}
+            tokenA={tokenA}
+            tokenB={tokenB}
+            onTokenAChange={setTokenA}
+            onTokenBChange={setTokenB}
+            onTokenAClick={() => setTokenSelectorTarget('A')}
+            onTokenBClick={() => setTokenSelectorTarget('B')}
+            selectedHook={selectedHook}
+            hookObj={hookObj}
+            hookColor={hookColor}
+            onOpenHookSelector={() => setIsHookModalOpen(true)}
+            isMobile={isMobile}
+          />
+        )}
       </div>
     </div>
   );

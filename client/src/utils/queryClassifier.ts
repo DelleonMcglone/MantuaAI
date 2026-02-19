@@ -1,4 +1,4 @@
-export type QueryType = 'price' | 'volume' | 'comparison' | 'portfolio' | 'performance' | 'tvl' | 'action' | 'general' | 'addLiquidity' | 'liquidityList' | 'swap' | 'agent' | 'newChat' | 'faucet' | 'analysis';
+export type QueryType = 'price' | 'volume' | 'comparison' | 'portfolio' | 'performance' | 'tvl' | 'action' | 'general' | 'addLiquidity' | 'liquidityList' | 'swap' | 'agent' | 'newChat' | 'faucet' | 'analysis' | 'balance';
 
 export interface ClassifiedQuery {
   type: QueryType;
@@ -105,10 +105,31 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
     return result;
   }
   
-  // PORTFOLIO
+  // BALANCE — check before portfolio to avoid false positives
+  if (
+    msg.includes("what's my balance") ||
+    msg.includes("what is my balance") ||
+    msg.includes('my balance') ||
+    msg.includes('how much do i have') ||
+    msg.includes('check my balance') ||
+    msg.includes('show my balance') ||
+    msg.includes('check balance') ||
+    msg === 'balance'
+  ) {
+    result.type = 'balance';
+    return result;
+  }
+
+  // PORTFOLIO — show my positions / LP positions / liquidity
   if (
     msg === 'portfolio' ||
-    msg.match(/^(show|view|my)\s*portfolio/)
+    msg.match(/^(show|view|my)\s*portfolio/) ||
+    msg.includes('show my positions') ||
+    msg.includes('my positions') ||
+    msg.includes('my liquidity') ||
+    msg.includes('my lp') ||
+    msg.includes('where is my liquidity') ||
+    msg.includes('my active positions')
   ) {
     result.type = 'portfolio';
     return result;

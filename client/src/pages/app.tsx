@@ -28,6 +28,8 @@ import { normalizeForChart } from '../lib/normalizeSubgraphData';
 import { QueryLibrary } from '../components/analytics/QueryLibrary';
 import { PredictionsView } from '../components/predictions/PredictionsView';
 import { VaultsView }      from '../components/vaults/VaultsView';
+import { TxHistoryPanel }  from '../components/portfolio/TxHistoryPanel';
+import { useTxHistory }    from '../hooks/useTxHistory';
 import { ConnectButton } from '../components/wallet/ConnectButton';
 import { useWalletConnection } from '../hooks/useWalletConnection';
 import { useTokenApproval } from '../hooks/useTokenApproval';
@@ -416,7 +418,7 @@ const AssetsTable = ({ assets, theme }) => (
 );
 
 // Liquidity Positions
-const LiquidityPositions = ({ positions, theme }) => (
+const LiquidityPositions = ({ positions, theme, onRemoveLiquidity = null }) => (
   <div style={{
     background: theme.bgCard,
     borderRadius: '16px',
@@ -427,7 +429,7 @@ const LiquidityPositions = ({ positions, theme }) => (
     <div style={{ padding: '20px 24px', borderBottom: `1px solid ${theme.border}` }}>
       <h3 style={{ color: theme.textPrimary, fontSize: '16px', fontWeight: '700', margin: 0 }}>Liquidity Positions</h3>
     </div>
-    
+
     {positions.length === 0 ? (
       <div style={{ padding: '48px', textAlign: 'center', color: theme.textSecondary }}>
         <p style={{ fontSize: '14px' }}>No liquidity positions yet</p>
@@ -460,24 +462,36 @@ const LiquidityPositions = ({ positions, theme }) => (
                   </div>
                 </div>
               </div>
-              
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ color: theme.textSecondary, fontSize: '12px', marginBottom: '2px' }}>TVL in Position</div>
-                <div style={{ 
-                  color: theme.textPrimary, 
-                  fontSize: '18px', 
-                  fontWeight: '700',
-                  fontFamily: 'SF Mono, Monaco, monospace',
-                }}>
-                  ${position.tvl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ color: theme.textSecondary, fontSize: '12px', marginBottom: '2px' }}>TVL in Position</div>
+                  <div style={{
+                    color: theme.textPrimary,
+                    fontSize: '18px',
+                    fontWeight: '700',
+                    fontFamily: 'SF Mono, Monaco, monospace',
+                  }}>
+                    ${position.tvl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
                 </div>
+                {onRemoveLiquidity && (
+                  <button
+                    onClick={() => onRemoveLiquidity(position)}
+                    style={{ padding: '6px 14px', fontSize: '12px', fontWeight: '600', borderRadius: '8px', border: `1px solid ${theme.border}`, background: 'transparent', color: '#ef4444', cursor: 'pointer', transition: 'all 0.2s' }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#ef4444'; e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    Remove
+                  </button>
+                )}
               </div>
             </div>
-            
-            <div style={{ 
-              display: 'flex', 
-              gap: '24px', 
-              marginTop: '12px', 
+
+            <div style={{
+              display: 'flex',
+              gap: '24px',
+              marginTop: '12px',
               paddingTop: '12px',
               borderTop: `1px solid ${theme.border}`,
             }}>
@@ -688,8 +702,9 @@ const ActivityFeed = ({ activities, filter, setFilter, theme }) => {
 };
 
 // ============ PORTFOLIO INTERFACE ============
-const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, currentChain }) => {
+const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, currentChain, onRemoveLiquidity }) => {
   const [activityFilter, setActivityFilter] = useState('All');
+  const [showHistory, setShowHistory] = useState(false);
 
   // Mock data tailored for empty/filled states based on requirements
   const isAgent = type === 'Agent';
@@ -741,15 +756,31 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
            <h1 style={{ margin: 0, fontSize: '24px', color: theme.textPrimary }}>{type} Portfolio</h1>
-           <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '8px', color: theme.textSecondary }}>
-             <CloseIcon />
-           </button>
+           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+             <button
+               onClick={() => setShowHistory(h => !h)}
+               style={{ padding: '6px 14px', fontSize: '12px', fontWeight: '600', borderRadius: '8px', border: `1px solid ${theme.border}`, background: showHistory ? `${theme.accent}20` : 'transparent', color: showHistory ? theme.accent : theme.textSecondary, cursor: 'pointer' }}
+             >
+               {showHistory ? 'Hide History' : 'Tx History'}
+             </button>
+             <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '8px', color: theme.textSecondary }}>
+               <CloseIcon />
+             </button>
+           </div>
         </div>
 
-        <PortfolioSummary data={portfolioData} theme={theme} currentChain={currentChain} />
-        <AssetsTable assets={assets} theme={theme} />
-        <LiquidityPositions positions={liquidityPositions} theme={theme} />
-        <ActivityFeed activities={activities} filter={activityFilter} setFilter={setActivityFilter} theme={theme} />
+        {showHistory ? (
+          <div style={{ background: theme.bgCard, borderRadius: '16px', border: `1px solid ${theme.border}`, minHeight: '300px', marginBottom: '24px' }}>
+            <TxHistoryPanel />
+          </div>
+        ) : (
+          <>
+            <PortfolioSummary data={portfolioData} theme={theme} currentChain={currentChain} />
+            <AssetsTable assets={assets} theme={theme} />
+            <LiquidityPositions positions={liquidityPositions} theme={theme} onRemoveLiquidity={onRemoveLiquidity} />
+            <ActivityFeed activities={activities} filter={activityFilter} setFilter={setActivityFilter} theme={theme} />
+          </>
+        )}
       </div>
     </div>
   );
@@ -3067,6 +3098,10 @@ export default function MantuaApp() {
   // Real wallet connection using AppKit
   const { isConnected, address, truncatedAddress } = useWalletConnection();
 
+  // Token balances (used for balance chat command)
+  const { balances: tokenBalances, balancesBySymbol } = useTokenBalances();
+  const { data: ethBalanceData } = useBalance({ address });
+
   // Chain switching hook
   const { switchChain } = useSwitchChain();
 
@@ -3106,7 +3141,7 @@ export default function MantuaApp() {
   const [showPredictions, setShowPredictions] = useState(false);
   const [showVaults,      setShowVaults]      = useState(false);
   const [selectedPool, setSelectedPool] = useState(null);
-  const [addLiquidityMode, setAddLiquidityMode] = useState<'add' | 'create'>('add');
+  const [addLiquidityMode, setAddLiquidityMode] = useState<'add' | 'create' | 'remove'>('add');
   const [portfolioType, setPortfolioType] = useState('User');
   const [swapDetails, setSwapDetails] = useState(null);
   // Voice command state
@@ -3299,12 +3334,47 @@ export default function MantuaApp() {
         resetModals();
         if (inputValue.toLowerCase().includes('agent')) {
             setPortfolioType('Agent');
-            setShowPortfolioModal(true);
         } else {
             setPortfolioType('User');
-            setShowPortfolioModal(true);
         }
+        setShowPortfolioModal(true);
         sendMessage(inputValue);
+        return;
+    }
+
+    if (command.type === 'balance') {
+        resetModals();
+        // Build a balance summary from on-chain data
+        const ethBal = ethBalanceData
+          ? `${parseFloat(ethBalanceData.formatted).toFixed(4)} ETH`
+          : null;
+        const topTokens = tokenBalances
+          .filter(b => parseFloat(b.formatted) > 0)
+          .slice(0, 5)
+          .map(b => `${b.formatted.slice(0, 8)} ${b.token.symbol}`);
+        const lines = [ethBal, ...topTokens].filter(Boolean);
+        const balanceSummary = lines.length
+          ? `Your current balances on Base Sepolia:\n${lines.join('\n')}`
+          : 'No token balances found for this wallet on Base Sepolia.';
+        // Inject a synthetic assistant message directly (no AI round-trip needed)
+        setAnalyticsMessages(prev => [
+          ...prev,
+          {
+            id: 'user-bal-' + Date.now(),
+            sessionId: '',
+            role: 'user' as const,
+            content: inputValue,
+            createdAt: new Date().toISOString(),
+          },
+          {
+            id: 'asst-bal-' + Date.now(),
+            sessionId: '',
+            role: 'assistant' as const,
+            content: balanceSummary,
+            createdAt: new Date().toISOString(),
+          },
+        ]);
+        setHasInteracted(true);
         return;
     }
 
@@ -3698,6 +3768,13 @@ export default function MantuaApp() {
                   isDark={isDark}
                   isConnected={isConnected}
                   currentChain={currentChain}
+                  onRemoveLiquidity={(pool) => {
+                    setSelectedPool({ token1: pool.token1, token2: pool.token2 });
+                    setAddLiquidityMode('remove');
+                    setShowPortfolioModal(false);
+                    setShowAddLiquidityModal(true);
+                    setHasInteracted(true);
+                  }}
                 />
             </div>
           )}
