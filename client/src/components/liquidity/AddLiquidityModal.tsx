@@ -35,7 +35,7 @@ const tokenGlyph = (s?: string) => !s ? '?' : s.includes('ETH') ? 'Ξ' : s.inclu
 const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
   onClose, theme, isDark, pool, mode = 'add',
 }) => {
-  const [selectedHook, setSelectedHook] = useState('jit');
+  const [selectedHook, setSelectedHook] = useState('none');
   const [isHookModalOpen, setIsHookModalOpen] = useState(false);
   const [tokenSelectorTarget, setTokenSelectorTarget] = useState<'A' | 'B' | null>(null);
   const [tokenA, setTokenA] = useState<Token | null>(null);
@@ -104,7 +104,7 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px' }}>
                     <span style={{ color: '#10b981', fontSize: '13px', fontWeight: '600' }}>↗ 0.029% Fee</span>
-                    <span style={{ color: theme.textSecondary, fontSize: '13px' }}>TVL <span style={{ color: theme.textPrimary, fontWeight: '600' }}>$315,790</span></span>
+                    <span style={{ color: theme.textSecondary, fontSize: '13px' }}>TVL <span style={{ color: theme.textPrimary, fontWeight: '600' }}>$315,790</span> <span style={{ background: 'rgba(107,114,128,0.2)', color: '#9ca3af', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, verticalAlign: 'middle' }}>Testnet</span></span>
                     <span style={{ color: theme.textSecondary, fontSize: '13px' }}>APY <span style={{ color: '#10b981', fontWeight: '600' }}>1.45%</span></span>
                   </div>
                 </div>
@@ -114,12 +114,12 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
 
           <div style={{ flex: 1, padding: '24px', display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', gap: '4px', marginBottom: '20px' }}>
-              {['Dynamic Fee', 'Volume', 'TVL'].map((tab, i) => (
+              {['Volume', 'TVL'].map((tab, i) => (
                 <button key={tab} style={{ padding: '6px 12px', borderRadius: '8px', background: i === 0 ? theme.bgSecondary : 'transparent', color: i === 0 ? theme.textPrimary : theme.textSecondary, border: 'none', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>{tab}</button>
               ))}
             </div>
             <div style={{ flex: 1, minHeight: '250px' }}>
-              <PoolActivityChart theme={theme} isDark={isDark} />
+              <PoolActivityChart theme={theme} isDark={isDark} tokenA={displayA} tokenB={displayB} />
             </div>
           </div>
         </div>

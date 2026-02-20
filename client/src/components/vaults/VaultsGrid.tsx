@@ -2,6 +2,7 @@
  * VaultsGrid.tsx
  * Filterable 2-column vault grid.
  * Strategy filter pills on top. Shows VaultDetailModal on card click.
+ * Theme-aware via optional `theme`/`isDark` props.
  */
 
 import { useState } from 'react';
@@ -24,9 +25,11 @@ const FILTER_LABELS: Record<Filter, string> = {
 interface Props {
   vaults:    VaultData[];
   isLoading: boolean;
+  theme?:    any;
+  isDark?:   boolean;
 }
 
-export function VaultsGrid({ vaults, isLoading }: Props) {
+export function VaultsGrid({ vaults, isLoading, theme, isDark }: Props) {
   const [filter,   setFilter]   = useState<Filter>('all');
   const [selected, setSelected] = useState<VaultData | null>(null);
 
@@ -38,7 +41,8 @@ export function VaultsGrid({ vaults, isLoading }: Props) {
     return (
       <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="p-5 bg-gray-900 border border-gray-800 rounded-2xl space-y-4">
+          <div key={i} className="p-5 rounded-2xl space-y-4"
+               style={{ background: theme?.bgCard ?? '#111827', border: `1px solid ${theme?.border ?? 'rgba(55,65,81,1)'}` }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <SkeletonBox className="w-10 h-10 rounded-xl" />
@@ -64,18 +68,18 @@ export function VaultsGrid({ vaults, isLoading }: Props) {
   return (
     <div className="p-6">
       {/* ── STRATEGY FILTER ─────────────────────────────────────────────── */}
-      <div className="flex items-center gap-1 p-1 bg-gray-900 border border-gray-800
-                      rounded-xl mb-6 w-fit">
+      <div className="flex items-center gap-1 p-1 rounded-xl mb-6 w-fit"
+           style={{ background: theme?.bgSecondary ?? '#111827', border: `1px solid ${theme?.border ?? 'rgba(55,65,81,1)'}` }}>
         {FILTERS.map(f => (
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize
-                       transition-colors ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-colors ${
               filter === f
                 ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30'
-                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                : 'hover:bg-gray-800/50'
             }`}
+            style={filter !== f ? { color: theme?.textSecondary ?? '#9ca3af' } : undefined}
           >
             {FILTER_LABELS[f]}
           </button>
@@ -83,13 +87,13 @@ export function VaultsGrid({ vaults, isLoading }: Props) {
       </div>
 
       {/* Result count */}
-      <p className="text-xs text-gray-600 mb-4 font-medium">
+      <p className="text-xs mb-4 font-medium" style={{ color: theme?.textSecondary ?? '#4b5563' }}>
         {filtered.length} vault{filtered.length !== 1 ? 's' : ''}
       </p>
 
       {/* ── GRID ────────────────────────────────────────────────────────── */}
       {filtered.length === 0 ? (
-        <div className="text-center py-16 text-gray-600">
+        <div className="text-center py-16" style={{ color: theme?.textSecondary ?? '#4b5563' }}>
           <p className="text-sm">No vaults match this filter.</p>
         </div>
       ) : (
@@ -99,6 +103,7 @@ export function VaultsGrid({ vaults, isLoading }: Props) {
               key={vault.id}
               vault={vault}
               onClick={() => setSelected(vault)}
+              theme={theme}
             />
           ))}
         </div>
@@ -108,6 +113,7 @@ export function VaultsGrid({ vaults, isLoading }: Props) {
         <VaultDetailModal
           vault={selected}
           onClose={() => setSelected(null)}
+          theme={theme}
         />
       )}
     </div>

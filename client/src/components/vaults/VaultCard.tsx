@@ -2,8 +2,10 @@
  * VaultCard.tsx
  * Single vault card for the VaultsGrid.
  * APY is the dominant visual. Strategy badge + risk level in footer.
+ * Theme-aware via optional `theme` prop.
  */
 
+import { useState } from 'react';
 import { TrendingUp, Shield, Zap } from 'lucide-react';
 import {
   formatApy,
@@ -36,23 +38,36 @@ const formatTvl = (raw: string): string => {
 interface Props {
   vault:   VaultData;
   onClick: () => void;
+  theme?:  any;
 }
 
-export function VaultCard({ vault, onClick }: Props) {
+export function VaultCard({ vault, onClick, theme }: Props) {
   const StratIcon  = STRATEGY_ICONS[vault.strategy];
   const apyStr     = formatApy(vault.liveApyBps);
   const tvlStr     = formatTvl(vault.totalAssetsFormatted);
   const userAmt    = parseFloat(vault.userAssetsFormatted);
   const hasDeposit = userAmt > 0;
+  const [hovered, setHovered] = useState(false);
+
+  const cardBg     = theme ? (hovered ? theme.bgSecondary : theme.bgCard) : undefined;
+  const cardBorder = theme ? theme.border : undefined;
+  const textPrimary    = theme ? theme.textPrimary    : undefined;
+  const textSecondary  = theme ? theme.textSecondary  : undefined;
 
   return (
     <button
       onClick={onClick}
       disabled={vault.isPaused}
-      className="w-full text-left p-5 bg-gray-900 hover:bg-gray-800/70
-                 border border-gray-800 hover:border-gray-600
-                 rounded-2xl transition-all duration-150 group
-                 disabled:opacity-60 disabled:cursor-not-allowed"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className={`w-full text-left p-5 rounded-2xl transition-all duration-150 group
+                 disabled:opacity-60 disabled:cursor-not-allowed${
+        theme ? '' : ' bg-gray-900 hover:bg-gray-800/70 border border-gray-800 hover:border-gray-600'
+      }`}
+      style={theme ? {
+        background: cardBg,
+        border: `1px solid ${cardBorder}`,
+      } : undefined}
     >
       {/* ── ROW 1: Strategy badge + risk ────────────────────────── */}
       <div className="flex items-center justify-between mb-3">
@@ -68,17 +83,18 @@ export function VaultCard({ vault, onClick }: Props) {
       </div>
 
       {/* ── ROW 2: Name ─────────────────────────────────────────── */}
-      <p className="text-sm font-semibold text-white leading-snug mb-1
-                   group-hover:text-gray-100 line-clamp-2">
-        {vault.name}
+      <p className="text-sm font-semibold leading-snug mb-1 line-clamp-2"
+         style={{ color: textPrimary ?? undefined }}>
+        <span className={theme ? '' : 'text-white group-hover:text-gray-100'}>{vault.name}</span>
       </p>
-      <p className="text-xs text-gray-500 mb-4 line-clamp-2">
+      <p className="text-xs mb-4 line-clamp-2"
+         style={{ color: textSecondary ?? '#6b7280' }}>
         {vault.description}
       </p>
 
       {/* ── APY: dominant visual ─────────────────────────────────── */}
       <div className="mb-4">
-        <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">APY</p>
+        <p className="text-xs uppercase tracking-wide mb-1" style={{ color: textSecondary ?? '#6b7280' }}>APY</p>
         <p className="text-4xl font-bold text-emerald-400">{apyStr}</p>
       </div>
 
@@ -92,12 +108,12 @@ export function VaultCard({ vault, onClick }: Props) {
       )}
 
       {/* ── FOOTER: TVL + user deposit ──────────────────────────── */}
-      <div className="flex items-center justify-between pt-3
-                      border-t border-gray-800 text-xs text-gray-500">
+      <div className="flex items-center justify-between pt-3 text-xs"
+           style={{ borderTop: `1px solid ${cardBorder ?? 'rgba(55,65,81,1)'}`, color: textSecondary ?? '#6b7280' }}>
         <span className="flex items-center gap-1.5">
           <TrendingUp className="w-3 h-3" />
           {tvlStr}
-          <span className="text-gray-700">TVL</span>
+          <span style={{ opacity: 0.5 }}>TVL</span>
         </span>
         {hasDeposit && (
           <span className="text-emerald-400 font-semibold">

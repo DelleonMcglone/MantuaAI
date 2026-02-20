@@ -210,7 +210,8 @@ export function createSwapParams(
   
   const zeroForOne = normalizedIn.toLowerCase() === currency0.toLowerCase();
   
-  const amountSpecified = isExactInput ? amountIn : -amountIn;
+  // Uniswap v4: negative amountSpecified = exact input, positive = exact output
+  const amountSpecified = isExactInput ? -amountIn : amountIn;
   
   const sqrtPriceLimitX96 = zeroForOne 
     ? SQRT_PRICE_LIMIT_X96.MIN + BigInt(1)

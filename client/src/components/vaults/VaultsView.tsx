@@ -1,8 +1,8 @@
 /**
  * VaultsView.tsx
  * Full-page vaults terminal.
- * Matches design language of PredictionsView exactly.
  * Tabs: Vaults | My Deposits | Performance
+ * Theme-aware via optional `theme`/`isDark` props.
  */
 
 import { useState }          from 'react';
@@ -21,9 +21,21 @@ const TABS = [
   { id: 'performance' as Tab, label: 'Performance',  icon: TrendingUp },
 ];
 
-export function VaultsView() {
+interface Props {
+  theme?:  any;
+  isDark?: boolean;
+}
+
+export function VaultsView({ theme, isDark }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('vaults');
   const { vaults, isLoading } = useVaults();
+
+  const bgPrimary   = theme?.bgPrimary     ?? '#030712';
+  const bgCard      = theme?.bgCard        ?? '#111827';
+  const border      = theme?.border        ?? 'rgba(55,65,81,1)';
+  const textPrimary = theme?.textPrimary   ?? '#ffffff';
+  const textSec     = theme?.textSecondary ?? '#9ca3af';
+  const accent      = theme?.accent        ?? '#8b5cf6';
 
   // Aggregate stats
   const totalTvl    = vaults.reduce((s, v) => s + parseFloat(v.totalAssetsFormatted), 0);
@@ -34,79 +46,65 @@ export function VaultsView() {
     : '—';
 
   const myTotal = vaults.reduce((s, v) => s + parseFloat(v.userAssetsFormatted), 0);
-  const myTotalStr = myTotal > 0
-    ? myTotal.toFixed(4)
-    : '—';
-
-  const depositsTab = TABS.find(t => t.id === 'deposits')!;
-  const myBadge     = vaults.filter(v => v.userShares > 0n).length;
+  const myTotalStr = myTotal > 0 ? myTotal.toFixed(4) : '—';
+  const myBadge    = vaults.filter(v => v.userShares > 0n).length;
 
   return (
-    <div className="flex flex-col h-full min-h-screen bg-gray-950 overflow-hidden">
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%', background: bgPrimary, overflow: 'hidden' }}>
 
       {/* ── TOP HEADER ──────────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-gray-800">
+      <div style={{ flexShrink: 0, padding: '24px 24px 16px', borderBottom: `1px solid ${border}` }}>
 
         {/* Title row */}
-        <div className="flex items-center justify-between mb-5">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <div>
-            <h1 className="text-2xl font-bold text-white">Vaults</h1>
-            <p className="text-sm text-gray-400 mt-0.5">
+            <h1 style={{ fontSize: 24, fontWeight: 700, color: textPrimary, margin: '0 0 2px' }}>Vaults</h1>
+            <p style={{ fontSize: 14, color: textSec, margin: 0 }}>
               ERC-4626 yield vaults — deposit LP tokens, earn passive yield
             </p>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5
-                          bg-emerald-900/30 border border-emerald-700/50 rounded-full">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs font-medium text-emerald-400">Live</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 20 }}>
+            <span className="animate-pulse" style={{ width: 8, height: 8, borderRadius: '50%', background: '#34d399', display: 'inline-block' }} />
+            <span style={{ fontSize: 12, fontWeight: 500, color: '#34d399' }}>Live</span>
           </div>
         </div>
 
         {/* ── STATS ROW ───────────────────────────────────────────────── */}
-        <div className="grid grid-cols-3 gap-4 mb-5">
-          <div className="p-4 bg-gray-900 border border-gray-800 rounded-xl">
-            <p className="text-xs text-gray-500 mb-1 uppercase tracking-wide font-medium">
-              Total TVL
-            </p>
-            <p className="text-2xl font-bold text-white">{totalTvlStr}</p>
-            <p className="text-xs text-gray-500 mt-0.5">across {vaults.length} vaults</p>
-          </div>
-          <div className="p-4 bg-gray-900 border border-gray-800 rounded-xl">
-            <p className="text-xs text-gray-500 mb-1 uppercase tracking-wide font-medium">
-              Avg APY
-            </p>
-            <p className="text-2xl font-bold text-emerald-400">
-              {formatApy(avgApyBps())}
-            </p>
-            <p className="text-xs text-gray-500 mt-0.5">across all strategies</p>
-          </div>
-          <div className="p-4 bg-gray-900 border border-gray-800 rounded-xl">
-            <p className="text-xs text-gray-500 mb-1 uppercase tracking-wide font-medium">
-              My Deposits
-            </p>
-            <p className="text-2xl font-bold text-white">{myTotalStr}</p>
-            <p className="text-xs text-gray-500 mt-0.5">LP tokens</p>
-          </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 20 }}>
+          {[
+            { label: 'Total TVL',   value: totalTvlStr, sub: `across ${vaults.length} vaults`, green: false },
+            { label: 'Avg APY',     value: formatApy(avgApyBps()), sub: 'across all strategies', green: true },
+            { label: 'My Deposits', value: myTotalStr,  sub: 'LP tokens', green: false },
+          ].map(s => (
+            <div key={s.label} style={{ padding: 16, background: bgCard, border: `1px solid ${border}`, borderRadius: 12 }}>
+              <p style={{ fontSize: 11, color: textSec, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500 }}>{s.label}</p>
+              <p style={{ fontSize: 24, fontWeight: 700, color: s.green ? '#34d399' : textPrimary, margin: 0 }}>{s.value}</p>
+              <p style={{ fontSize: 11, color: textSec, marginTop: 2 }}>{s.sub}</p>
+            </div>
+          ))}
         </div>
 
         {/* ── TAB BAR ──────────────────────────────────────────────── */}
-        <div className="flex gap-1">
+        <div style={{ display: 'flex', gap: 4 }}>
           {TABS.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm
-                         font-medium transition-all ${
-                activeTab === tab.id
-                  ? 'bg-gray-800 text-white border border-gray-700'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
-              }`}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '10px 20px', borderRadius: 12,
+                fontSize: 14, fontWeight: 500,
+                border: activeTab === tab.id ? `1px solid ${border}` : '1px solid transparent',
+                background: activeTab === tab.id ? bgCard : 'transparent',
+                color: activeTab === tab.id ? textPrimary : textSec,
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
             >
-              <tab.icon className="w-4 h-4" />
+              <tab.icon style={{ width: 16, height: 16 }} />
               {tab.label}
               {tab.id === 'deposits' && myBadge > 0 && (
-                <span className="ml-0.5 px-1.5 py-0.5 bg-purple-600 text-white
-                                 text-xs rounded-full font-bold leading-none">
+                <span style={{ marginLeft: 2, padding: '1px 6px', background: accent, color: 'white', fontSize: 11, borderRadius: 10, fontWeight: 700 }}>
                   {myBadge}
                 </span>
               )}
@@ -116,16 +114,10 @@ export function VaultsView() {
       </div>
 
       {/* ── TAB CONTENT — scrollable ─────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto">
-        {activeTab === 'vaults'      && (
-          <VaultsGrid vaults={vaults} isLoading={isLoading} />
-        )}
-        {activeTab === 'deposits'    && (
-          <MyDepositsTab vaults={vaults} />
-        )}
-        {activeTab === 'performance' && (
-          <PerformanceTab vaults={vaults} />
-        )}
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+        {activeTab === 'vaults'      && <VaultsGrid vaults={vaults} isLoading={isLoading} theme={theme} isDark={isDark} />}
+        {activeTab === 'deposits'    && <MyDepositsTab vaults={vaults} />}
+        {activeTab === 'performance' && <PerformanceTab vaults={vaults} />}
       </div>
     </div>
   );

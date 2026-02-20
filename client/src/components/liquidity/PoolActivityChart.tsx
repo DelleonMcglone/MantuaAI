@@ -1,70 +1,83 @@
-import React from 'react';
-import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import React, { useMemo } from 'react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 interface PoolActivityChartProps {
   theme: any;
   isDark: boolean;
+  tokenA?: string;
+  tokenB?: string;
 }
 
-const PoolActivityChart: React.FC<PoolActivityChartProps> = ({ theme, isDark }) => {
-  const data = [
-    { name: 'Dec 12', volume: 120000, fee: 0.02 },
-    { name: 'Dec 14', volume: 150000, fee: 0.022 },
-    { name: 'Dec 16', volume: 180000, fee: 0.025 },
-    { name: 'Dec 18', volume: 140000, fee: 0.021 },
-    { name: 'Dec 20', volume: 200000, fee: 0.028 },
-    { name: 'Dec 22', volume: 170000, fee: 0.026 },
-    { name: 'Dec 24', volume: 220000, fee: 0.03 },
-    { name: 'Dec 26', volume: 190000, fee: 0.027 },
-    { name: 'Dec 28', volume: 210000, fee: 0.029 },
-    { name: 'Jan 1', volume: 250000, fee: 0.032 },
-    { name: 'Jan 3', volume: 230000, fee: 0.031 },
-    { name: 'Jan 5', volume: 270000, fee: 0.035 },
-    { name: 'Jan 7', volume: 240000, fee: 0.033 },
-    { name: 'Jan 14', volume: 315000, fee: 0.04 },
-  ];
+/**
+ * Generates deterministic mock volume data seeded by the token pair.
+ * Dynamic Fee series has been removed per Issue 3/5.
+ */
+function seedRandom(str: string): () => number {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = (h * 16777619) >>> 0;
+  }
+  return () => {
+    h ^= h << 13;
+    h ^= h >> 17;
+    h ^= h << 5;
+    h = h >>> 0;
+    return (h % 1000) / 1000;
+  };
+}
+
+const LABELS = [
+  'Dec 12', 'Dec 14', 'Dec 16', 'Dec 18', 'Dec 20', 'Dec 22',
+  'Dec 24', 'Dec 26', 'Dec 28', 'Jan 1', 'Jan 3', 'Jan 5', 'Jan 7', 'Jan 14',
+];
+
+const PoolActivityChart: React.FC<PoolActivityChartProps> = ({ theme, isDark, tokenA, tokenB }) => {
+  const pairKey = `${tokenA ?? 'ETH'}/${tokenB ?? 'mUSDC'}`;
+
+  const data = useMemo(() => {
+    const rand = seedRandom(pairKey);
+    const baseVolume = 80_000 + rand() * 200_000;
+    return LABELS.map(name => ({
+      name,
+      volume: Math.round(baseVolume * (0.6 + rand() * 0.8)),
+    }));
+  }, [pairKey]);
 
   return (
     <div style={{ width: '100%', height: '100%', minHeight: '200px' }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#334155' : '#e2e8f0'} strokeOpacity={0.5} />
-          <XAxis 
-            dataKey="name" 
+      <div style={{ marginBottom: 6, fontSize: 11, color: theme.textSecondary, display: 'flex', alignItems: 'center', gap: 6 }}>
+        {tokenA && tokenB ? `${pairKey} Volume` : 'Volume'}
+        <span style={{ background: 'rgba(107,114,128,0.2)', color: '#9ca3af', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3 }}>Testnet</span>
+      </div>
+      <ResponsiveContainer width="100%" height="90%">
+        <BarChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#334155' : '#e2e8f0'} strokeOpacity={0.5} />
+          <XAxis
+            dataKey="name"
             axisLine={false}
             tickLine={false}
             tick={{ fill: theme.textSecondary, fontSize: 10 }}
             interval={2}
           />
-          <YAxis 
-            yAxisId="left"
-            orientation="left"
+          <YAxis
             axisLine={false}
             tickLine={false}
             tick={{ fill: theme.textSecondary, fontSize: 10 }}
             tickFormatter={(value) => `$${value / 1000}k`}
           />
-          <YAxis 
-            yAxisId="right"
-            orientation="right"
-            axisLine={false}
-            tickLine={false}
-            tick={{ fill: theme.textSecondary, fontSize: 10 }}
-            tickFormatter={(value) => `${value}%`}
-            domain={[0, 0.05]}
-          />
-          <Tooltip 
-             contentStyle={{
+          <Tooltip
+            contentStyle={{
               backgroundColor: theme.bgCard,
               borderColor: theme.border,
               borderRadius: '8px',
               fontSize: '12px',
-              color: theme.textPrimary
+              color: theme.textPrimary,
             }}
+            formatter={(value: number) => [`$${value.toLocaleString()}`, 'Volume']}
           />
-          <Bar yAxisId="left" dataKey="volume" fill="#f97316" radius={[4, 4, 0, 0]} barSize={12} />
-          <Line yAxisId="right" type="monotone" dataKey="fee" stroke={isDark ? '#9ca3af' : '#64748b'} strokeDasharray="3 3" dot={false} strokeWidth={2} />
-        </ComposedChart>
+          <Bar dataKey="volume" fill="#f97316" radius={[4, 4, 0, 0]} barSize={12} />
+        </BarChart>
       </ResponsiveContainer>
     </div>
   );

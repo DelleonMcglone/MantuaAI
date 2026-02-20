@@ -25,11 +25,9 @@ import { TrendingUp, BarChart2, PieChart as PieIcon, Activity, Layers } from 'lu
 import { isAnalyticsQuery, generateAnalyticsQuery } from '../lib/analyticsEngine';
 import { gqlQuery } from '../lib/graphql';
 import { normalizeForChart } from '../lib/normalizeSubgraphData';
-import { QueryLibrary } from '../components/analytics/QueryLibrary';
 // Heavy views loaded lazily for bundle splitting
 const PredictionsView   = lazy(() => import('../components/predictions/PredictionsView').then(m => ({ default: m.PredictionsView })));
 const VaultsView        = lazy(() => import('../components/vaults/VaultsView').then(m => ({ default: m.VaultsView })));
-const AnalyticsDashboard = lazy(() => import('../components/analytics/AnalyticsDashboard').then(m => ({ default: m.AnalyticsDashboard })));
 import { TxHistoryPanel }  from '../components/portfolio/TxHistoryPanel';
 import { useTxHistory }    from '../hooks/useTxHistory';
 import { sanitizeInput }   from '../lib/sanitize';
@@ -40,7 +38,7 @@ import { useTokenApproval } from '../hooks/useTokenApproval';
 import { useSwapQuote, getPriceImpactSeverity } from '../hooks/useSwapQuote';
 import { useSwapExecution } from '../hooks/useSwapExecution';
 import { useTokenBalances } from '../hooks/useTokenBalances';
-import { PriceImpact, SwapButton, SwapButtonStyles, SwapConfirmation } from '../components/swap';
+import { PriceImpact, SwapButton, SwapButtonStyles, SwapConfirmation, SwapPriceChart } from '../components/swap';
 import { parseTokenAmount, formatTokenAmount, isNativeEth, getZeroAddress, getHookAddress } from '../lib/swap-utils';
 import { ALL_TOKENS, NATIVE_ETH } from '../config/tokens';
 import {
@@ -900,30 +898,6 @@ const MiniChart = ({ data, color = "#10b981" }) => {
   );
 };
 
-// Price Chart Component Placeholder
-const PriceChart = ({ pair, theme }) => {
-  return (
-    <div style={{ 
-      width: '100%', 
-      height: '100%', 
-      display: 'flex', 
-      alignItems: 'center', 
-      justifyContent: 'center',
-      background: 'rgba(0,0,0,0.2)',
-      borderRadius: '16px',
-      position: 'relative'
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: theme.textSecondary, opacity: 0.6 }}>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="18" y1="20" x2="18" y2="10"></line>
-          <line x1="12" y1="20" x2="12" y2="4"></line>
-          <line x1="6" y1="20" x2="6" y2="14"></line>
-        </svg>
-        <span style={{ fontWeight: '500', letterSpacing: '0.5px' }}>TradingView Chart Here</span>
-      </div>
-    </div>
-  );
-};
 
 // Token Select Modal
 const TokenSelectModal = ({ isOpen, onClose, onSelect, theme, isDark, getTokenBalance, calculateUsdValue }) => {
@@ -1883,76 +1857,19 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
           gap: '20px',
           padding: '24px'
         }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                  <TokenPairIcon token1={fromToken} token2={toToken} size={32} />
-                  <span style={{ color: theme.textPrimary, fontWeight: '700', fontSize: '18px' }}>{fromToken} / {toToken}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
-                  <span style={{ color: theme.textPrimary, fontSize: '32px', fontWeight: '700', fontFamily: 'SF Mono, Monaco, monospace', letterSpacing: '-0.03em' }}>$3,245.50</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(16, 185, 129, 0.1)', padding: '4px 8px', borderRadius: '6px' }}>
-                    <span style={{ color: '#10b981', fontSize: '13px', fontWeight: '700' }}>+2.34%</span>
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '4px', background: theme.bgSecondary, padding: '4px', borderRadius: '10px' }}>
-                {['1H', '4H', '1D', '1W'].map((tf, i) => (
-                  <button key={tf} style={{ 
-                    padding: '6px 12px', 
-                    borderRadius: '8px', 
-                    border: 'none', 
-                    background: i === 2 ? theme.bgCard : 'transparent', 
-                    color: i === 2 ? theme.textPrimary : theme.textSecondary, 
-                    fontSize: '13px', 
-                    fontWeight: '600', 
-                    cursor: 'pointer',
-                    boxShadow: i === 2 ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
-                  }}>{tf}</button>
-                ))}
-              </div>
-            </div>
-            
-            <div style={{ height: '240px', width: '100%', flex: 1 }}>
-               <PriceChart pair={`${fromToken}/${toToken}`} theme={theme} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+              <TokenPairIcon token1={fromToken} token2={toToken} size={28} />
+              <span style={{ color: theme.textPrimary, fontWeight: '700', fontSize: '16px' }}>{fromToken} / {toToken}</span>
             </div>
 
-            {/* Market Stats */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginTop: 'auto' }}>
-                <div style={{ 
-                  background: theme.bgSecondary, 
-                  borderRadius: '12px', 
-                  padding: '16px', 
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'center',
-                }}>
-                  <div style={{ color: theme.textSecondary, fontSize: '12px', marginBottom: '4px', fontWeight: '600', textTransform: 'uppercase' }}>24h Volume</div>
-                  <div style={{ color: theme.textPrimary, fontSize: '18px', fontWeight: '700' }}>$2.4B</div>
-                </div>
-                <div style={{ 
-                  background: theme.bgSecondary, 
-                  borderRadius: '12px', 
-                  padding: '16px', 
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'center',
-                }}>
-                  <div style={{ color: theme.textSecondary, fontSize: '12px', marginBottom: '4px', fontWeight: '600', textTransform: 'uppercase' }}>Pool TVL</div>
-                  <div style={{ color: theme.textPrimary, fontSize: '18px', fontWeight: '700' }}>$847M</div>
-                </div>
-                <div style={{ 
-                  background: theme.bgSecondary, 
-                  borderRadius: '12px', 
-                  padding: '16px', 
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'center',
-                }}>
-                  <div style={{ color: theme.textSecondary, fontSize: '12px', marginBottom: '4px', fontWeight: '600', textTransform: 'uppercase' }}>Current Fee</div>
-                  <div style={{ color: theme.textPrimary, fontSize: '18px', fontWeight: '700' }}>0.05%</div>
-                </div>
-              </div>
+            <div style={{ flex: 1, minHeight: '320px' }}>
+              <SwapPriceChart
+                fromToken={fromToken}
+                toToken={toToken}
+                theme={theme}
+                isDark={isDark}
+              />
+            </div>
         </div>
 
         {/* RIGHT COLUMN: Swap Form */}
@@ -2406,9 +2323,9 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
 
         {/* Stats Cards */}
         <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
-          <StatsCard label="TVL" value={`$${totalTVL.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} change="+12.5%" />
-          <StatsCard label="Volume (24H)" value={`$${totalVolume.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} change="+8.3%" />
-          <StatsCard label="Fees (24H)" value={`$${totalFees.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} change="+5.2%" />
+          <StatsCard label="TVL [Testnet]" value={`$${totalTVL.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} change="+12.5%" />
+          <StatsCard label="Volume 24H [Testnet]" value={`$${totalVolume.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} change="+8.3%" />
+          <StatsCard label="Fees 24H [Testnet]" value={`$${totalFees.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} change="+5.2%" />
         </div>
 
         {/* Filters */}
@@ -3061,6 +2978,7 @@ export default function MantuaApp() {
 
   useEffect(() => {
     localStorage.setItem('mantua-theme', isDark ? 'dark' : 'light');
+    document.documentElement.classList.toggle('dark', isDark);
   }, [isDark]);
 
   // Chain configuration
@@ -3144,7 +3062,6 @@ export default function MantuaApp() {
   const [showAddLiquidityModal, setShowAddLiquidityModal] = useState(false);
   const [showPredictions,  setShowPredictions]  = useState(false);
   const [showVaults,       setShowVaults]       = useState(false);
-  const [showAnalytics,    setShowAnalytics]    = useState(false);
   const [selectedPool, setSelectedPool] = useState(null);
   const [addLiquidityMode, setAddLiquidityMode] = useState<'add' | 'create' | 'remove'>('add');
   const [portfolioType, setPortfolioType] = useState('User');
@@ -3320,7 +3237,6 @@ export default function MantuaApp() {
        setShowAgentBuilder(false);
        setShowAddLiquidityModal(false);
        setShowPortfolioModal(false);
-       setShowAnalytics(false);
     };
 
     if (command.type === 'newChat') {
@@ -3651,22 +3567,6 @@ export default function MantuaApp() {
             <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', color: 'white', padding: '1px 6px', borderRadius: 10 }}>AI</span>
           </button>
 
-          {/* Analytics — dev/admin only */}
-          {import.meta.env.DEV && (
-            <button
-              onClick={() => {
-                setShowAnalytics(true);
-                setShowAgentBuilder(false); setShowPredictions(false); setShowVaults(false);
-                setShowSwap(false); setShowLiquidity(false);
-                setShowPortfolioModal(false); setShowAddLiquidityModal(false);
-                setHasInteracted(true);
-              }}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', background: showAnalytics ? `${theme.accent}20` : 'transparent', border: 'none', borderRadius: 8, color: showAnalytics ? theme.accent : theme.textPrimary, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
-            >
-              <BarChart2 size={16} /> Analytics
-            </button>
-          )}
-
           {/* Portfolio */}
           <div style={{ marginBottom: 8 }}>
             <button
@@ -3772,27 +3672,18 @@ export default function MantuaApp() {
           
           {/* Predictions — full-page sibling, not inside chat scroll container */}
           {showPredictions && !showSwap && !showLiquidity && !showAgentBuilder && !showAddLiquidityModal && (
-            <div style={{ position: 'absolute', inset: 0, zIndex: 110, overflow: 'auto', background: '#030712' }}>
+            <div style={{ position: 'absolute', inset: 0, zIndex: 110, overflow: 'auto', background: theme.bgPrimary }}>
               <Suspense fallback={<div style={{ padding: 40, color: '#6b7280' }}>Loading…</div>}>
-                <PredictionsView />
+                <PredictionsView theme={theme} isDark={isDark} />
               </Suspense>
             </div>
           )}
 
           {/* Vaults — full-page sibling, not inside chat scroll container */}
           {showVaults && !showSwap && !showLiquidity && !showAgentBuilder && !showAddLiquidityModal && !showPredictions && (
-            <div style={{ position: 'absolute', inset: 0, zIndex: 110, overflow: 'auto', background: '#030712' }}>
+            <div style={{ position: 'absolute', inset: 0, zIndex: 110, overflow: 'auto', background: theme.bgPrimary }}>
               <Suspense fallback={<div style={{ padding: 40, color: '#6b7280' }}>Loading…</div>}>
-                <VaultsView />
-              </Suspense>
-            </div>
-          )}
-
-          {/* Analytics Dashboard — dev only */}
-          {showAnalytics && (
-            <div style={{ position: 'absolute', inset: 0, zIndex: 110, overflow: 'auto', background: '#030712' }}>
-              <Suspense fallback={<div style={{ padding: 40, color: '#6b7280' }}>Loading…</div>}>
-                <AnalyticsDashboard />
+                <VaultsView theme={theme} isDark={isDark} />
               </Suspense>
             </div>
           )}
@@ -3951,14 +3842,6 @@ export default function MantuaApp() {
                     onSubmit={handleChatSubmit}
                     disabled={isSending}
                   />
-
-                  {!hasInteracted && (
-                    <QueryLibrary
-                      onSelect={handleChatSubmit}
-                      theme={theme}
-                      isDark={isDark}
-                    />
-                  )}
 
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
                     <ChainSelector

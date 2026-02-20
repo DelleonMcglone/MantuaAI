@@ -1,8 +1,8 @@
 /**
  * PredictionsView.tsx
  * Full-page prediction market terminal.
- * Matches design language of LiquidityPools.tsx exactly.
  * Tabs: Markets | Arbitrage | My Positions
+ * Theme-aware via optional `theme`/`isDark` props.
  */
 
 import { useState } from 'react';
@@ -17,7 +17,12 @@ import { getKalshiMarkets }  from '../../config/kalshiMock';
 
 type Tab = 'markets' | 'arbitrage' | 'positions';
 
-export function PredictionsView() {
+interface Props {
+  theme?:  any;
+  isDark?: boolean;
+}
+
+export function PredictionsView({ theme, isDark }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('markets');
 
   const { markets: polyMarkets,   isLoading: polyLoading   } = usePolymarket();
@@ -29,87 +34,86 @@ export function PredictionsView() {
   const totalVolume = allMarkets.reduce((s, m) => s + (m.volume24h ?? 0), 0);
   const bestSpread  = arbOpportunities[0]?.spreadPct ?? 0;
 
+  const bgPrimary   = theme?.bgPrimary     ?? '#030712';
+  const bgCard      = theme?.bgCard        ?? '#111827';
+  const border      = theme?.border        ?? 'rgba(55,65,81,1)';
+  const textPrimary = theme?.textPrimary   ?? '#ffffff';
+  const textSec     = theme?.textSecondary ?? '#9ca3af';
+  const accent      = theme?.accent        ?? '#8b5cf6';
+
   const TABS = [
-    { id: 'markets'   as Tab, label: 'Markets',      icon: TrendingUp, badge: null },
+    { id: 'markets'   as Tab, label: 'Markets',      icon: TrendingUp, badge: null as number | null },
     { id: 'arbitrage' as Tab, label: 'Arbitrage',    icon: Zap,
       badge: arbOpportunities.length > 0 ? arbOpportunities.length : null },
-    { id: 'positions' as Tab, label: 'My Positions', icon: Briefcase,  badge: null },
+    { id: 'positions' as Tab, label: 'My Positions', icon: Briefcase,  badge: null as number | null },
   ];
 
   return (
-    <div className="flex flex-col h-full min-h-screen bg-gray-950 overflow-hidden">
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%', background: bgPrimary, overflow: 'hidden' }}>
 
       {/* ── TOP HEADER ─────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-gray-800">
+      <div style={{ flexShrink: 0, padding: '24px 24px 16px', borderBottom: `1px solid ${border}` }}>
 
         {/* Title row */}
-        <div className="flex items-center justify-between mb-5">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <div>
-            <h1 className="text-2xl font-bold text-white">Prediction Markets</h1>
-            <p className="text-sm text-gray-400 mt-0.5">
+            <h1 style={{ fontSize: 24, fontWeight: 700, color: textPrimary, margin: '0 0 2px' }}>Prediction Markets</h1>
+            <p style={{ fontSize: 14, color: textSec, margin: 0 }}>
               Unified view across Mantua, Polymarket &amp; Kalshi
             </p>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5
-                          bg-emerald-900/30 border border-emerald-700/50 rounded-full">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs font-medium text-emerald-400">Live</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 20 }}>
+            <span className="animate-pulse" style={{ width: 8, height: 8, borderRadius: '50%', background: '#34d399', display: 'inline-block' }} />
+            <span style={{ fontSize: 12, fontWeight: 500, color: '#34d399' }}>Live</span>
           </div>
         </div>
 
         {/* ── STATS ROW ────────────────────────────────────────────── */}
-        <div className="grid grid-cols-3 gap-4 mb-5">
-          <div className="p-4 bg-gray-900 border border-gray-800 rounded-xl">
-            <p className="text-xs text-gray-500 mb-1 uppercase tracking-wide font-medium">
-              Total Markets
-            </p>
-            <p className="text-2xl font-bold text-white">{allMarkets.length}</p>
-            <p className="text-xs text-emerald-400 mt-0.5">
-              {mantuaMarkets.length} on Mantua
-            </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 20 }}>
+          <div style={{ padding: 16, background: bgCard, border: `1px solid ${border}`, borderRadius: 12 }}>
+            <p style={{ fontSize: 11, color: textSec, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500 }}>Total Markets</p>
+            <p style={{ fontSize: 24, fontWeight: 700, color: textPrimary, margin: 0 }}>{allMarkets.length}</p>
+            <p style={{ fontSize: 11, color: '#34d399', marginTop: 2 }}>{mantuaMarkets.length} on Mantua</p>
           </div>
-          <div className="p-4 bg-gray-900 border border-gray-800 rounded-xl">
-            <p className="text-xs text-gray-500 mb-1 uppercase tracking-wide font-medium">
-              Volume (24h)
-            </p>
-            <p className="text-2xl font-bold text-white">
+          <div style={{ padding: 16, background: bgCard, border: `1px solid ${border}`, borderRadius: 12 }}>
+            <p style={{ fontSize: 11, color: textSec, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500 }}>Volume (24h)</p>
+            <p style={{ fontSize: 24, fontWeight: 700, color: textPrimary, margin: 0 }}>
               ${totalVolume >= 1_000_000
                 ? `${(totalVolume / 1_000_000).toFixed(1)}M`
                 : `${(totalVolume / 1_000).toFixed(0)}K`}
             </p>
-            <p className="text-xs text-gray-500 mt-0.5">Across all venues</p>
+            <p style={{ fontSize: 11, color: textSec, marginTop: 2 }}>Across all venues</p>
           </div>
-          <div className="p-4 bg-gray-900 border border-gray-800 rounded-xl">
-            <p className="text-xs text-gray-500 mb-1 uppercase tracking-wide font-medium">
-              Best Arb Spread
-            </p>
-            <p className={`text-2xl font-bold ${bestSpread > 0 ? 'text-emerald-400' : 'text-white'}`}>
+          <div style={{ padding: 16, background: bgCard, border: `1px solid ${border}`, borderRadius: 12 }}>
+            <p style={{ fontSize: 11, color: textSec, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500 }}>Best Arb Spread</p>
+            <p style={{ fontSize: 24, fontWeight: 700, color: bestSpread > 0 ? '#34d399' : textPrimary, margin: 0 }}>
               {bestSpread > 0 ? `+${bestSpread.toFixed(1)}%` : '—'}
             </p>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {arbOpportunities.length} opportunities
-            </p>
+            <p style={{ fontSize: 11, color: textSec, marginTop: 2 }}>{arbOpportunities.length} opportunities</p>
           </div>
         </div>
 
         {/* ── TAB BAR ──────────────────────────────────────────────── */}
-        <div className="flex gap-1">
+        <div style={{ display: 'flex', gap: 4 }}>
           {TABS.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm
-                         font-medium transition-all ${
-                activeTab === tab.id
-                  ? 'bg-gray-800 text-white border border-gray-700'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
-              }`}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '10px 20px', borderRadius: 12,
+                fontSize: 14, fontWeight: 500,
+                border: activeTab === tab.id ? `1px solid ${border}` : '1px solid transparent',
+                background: activeTab === tab.id ? bgCard : 'transparent',
+                color: activeTab === tab.id ? textPrimary : textSec,
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
             >
-              <tab.icon className="w-4 h-4" />
+              <tab.icon style={{ width: 16, height: 16 }} />
               {tab.label}
               {tab.badge !== null && (
-                <span className="ml-0.5 px-1.5 py-0.5 bg-purple-600 text-white
-                                 text-xs rounded-full font-bold leading-none">
+                <span style={{ marginLeft: 2, padding: '1px 6px', background: accent, color: 'white', fontSize: 11, borderRadius: 10, fontWeight: 700 }}>
                   {tab.badge}
                 </span>
               )}
@@ -119,7 +123,7 @@ export function PredictionsView() {
       </div>
 
       {/* ── TAB CONTENT — scrollable ───────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto">
+      <div style={{ flex: 1, overflowY: 'auto' }}>
         {activeTab === 'markets' && (
           <MarketsTab
             mantuaMarkets={mantuaMarkets}

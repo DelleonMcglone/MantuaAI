@@ -36,11 +36,18 @@ type Tab = 'deposit' | 'withdraw';
 interface Props {
   vault:   VaultData;
   onClose: () => void;
+  theme?:  any;
 }
 
-export function VaultDetailModal({ vault, onClose }: Props) {
+export function VaultDetailModal({ vault, onClose, theme }: Props) {
   const [tab, setTab] = useState<Tab>('deposit');
   const StratIcon = STRATEGY_ICONS[vault.strategy];
+
+  const bgCard   = theme?.bgCard     ?? '#111827';
+  const border   = theme?.border     ?? 'rgba(55,65,81,1)';
+  const textPri  = theme?.textPrimary   ?? '#ffffff';
+  const textSec  = theme?.textSecondary ?? '#6b7280';
+  const bgSec    = theme?.bgSecondary   ?? '#1f2937';
 
   return createPortal(
     <div
@@ -49,12 +56,12 @@ export function VaultDetailModal({ vault, onClose }: Props) {
       onClick={e => e.target === e.currentTarget && onClose()}
     >
       <div
-        className="relative w-full max-w-lg bg-gray-900 border border-gray-700
-                   rounded-2xl shadow-2xl overflow-hidden max-h-[88vh] flex flex-col"
+        className="relative w-full max-w-lg rounded-2xl shadow-2xl flex flex-col"
+        style={{ background: bgCard, border: `1px solid ${border}`, maxHeight: '88vh', overflowY: 'auto' }}
         onClick={e => e.stopPropagation()}
       >
         {/* ── HEADER ──────────────────────────────────────────────────── */}
-        <div className="flex items-start gap-3 p-5 border-b border-gray-800 flex-shrink-0">
+        <div className="flex items-start gap-3 p-5 flex-shrink-0" style={{ borderBottom: `1px solid ${border}` }}>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2 flex-wrap">
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg
@@ -73,90 +80,74 @@ export function VaultDetailModal({ vault, onClose }: Props) {
                 </span>
               )}
             </div>
-            <h2 className="text-base font-semibold text-white leading-snug">
+            <h2 className="text-base font-semibold leading-snug" style={{ color: textPri }}>
               {vault.name}
             </h2>
-            <p className="text-xs text-gray-500 mt-1">{vault.description}</p>
+            <p className="text-xs mt-1" style={{ color: textSec }}>{vault.description}</p>
           </div>
           <button
             onClick={onClose}
-            className="flex-shrink-0 p-1.5 hover:bg-gray-800 rounded-lg
-                       text-gray-400 hover:text-white transition-colors"
+            className="flex-shrink-0 p-1.5 rounded-lg transition-colors"
+            style={{ color: textSec }}
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* ── SCROLLABLE CONTENT ──────────────────────────────────────── */}
-        <div className="overflow-y-auto flex-1">
-
-          {/* ── KEY METRICS ─────────────────────────────────────────── */}
-          <div className="grid grid-cols-3 gap-px bg-gray-800 border-b border-gray-800">
-            <div className="p-4 bg-gray-900">
-              <p className="text-xs text-gray-500 mb-1 uppercase tracking-wide">APY</p>
-              <p className="text-3xl font-bold text-emerald-400">
-                {formatApy(vault.liveApyBps)}
+        {/* ── KEY METRICS ─────────────────────────────────────────── */}
+        <div className="grid grid-cols-3" style={{ borderBottom: `1px solid ${border}` }}>
+          {[
+            { label: 'APY',         value: formatApy(vault.liveApyBps), green: true },
+            { label: 'TVL',         value: formatTvl(vault.totalAssetsFormatted), green: false },
+            { label: 'Price/Share', value: vault.pricePerShare.toFixed(4), green: false },
+          ].map((m, i) => (
+            <div key={m.label} className="p-4" style={{ borderRight: i < 2 ? `1px solid ${border}` : undefined }}>
+              <p className="text-xs mb-1 uppercase tracking-wide" style={{ color: textSec }}>{m.label}</p>
+              <p className={`font-bold ${i === 0 ? 'text-3xl text-emerald-400' : 'text-xl'}`}
+                 style={!m.green ? { color: textPri } : undefined}>
+                {m.value}
               </p>
             </div>
-            <div className="p-4 bg-gray-900">
-              <p className="text-xs text-gray-500 mb-1 uppercase tracking-wide">TVL</p>
-              <p className="text-xl font-bold text-white">
-                {formatTvl(vault.totalAssetsFormatted)}
-              </p>
-            </div>
-            <div className="p-4 bg-gray-900">
-              <p className="text-xs text-gray-500 mb-1 uppercase tracking-wide">Price/Share</p>
-              <p className="text-xl font-bold text-white">
-                {vault.pricePerShare.toFixed(4)}
-              </p>
-            </div>
+          ))}
+        </div>
+
+        {/* ── PAIR & SHARE INFO ────────────────────────────────────── */}
+        <div className="px-5 py-4" style={{ borderBottom: `1px solid ${border}` }}>
+          <div className="flex items-center gap-2 mb-1">
+            <Info className="w-3.5 h-3.5" style={{ color: textSec }} />
+            <span className="text-xs" style={{ color: textSec }}>Underlying pair</span>
+            <span className="text-xs font-semibold" style={{ color: textPri }}>{vault.pair}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Info className="w-3.5 h-3.5" style={{ color: textSec }} />
+            <span className="text-xs" style={{ color: textSec }}>Share token</span>
+            <span className="text-xs font-mono text-purple-300">{vault.shareSymbol}</span>
+          </div>
+        </div>
+
+        {/* ── DEPOSIT / WITHDRAW TABS ──────────────────────────────── */}
+        <div className="p-5">
+          {/* Tab switcher */}
+          <div className="flex gap-1 p-1 rounded-xl mb-4" style={{ background: bgSec }}>
+            <button
+              onClick={() => setTab('deposit')}
+              className="flex-1 py-2 rounded-lg text-sm font-medium transition-all"
+              style={{ background: tab === 'deposit' ? bgCard : 'transparent', color: tab === 'deposit' ? textPri : textSec, border: tab === 'deposit' ? `1px solid ${border}` : '1px solid transparent' }}
+            >
+              Deposit
+            </button>
+            <button
+              onClick={() => setTab('withdraw')}
+              className="flex-1 py-2 rounded-lg text-sm font-medium transition-all"
+              style={{ background: tab === 'withdraw' ? bgCard : 'transparent', color: tab === 'withdraw' ? textPri : textSec, border: tab === 'withdraw' ? `1px solid ${border}` : '1px solid transparent' }}
+            >
+              Withdraw
+            </button>
           </div>
 
-          {/* ── PAIR & SHARE INFO ────────────────────────────────────── */}
-          <div className="px-5 py-4 border-b border-gray-800">
-            <div className="flex items-center gap-2 mb-1">
-              <Info className="w-3.5 h-3.5 text-gray-600" />
-              <span className="text-xs text-gray-500">Underlying pair</span>
-              <span className="text-xs font-semibold text-white">{vault.pair}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Info className="w-3.5 h-3.5 text-gray-600" />
-              <span className="text-xs text-gray-500">Share token</span>
-              <span className="text-xs font-mono text-purple-300">{vault.shareSymbol}</span>
-            </div>
-          </div>
-
-          {/* ── DEPOSIT / WITHDRAW TABS ──────────────────────────────── */}
-          <div className="p-5">
-            {/* Tab switcher */}
-            <div className="flex gap-1 p-1 bg-gray-800 rounded-xl mb-4">
-              <button
-                onClick={() => setTab('deposit')}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
-                  tab === 'deposit'
-                    ? 'bg-gray-700 text-white'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Deposit
-              </button>
-              <button
-                onClick={() => setTab('withdraw')}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
-                  tab === 'withdraw'
-                    ? 'bg-gray-700 text-white'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Withdraw
-              </button>
-            </div>
-
-            {/* Tab content */}
-            {tab === 'deposit'  && <DepositForm  vault={vault} />}
-            {tab === 'withdraw' && <WithdrawForm vault={vault} />}
-          </div>
-
+          {/* Tab content */}
+          {tab === 'deposit'  && <DepositForm  vault={vault} />}
+          {tab === 'withdraw' && <WithdrawForm vault={vault} />}
         </div>
       </div>
     </div>,

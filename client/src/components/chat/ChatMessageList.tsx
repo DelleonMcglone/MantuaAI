@@ -107,26 +107,7 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
   }
 
   if (messages.length === 0) {
-    return (
-      <div
-        data-testid="empty-state"
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "60px 20px",
-          gap: 16,
-          color: textSecondary,
-          textAlign: "center",
-        }}
-      >
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" opacity={0.4}>
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-        </svg>
-        <p style={{ margin: 0, fontSize: 15 }}>Start a conversation</p>
-      </div>
-    );
+    return null;
   }
 
   return (
