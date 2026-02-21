@@ -8,7 +8,7 @@
 
 import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { useLocation } from 'wouter';
-import { useAccount, useBalance, useSwitchChain } from 'wagmi';
+import { useAccount, useBalance, useSwitchChain, useChainId } from 'wagmi';
 import logoWhite from '@assets/Mantua_logo_white_1768946648374.png';
 import logoBlack from '@assets/Mantua_logo_black_1768946648374.png';
 import AnalysisCard from '../components/chat/AnalysisCard';
@@ -1622,6 +1622,7 @@ const HookSelectorModal = ({ isOpen, onClose, hooks, selectedHook, onSelect, the
 // ============ SWAP INTERFACE ============
 const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
   const { isConnected, address } = useAccount();
+  const currentChainId = useChainId();
   const { openModal } = useWalletConnection();
   const [selectedHook, setSelectedHook] = useState(swapDetails?.hook || 'sp');
   const [isHookModalOpen, setIsHookModalOpen] = useState(false);
@@ -1753,18 +1754,45 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
      }
   }, [swapDetails]);
 
-  // Handle swap execution
+  const pendingSwapAfterApproval = useRef(false);
+  const swapParamsRef = useRef<{
+    tokenIn: `0x${string}`;
+    tokenOut: `0x${string}`;
+    amountIn: bigint;
+    hookAddress: `0x${string}`;
+    hookId: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (pendingSwapAfterApproval.current && isApproved && !needsApproval && swapParamsRef.current) {
+      pendingSwapAfterApproval.current = false;
+      const params = swapParamsRef.current;
+      swapParamsRef.current = null;
+      setShowConfirmation(true);
+      executeSwap(params);
+    }
+  }, [isApproved, needsApproval, executeSwap]);
+
   const handleSwap = async () => {
     if (!isConnected || !quote) return;
-    
-    setShowConfirmation(true);
-    await executeSwap({
-      tokenIn: fromTokenData.address,
-      tokenOut: toTokenData.address,
+
+    const params = {
+      tokenIn: fromTokenData.address as `0x${string}`,
+      tokenOut: toTokenData.address as `0x${string}`,
       amountIn: parsedAmount,
       hookAddress: getHookAddress(selectedHook),
       hookId: selectedHook,
-    });
+    };
+
+    if (needsApproval) {
+      pendingSwapAfterApproval.current = true;
+      swapParamsRef.current = params;
+      await approve(true);
+      return;
+    }
+
+    setShowConfirmation(true);
+    await executeSwap(params);
   };
 
   const handleCloseConfirmation = () => {
@@ -2188,9 +2216,9 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
               tokenSymbol={fromToken}
               priceImpact={quote?.priceImpact || 0}
               onConnect={openModal}
-              onApprove={() => approve(true)}
+              onApprove={handleSwap}
               onSwap={handleSwap}
-              disabled={isExecuting || !quote}
+              disabled={isExecuting || !quote || (approvalStatus === 'approving')}
               theme={theme}
               isDark={isDark}
             />
@@ -2253,6 +2281,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
               outputSymbol={toToken}
               onRetry={retrySwap}
               onClose={handleCloseConfirmation}
+              chainId={currentChainId}
               theme={theme}
               isDark={isDark}
             />

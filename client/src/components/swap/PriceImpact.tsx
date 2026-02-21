@@ -100,7 +100,7 @@ export function PriceImpact({
                 color: impactColor,
               }}
             >
-              {priceImpact.toFixed(2)}%
+              {priceImpact < 0.01 ? priceImpact.toFixed(4) : priceImpact.toFixed(2)}%
             </span>
             {severity === 'high' && (
               <span
@@ -210,7 +210,7 @@ export function PriceImpactBadge({ priceImpact }: { priceImpact: number }) {
         background: `${color}15`,
       }}
     >
-      {priceImpact.toFixed(2)}%
+      {priceImpact < 0.01 ? priceImpact.toFixed(4) : priceImpact.toFixed(2)}%
       {severity === 'high' && ' ⚠️'}
     </span>
   );

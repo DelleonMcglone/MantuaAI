@@ -255,16 +255,32 @@ export function calculatePriceImpact(
   if (inputAmount === BigInt(0) || spotPrice === BigInt(0)) {
     return 0;
   }
-  
-  const expectedOutput = (inputAmount * spotPrice * BigInt(10 ** outputDecimals)) / 
+
+  const expectedOutput = (inputAmount * spotPrice * BigInt(10 ** outputDecimals)) /
     (BigInt(10 ** inputDecimals) * BigInt(10 ** 18));
-  
+
   if (expectedOutput === BigInt(0)) {
     return 0;
   }
-  
-  const impact = Number(((expectedOutput - outputAmount) * BigInt(10000)) / expectedOutput) / 100;
-  return Math.max(0, impact);
+
+  const feeImpact = Number(((expectedOutput - outputAmount) * BigInt(1000000)) / expectedOutput) / 10000;
+
+  const SIMULATED_POOL_RESERVE_USD = 500_000;
+  let ammImpact = 0;
+  try {
+    const inputScaled = Number(inputAmount / BigInt(10 ** Math.max(0, inputDecimals - 6)));
+    const spotScaled = Number(spotPrice / BigInt(10 ** 12));
+    const inputUsd = (inputScaled * spotScaled) / 1e12;
+    if (isFinite(inputUsd) && inputUsd > 0) {
+      ammImpact = (inputUsd / SIMULATED_POOL_RESERVE_USD) * 100;
+    }
+  } catch {
+    ammImpact = 0;
+  }
+
+  const totalImpact = feeImpact + ammImpact;
+  if (!isFinite(totalImpact) || isNaN(totalImpact)) return 0.0025;
+  return Math.max(0.0025, totalImpact);
 }
 
 export function formatTokenAmount(amount: bigint, decimals: number): string {

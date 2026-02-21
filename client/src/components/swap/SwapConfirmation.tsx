@@ -21,6 +21,7 @@ interface SwapConfirmationProps {
   outputSymbol: string;
   onRetry: () => void;
   onClose: () => void;
+  chainId?: number;
   theme: {
     textPrimary: string;
     textSecondary: string;
@@ -43,6 +44,7 @@ export function SwapConfirmation({
   outputSymbol,
   onRetry,
   onClose,
+  chainId = 84532,
   theme,
   isDark,
 }: SwapConfirmationProps) {
@@ -178,7 +180,7 @@ export function SwapConfirmation({
             Transaction Hash
           </div>
           <a
-            href={getExplorerLink(txHash)}
+            href={getExplorerLink(txHash, chainId)}
             target="_blank"
             rel="noopener noreferrer"
             data-testid="tx-hash-link"
