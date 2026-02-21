@@ -33,12 +33,6 @@ VaultDeposit: vault{name symbol}, sender, owner, assets, shares, timestamp
 VaultDayData: vault{name}, dayStartUnix, totalAssets, dailyDeposits,
               dailyWithdrawals, apyBps
 
-PredictionMarket: id, question, category, resolved, outcome,
-                  totalYesShares, totalNoShares, createdAt
-
-PredictionBet: market{question}, user, isYes, amount, timestamp
-
-PredictionClaim: market{question}, user, payout, timestamp
 
 Filtering: where:{field_gte: $value, field_lte: $value}
 Sorting: orderBy: fieldName, orderDirection: asc|desc
@@ -89,7 +83,7 @@ export function isAnalyticsQuery(message: string): boolean {
     'distribution', 'how much total', 'how many total', 'total swaps',
     'total volume', 'trend', 'compare pools', 'top pools', 'top vaults',
     'my positions', 'my deposits', 'leaderboard', 'vault tvl',
-    'swap volume', 'prediction stats', 'market stats',
+    'swap volume', 'market stats',
     'protocol stats', 'on-chain', 'onchain', 'subgraph',
   ];
   const tradeKeywords = ['swap ', 'buy ', 'sell ', 'deposit ', 'withdraw ', 'bet '];

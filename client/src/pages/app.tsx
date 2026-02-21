@@ -26,7 +26,6 @@ import { isAnalyticsQuery, generateAnalyticsQuery } from '../lib/analyticsEngine
 import { gqlQuery } from '../lib/graphql';
 import { normalizeForChart } from '../lib/normalizeSubgraphData';
 // Heavy views loaded lazily for bundle splitting
-const PredictionsView   = lazy(() => import('../components/predictions/PredictionsView').then(m => ({ default: m.PredictionsView })));
 import { TxHistoryPanel }  from '../components/portfolio/TxHistoryPanel';
 import { useTxHistory }    from '../hooks/useTxHistory';
 import { sanitizeInput }   from '../lib/sanitize';
@@ -2830,7 +2829,6 @@ const AgentBuilderInterface = ({ onClose, theme, isDark, onNavigate }) => {
     { id: 'transfer',  color: '#10b981', emoji: '📤', title: 'Send Tokens',                subtitle: 'Transfer tokens to any address on Base',    tag: null },
     { id: 'swap',      color: '#f59e0b', emoji: '🔄', title: 'Swap Tokens',                subtitle: 'Execute swaps via Uniswap v4 hooks',        tag: null },
     { id: 'liquidity', color: '#8b5cf6', emoji: '💧', title: 'Add / Remove Liquidity',     subtitle: 'Manage LP positions across pools',          tag: null },
-    { id: 'bets',      color: '#ef4444', emoji: '🎯', title: 'Place Bets',                 subtitle: 'Participate in prediction markets',         tag: 'NEW' },
     { id: 'analytics', color: '#06b6d4', emoji: '🔍', title: 'Query Onchain Data',         subtitle: 'Analyze on-chain metrics and pool data',    tag: null },
   ];
 
@@ -2862,18 +2860,6 @@ const AgentBuilderInterface = ({ onClose, theme, isDark, onNavigate }) => {
             cta="Open Liquidity Interface →"
             onNavigate={() => onNavigate('liquidity')}
             accentColor="#8b5cf6"
-          />
-        );
-      case 'bets':
-        return (
-          <AgentNavPanel
-            theme={theme}
-            title="Prediction Markets"
-            description="Place bets on crypto, sports, politics, and real-world events. Powered by on-chain markets with transparent, trustless settlement."
-            features={['Live prediction markets with real-time odds', 'On-chain settlement via smart contracts', 'Supports ETH and USDC for betting', 'Full market history, analytics, and leaderboards']}
-            cta="Open Predictions →"
-            onNavigate={() => onNavigate('predictions')}
-            accentColor="#ef4444"
           />
         );
       case 'analytics':
@@ -3213,7 +3199,6 @@ export default function MantuaApp() {
   const [showAgentBuilder, setShowAgentBuilder] = useState(false);
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const [showAddLiquidityModal, setShowAddLiquidityModal] = useState(false);
-  const [showPredictions,  setShowPredictions]  = useState(false);
   const [selectedPool, setSelectedPool] = useState(null);
   const [addLiquidityMode, setAddLiquidityMode] = useState<'add' | 'create' | 'remove'>('add');
   const [liquidityInitialTokens, setLiquidityInitialTokens] = useState<{tokenA?: string; tokenB?: string} | null>(null);
@@ -3610,7 +3595,6 @@ export default function MantuaApp() {
               setShowSwap(false);
               setShowLiquidity(false);
               setShowAgentBuilder(false);
-              setShowPredictions(false);
               setShowPortfolioModal(false);
               setShowAddLiquidityModal(false);
               setHasInteracted(false);
@@ -3640,7 +3624,6 @@ export default function MantuaApp() {
               setShowSwap(true);
               setShowLiquidity(false);
               setShowAgentBuilder(false);
-              setShowPredictions(false);
               setShowPortfolioModal(false);
               setShowAddLiquidityModal(false);
               setSwapDetails(null);
@@ -3657,7 +3640,6 @@ export default function MantuaApp() {
               setShowLiquidity(true);
               setShowSwap(false);
               setShowAgentBuilder(false);
-              setShowPredictions(false);
               setShowPortfolioModal(false);
               setShowAddLiquidityModal(false);
               setHasInteracted(true);
@@ -3667,28 +3649,10 @@ export default function MantuaApp() {
             <DropletsIcon /> Liquidity
           </button>
 
-          {/* Predictions */}
-          <button
-            onClick={() => {
-              setShowPredictions(true);
-              setShowSwap(false);
-              setShowLiquidity(false);
-              setShowAgentBuilder(false);
-              setShowPortfolioModal(false);
-              setShowAddLiquidityModal(false);
-              setHasInteracted(true);
-            }}
-            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', background: showPredictions ? `${theme.accent}20` : 'transparent', border: 'none', borderRadius: 8, color: showPredictions ? theme.accent : theme.textPrimary, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
-          >
-            <TrendingUp size={16} /> Predictions
-            <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, background: '#7c3aed', color: 'white', padding: '1px 6px', borderRadius: 10 }}>NEW</span>
-          </button>
-
           {/* Agent */}
           <button
             onClick={() => {
               setShowAgentBuilder(true);
-              setShowPredictions(false);
               setShowSwap(false);
               setShowLiquidity(false);
               setShowPortfolioModal(false);
@@ -3804,16 +3768,6 @@ export default function MantuaApp() {
         {/* Main Content Area */}
         <main style={{ flex: 1, display: 'flex', flexDirection: 'column', background: theme.bgPrimary, overflow: 'hidden', position: 'relative' }}>
           
-          {/* Predictions — full-page sibling, not inside chat scroll container */}
-          {showPredictions && !showSwap && !showLiquidity && !showAgentBuilder && !showAddLiquidityModal && (
-            <div style={{ position: 'absolute', inset: 0, zIndex: 110, overflow: 'auto', background: theme.bgPrimary }}>
-              <Suspense fallback={<div style={{ padding: 40, color: '#6b7280' }}>Loading…</div>}>
-                <PredictionsView theme={theme} isDark={isDark} />
-              </Suspense>
-            </div>
-          )}
-
-
           {/* Portfolio Overlay */}
           {showPortfolioModal && (
             <div style={{
@@ -3944,7 +3898,6 @@ export default function MantuaApp() {
                           setHasInteracted(true);
                           if (view === 'swap') setShowSwap(true);
                           if (view === 'liquidity') setShowLiquidity(true);
-                          if (view === 'predictions') setShowPredictions(true);
                         }}
                       />
                     </div>

@@ -478,7 +478,7 @@ export async function registerRoutes(
   });
 
   const ANALYTICS_SCHEMA_CONTEXT = `You are a GraphQL query generator for the Mantua.AI subgraph.
-Available entities: Protocol, Swap, SwapHourData, Pool, Token, Position, Vault, VaultDeposit, VaultDayData, PredictionMarket, PredictionBet, PredictionClaim, ProtocolDayData.
+Available entities: Protocol, Swap, SwapHourData, Pool, Token, Position, Vault, VaultDeposit, VaultDayData, ProtocolDayData.
 Return ONLY a JSON object with: graphql (query string), chartType (line|bar|pie|table|stat), title, description, variables (object).`;
 
   app.post("/api/analytics/generate-query", async (req: Request, res: Response) => {

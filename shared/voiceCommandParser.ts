@@ -4,9 +4,9 @@
  * Imported by both server (validation) and client (modal preview via @shared alias).
  */
 import { normalizeToken, detectHook } from './voiceCommandTypes';
-import type { SwapCommand, LiquidityCommand, PredictionCommand, VaultCommand } from './voiceCommandTypes';
+import type { SwapCommand, LiquidityCommand, VaultCommand } from './voiceCommandTypes';
 
-export type { SwapCommand, LiquidityCommand, PredictionCommand, VaultCommand };
+export type { SwapCommand, LiquidityCommand, VaultCommand };
 export { normalizeToken } from './voiceCommandTypes';
 export type { HookType } from './voiceCommandTypes';
 
@@ -81,39 +81,6 @@ export function parseLiquidityCommand(text: string): LiquidityCommand | null {
   return null;
 }
 
-// ── Prediction market parsing ─────────────────────────────────────────────
-const PREDICTION_VERBS = /\b(predict|prediction|market|bet|odds|arb|arbitrage|positions?)\b/i;
-const SHOW_PREDICTIONS = /\b(show|open|view|display)\b.*\bpredictions?\b|\bpredictions?\b.*\b(tab|page|view)\b/i;
-const BET_PATTERN      = /\bbet\s+(\d+(?:\.\d+)?)\s+(?:usdc|dollars?|usd)?\s+on\s+(yes|no)\b/i;
-const ODDS_PATTERN     = /\b(odds?|price|probability)\b.*\b(on|for|of)\b\s+(.{5,60})/i;
-const ARB_PATTERN      = /\b(arb|arbitrage)\b/i;
-const POSITIONS_PATTERN = /\b(my\s+)?positions?\b/i;
-
-export function parsePredictionCommand(text: string): PredictionCommand | null {
-  if (SHOW_PREDICTIONS.test(text)) return { type: 'prediction', action: 'show' };
-  if (ARB_PATTERN.test(text))      return { type: 'prediction', action: 'arbitrage' };
-  if (POSITIONS_PATTERN.test(text) && !SWAP_VERBS.test(text))
-    return { type: 'prediction', action: 'positions' };
-
-  const betMatch = BET_PATTERN.exec(text);
-  if (betMatch) {
-    return {
-      type:   'prediction',
-      action: 'bet',
-      amount: betMatch[1],
-      side:   betMatch[2].toLowerCase() as 'yes' | 'no',
-    };
-  }
-
-  const oddsMatch = ODDS_PATTERN.exec(text);
-  if (oddsMatch) {
-    return { type: 'prediction', action: 'odds', query: oddsMatch[3].trim() };
-  }
-
-  if (PREDICTION_VERBS.test(text)) return { type: 'prediction', action: 'show' };
-  return null;
-}
-
 // ── Vault parsing ─────────────────────────────────────────────────────────
 const VAULT_VERBS     = /\bvault[s]?\b/i;
 const SHOW_VAULTS     = /\b(show|open|view|display)\b.*\bvaults?\b|\bvaults?\b.*\b(tab|page|view)\b/i;
@@ -144,8 +111,8 @@ export function parseVaultCommand(text: string): VaultCommand | null {
 // ── Unified entry point ───────────────────────────────────────────────────
 export function parseVoiceCommand(
   transcript: string,
-): SwapCommand | LiquidityCommand | PredictionCommand | VaultCommand | null {
+): SwapCommand | LiquidityCommand | VaultCommand | null {
   const text = transcript.trim();
   if (!text) return null;
-  return parseVaultCommand(text) ?? parsePredictionCommand(text) ?? parseLiquidityCommand(text) ?? parseSwapCommand(text);
+  return parseVaultCommand(text) ?? parseLiquidityCommand(text) ?? parseSwapCommand(text);
 }

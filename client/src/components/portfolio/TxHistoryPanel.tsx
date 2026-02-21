@@ -17,7 +17,6 @@ const TYPE_LABELS: Record<string, string> = {
   add_liquidity:    'Add Liquidity',
   remove_liquidity: 'Remove Liquidity',
   transfer:         'Transfer',
-  bet:              'Prediction Bet',
   claim:            'Claim Payout',
   other:            'Transaction',
 };

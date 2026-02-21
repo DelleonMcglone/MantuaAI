@@ -13,7 +13,6 @@ const QUERIES: QueryChip[] = [
   { label: 'Recent Swaps',         message: 'Show me the most recent swaps',                   icon: '🔄' },
   { label: 'Vault TVL Breakdown',  message: 'Show me vault TVL breakdown as a pie chart',      icon: '🏦' },
   { label: 'My Positions',         message: 'Show me my positions and deposits',               icon: '👤' },
-  { label: 'Prediction Markets',   message: 'Show me prediction market stats',                 icon: '🎯' },
   { label: 'Pool Leaderboard',     message: 'Show me the pool leaderboard by volume',          icon: '🏆' },
 ];
 

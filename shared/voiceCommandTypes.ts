@@ -23,17 +23,6 @@ export interface LiquidityCommand {
   hook?: HookType;
 }
 
-export interface PredictionCommand {
-  type: 'prediction';
-  action: 'show' | 'bet' | 'odds' | 'arbitrage' | 'positions';
-  /** Target market keyword(s) for odds/bet queries */
-  query?: string;
-  /** YES or NO for bet commands */
-  side?: 'yes' | 'no';
-  /** USDC amount for bet commands */
-  amount?: string;
-}
-
 export interface VaultCommand {
   type: 'vault';
   action: 'show' | 'deposit' | 'withdraw' | 'performance' | 'deposits';

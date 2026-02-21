@@ -23,7 +23,6 @@ export function normalizeForChart(
 
   if ('hourStartUnix'  in first) return normalizeHourData(rows);
   if ('dayStartUnix'   in first) return normalizeDayData(rows);
-  if ('totalYesShares' in first) return normalizePredictionMarkets(rows);
   if ('apyBps'         in first) return normalizeVaults(rows);
   if ('amountUSD'      in first && 'txHash' in first) return normalizeSwaps(rows);
   if ('tvlUSD'         in first) return normalizePools(rows);
@@ -47,15 +46,6 @@ function normalizeDayData(rows: any[]): ChartDataPoint[] {
     totalAssets: parseFloat(r.totalAssets ?? '0'),
     deposits:    parseFloat(r.dailyDeposits ?? '0'),
     withdrawals: parseFloat(r.dailyWithdrawals ?? '0'),
-  }));
-}
-
-function normalizePredictionMarkets(rows: any[]): ChartDataPoint[] {
-  return rows.map(r => ({
-    name:      (r.question?.slice(0, 40) ?? 'Market') + (r.question?.length > 40 ? '...' : ''),
-    yesShares: parseFloat(r.totalYesShares ?? '0'),
-    noShares:  parseFloat(r.totalNoShares  ?? '0'),
-    value:     parseFloat(r.totalYesShares ?? '0') + parseFloat(r.totalNoShares ?? '0'),
   }));
 }
 

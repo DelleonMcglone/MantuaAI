@@ -91,10 +91,6 @@ const USER_POSITIONS_QUERY = `query UserPositions($user: Bytes!) {
     assets shares timestamp
     vault { name symbol apyBps }
   }
-  predictionBets(where: { user: $user }, first: 20) {
-    amount isYes timestamp
-    market { question resolved outcome }
-  }
 }`;
 
 export function useUserPositions(address: string | undefined) {
@@ -107,28 +103,6 @@ export function useUserPositions(address: string | undefined) {
       setLoad(false);
     });
   }, [address]);
-  return { data, isLoading };
-}
-
-const PREDICTION_BETS_QUERY = `{
-  predictionMarkets(first: 20, orderBy: createdAt, orderDirection: desc) {
-    id question category resolved outcome
-    totalYesShares totalNoShares
-    bets(first: 5, orderBy: timestamp, orderDirection: desc) {
-      amount isYes timestamp
-    }
-  }
-}`;
-
-export function usePredictionMarkets() {
-  const [data, setData]      = useState<any[]>([]);
-  const [isLoading, setLoad] = useState(true);
-  useEffect(() => {
-    gqlQuery(PREDICTION_BETS_QUERY).then(r => {
-      setData((r.merged as any)?.predictionMarkets ?? []);
-      setLoad(false);
-    });
-  }, []);
   return { data, isLoading };
 }
 
