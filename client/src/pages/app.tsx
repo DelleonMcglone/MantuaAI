@@ -3662,7 +3662,6 @@ export default function MantuaApp() {
             style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', background: showAgentBuilder ? `${theme.accent}20` : 'transparent', border: 'none', borderRadius: 8, color: showAgentBuilder ? theme.accent : theme.textPrimary, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
           >
             <BotIcon /> Agent
-            <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', color: 'white', padding: '1px 6px', borderRadius: 10 }}>AI</span>
           </button>
 
           {/* Portfolio */}
