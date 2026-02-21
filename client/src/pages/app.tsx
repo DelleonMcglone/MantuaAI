@@ -1149,7 +1149,7 @@ const TokenSelectModal = ({ isOpen, onClose, onSelect, theme, isDark, getTokenBa
   );
 };
 
-const TokenSelect = ({ token, tokenData, balance, usdValue, side, amount, theme, onTokenClick, onAmountChange, livePrice, isPriceLoading }) => {
+const TokenSelect = ({ token, tokenData, balance, usdValue, side, amount, theme, onTokenClick, onAmountChange, livePrice, isPriceLoading, onPercentClick }) => {
   // Use tokenData if available, otherwise fall back to string-based logic
   const tokenSymbol = tokenData?.symbol || token;
   const tokenLogoURI = tokenData?.logoURI;
@@ -1162,10 +1162,53 @@ const TokenSelect = ({ token, tokenData, balance, usdValue, side, amount, theme,
       border: theme ? `1px solid ${theme.border}` : '1px solid rgba(139, 92, 246, 0.1)',
       marginBottom: '4px'
     }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: onPercentClick ? '8px' : '12px' }}>
         <span style={{ color: theme ? theme.textSecondary : '#6b7280', fontSize: '14px', fontWeight: '500' }}>{side}</span>
         <span style={{ color: theme ? theme.textMuted : '#9ca3af', fontSize: '13px' }}>Balance: {balance || '0.00'}</span>
       </div>
+
+      {/* Percentage shortcut buttons — Sell side only */}
+      {onPercentClick && (
+        <div style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
+          {[25, 50, 75].map(pct => (
+            <button
+              key={pct}
+              onClick={() => onPercentClick(pct / 100)}
+              style={{
+                flex: 1,
+                padding: '4px 0',
+                borderRadius: '6px',
+                border: `1px solid ${theme?.border || 'rgba(139,92,246,0.2)'}`,
+                background: 'transparent',
+                color: theme?.textSecondary || '#9ca3af',
+                fontSize: '11px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
+            >
+              {pct}%
+            </button>
+          ))}
+          <button
+            onClick={() => onPercentClick(1)}
+            style={{
+              flex: 1,
+              padding: '4px 0',
+              borderRadius: '6px',
+              border: `1px solid ${theme?.accent || '#8b5cf6'}`,
+              background: `${theme?.accent || '#8b5cf6'}15`,
+              color: theme?.accent || '#8b5cf6',
+              fontSize: '11px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+          >
+            Max
+          </button>
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
           <input
@@ -1584,7 +1627,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
   const [isHookModalOpen, setIsHookModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [slippageTolerance] = useState(0.5);
+  const [slippageTolerance, setSlippageTolerance] = useState(0.5);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 900);
@@ -1643,6 +1686,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
     outputDecimals: toTokenData.decimals,
     slippageTolerance,
     hookAddress: getHookAddress(selectedHook),
+    feeTier: 25, // 0.0025% LP fee — gives minimum price impact display
     enabled: parsedAmount > BigInt(0),
   });
 
@@ -1730,6 +1774,26 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
       setToAmount('');
       resetSwap();
     }
+  };
+
+  // Percentage-of-balance shortcut for the Sell input
+  const handlePercentage = (pct: number) => {
+    const rawBalance = getTokenBalance(fromToken, fromTokenData);
+    const bal = parseFloat(rawBalance || '0');
+    if (isNaN(bal) || bal < 0) return;
+    const maxDecimals = Math.min(fromTokenData.decimals, 8);
+    const result = (bal * pct).toFixed(maxDecimals).replace(/\.?0+$/, '');
+    setFromAmount(result || '0');
+  };
+
+  // Swap the from/to tokens and amounts
+  const handleFlipTokens = () => {
+    const tmpToken = fromToken;
+    const tmpAmount = fromAmount;
+    setFromToken(toToken);
+    setToToken(tmpToken);
+    setFromAmount(toAmount);
+    setToAmount(tmpAmount);
   };
 
   const handleTokenSelect = (tokenSymbol) => {
@@ -1910,28 +1974,32 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
               onAmountChange={(val) => setFromAmount(val)}
               livePrice={fromTokenLivePrice}
               isPriceLoading={fromPriceLoading}
+              onPercentClick={handlePercentage}
             />
             
-            <div style={{ 
-              position: 'absolute', 
-              top: '50%', 
-              left: '50%', 
-              transform: 'translate(-50%, -50%)', 
-              zIndex: 10 
+            <div style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              zIndex: 10
             }}>
-              <button style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '10px',
-                border: `4px solid ${theme.bgCard}`,
-                background: theme.bgSecondary,
-                color: theme.accent,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
-              }}>
+              <button
+                onClick={handleFlipTokens}
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  border: `4px solid ${theme.bgCard}`,
+                  background: theme.bgSecondary,
+                  color: theme.accent,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+                }}
+              >
                 <ArrowLeftRightIcon />
               </button>
             </div>
@@ -1998,58 +2066,115 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
           </div>
 
           {/* Swap Details Breakdown */}
-          <div style={{ marginTop: '12px', padding: '12px 16px', background: theme.bgSecondary, borderRadius: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px' }}>
-              <span style={{ color: theme.textSecondary }}>Rate</span>
-              <span style={{ color: theme.textPrimary, fontWeight: '500' }}>
-                {rateLoading ? '—' : livePairRate !== null ? `1 ${fromToken} = ${livePairRate < 0.001 ? livePairRate.toExponential(3) : livePairRate < 1 ? livePairRate.toFixed(6) : livePairRate >= 1000 ? livePairRate.toLocaleString(undefined, { maximumFractionDigits: 2 }) : livePairRate.toFixed(4)} ${toToken}` : 'Rate unavailable'}
-              </span>
-            </div>
-            <div style={{ borderTop: `1px solid ${theme.border}`, margin: '8px 0', padding: '8px 0' }}>
-              <div style={{ color: theme.textSecondary, fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', marginBottom: '6px' }}>Fee Architecture</div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '13px' }}>
-                <span style={{ color: theme.textMuted }}>LP Fee</span>
-                <span style={{ color: theme.textPrimary }}>0.05%</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '13px' }}>
-                <span style={{ color: theme.textMuted }}>Protocol Fee</span>
-                <span style={{ color: theme.textPrimary }}>0.00%</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                <span style={{ color: theme.textMuted }}>Hook Fee</span>
-                <span style={{ color: theme.textPrimary }}>0.01%</span>
-              </div>
-            </div>
+          {(() => {
+            const LP_FEE_PCT    = 0.0025; // matches feeTier: 25
+            const HOOK_FEE_PCT  = selectedHook !== 'none' ? 0.01 : 0;
+            const TOTAL_FEE_PCT = LP_FEE_PCT + HOOK_FEE_PCT;
+            const rateInclFees  = livePairRate !== null
+              ? livePairRate * (1 - TOTAL_FEE_PCT / 100)
+              : null;
+            const fmtRate = (r) => r < 0.001 ? r.toExponential(3) : r < 1 ? r.toFixed(6) : r >= 1000 ? r.toLocaleString(undefined, { maximumFractionDigits: 2 }) : r.toFixed(4);
+            const priceImpact  = quote ? quote.priceImpact : null;
+            const impactColor  = priceImpact === null ? '#10b981' : priceImpact < 1 ? '#10b981' : priceImpact < 5 ? '#f59e0b' : '#ef4444';
+            const fmtImpact = (v) => v < 0.01 ? `${v.toFixed(4)}%` : `${v.toFixed(2)}%`;
 
-            <div style={{ borderTop: `1px solid ${theme.border}`, paddingTop: '8px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '13px' }}>
-                <span style={{ color: theme.textSecondary }}>Price Impact</span>
-                <span style={{ 
-                  color: quote ? (quote.priceImpact < 1 ? '#10b981' : quote.priceImpact < 5 ? '#f59e0b' : '#ef4444') : '#10b981',
-                  fontWeight: quote && quote.priceImpact >= 5 ? '700' : '500'
-                }}>
-                  {quote ? `${quote.priceImpact.toFixed(2)}%` : '<0.01%'}
-                  {quote && quote.priceImpact >= 5 && ' ⚠️'}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '13px' }}>
-                <span style={{ color: theme.textSecondary }}>Max Slippage</span>
-                <span style={{ color: theme.textPrimary }}>{slippageTolerance}%</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '13px' }}>
-                <span style={{ color: theme.textSecondary }}>Min. Received</span>
-                <span style={{ color: theme.textPrimary }}>
-                  {quote ? `${formatTokenAmount(quote.minimumReceived, toTokenData.decimals)} ${toToken}` : '-'}
-                </span>
-              </div>
-              {selectedHook !== 'none' && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                  <span style={{ color: theme.textSecondary }}>Hook</span>
-                  <span style={{ color: '#10b981', fontWeight: '700' }}>Active</span>
+            // Pool routing label based on token pair + hook
+            const STABLES = ['USDC', 'USDT', 'DAI', 'FRAX', 'USDE'];
+            const normA = fromToken.replace(/^m/, '').toUpperCase();
+            const normB = toToken.replace(/^m/, '').toUpperCase();
+            const aIsStable = STABLES.includes(normA);
+            const bIsStable = STABLES.includes(normB);
+            const poolRoute = selectedHook === 'sp' || (aIsStable && bIsStable)
+              ? 'StablePoolV1'
+              : normA === 'ETH' || normB === 'ETH'
+                ? `ETH/${normA === 'ETH' ? normB : normA} CorePool`
+                : `${normA}/${normB} CorePool`;
+
+            return (
+              <div style={{ marginTop: '12px' }}>
+
+                {/* Exchange Rate — standalone, only for the active pair */}
+                {!rateLoading && rateInclFees !== null && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', padding: '8px 12px', background: `${theme.accent}10`, borderRadius: '10px', border: `1px solid ${theme.accent}20` }}>
+                    <span style={{ color: theme.textSecondary, fontSize: '12px', fontWeight: '600' }}>Exchange Rate (Incl. Fees)</span>
+                    <span style={{ color: theme.textPrimary, fontSize: '13px', fontWeight: '600' }}>
+                      1 {fromToken} = {fmtRate(rateInclFees)} {toToken}
+                    </span>
+                  </div>
+                )}
+
+                {/* Fee + Stats card */}
+                <div style={{ padding: '12px 16px', background: theme.bgSecondary, borderRadius: '16px' }}>
+                  {/* Fee Architecture */}
+                  <div style={{ color: theme.textSecondary, fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Fee Architecture</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '13px' }}>
+                    <span style={{ color: theme.textMuted }}>LP Fee</span>
+                    <span style={{ color: theme.textPrimary }}>0.0025%</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                    <span style={{ color: theme.textMuted }}>Hook Fee</span>
+                    <span style={{ color: theme.textPrimary }}>{HOOK_FEE_PCT === 0 ? '0.00' : HOOK_FEE_PCT.toFixed(2)}%</span>
+                  </div>
+
+                  {/* Swap Stats */}
+                  <div style={{ borderTop: `1px solid ${theme.border}`, marginTop: '8px', paddingTop: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '13px' }}>
+                      <span style={{ color: theme.textSecondary }}>Price Impact</span>
+                      <span style={{ color: impactColor, fontWeight: priceImpact !== null && priceImpact >= 5 ? '700' : '500' }}>
+                        {priceImpact !== null ? fmtImpact(priceImpact) : '<0.01%'}
+                        {priceImpact !== null && priceImpact >= 5 && ' ⚠️'}
+                      </span>
+                    </div>
+
+                    {/* Max Slippage — editable number scroll */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: '13px' }}>
+                      <span style={{ color: theme.textSecondary }}>Max Slippage</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <button
+                          onClick={() => setSlippageTolerance(v => Math.max(0.1, parseFloat((v - 0.1).toFixed(1))))}
+                          style={{ width: '20px', height: '20px', borderRadius: '4px', border: `1px solid ${theme.border}`, background: 'transparent', color: theme.textSecondary, cursor: 'pointer', fontSize: '14px', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+                        >−</button>
+                        <input
+                          type="number"
+                          min="0.1"
+                          max="50"
+                          step="0.1"
+                          value={slippageTolerance}
+                          onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v) && v >= 0.1 && v <= 50) setSlippageTolerance(parseFloat(v.toFixed(1))); }}
+                          style={{ width: '40px', textAlign: 'center', background: 'transparent', border: 'none', color: theme.textPrimary, fontSize: '13px', fontWeight: '600', outline: 'none', padding: 0 }}
+                        />
+                        <span style={{ color: theme.textMuted, fontSize: '13px' }}>%</span>
+                        <button
+                          onClick={() => setSlippageTolerance(v => Math.min(50, parseFloat((v + 0.1).toFixed(1))))}
+                          style={{ width: '20px', height: '20px', borderRadius: '4px', border: `1px solid ${theme.border}`, background: 'transparent', color: theme.textSecondary, cursor: 'pointer', fontSize: '14px', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+                        >+</button>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '13px' }}>
+                      <span style={{ color: theme.textSecondary }}>Min. Received</span>
+                      <span style={{ color: theme.textPrimary }}>
+                        {quote ? `${formatTokenAmount(quote.minimumReceived, toTokenData.decimals)} ${toToken}` : '-'}
+                      </span>
+                    </div>
+
+                    {/* Trade route */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px', marginBottom: selectedHook !== 'none' ? '6px' : 0 }}>
+                      <span style={{ color: theme.textSecondary }}>Trade Routed Through</span>
+                      <span style={{ color: theme.accent, fontWeight: '600', fontSize: '12px' }}>{poolRoute}</span>
+                    </div>
+
+                    {selectedHook !== 'none' && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                        <span style={{ color: theme.textSecondary }}>Hook</span>
+                        <span style={{ color: '#10b981', fontWeight: '700' }}>Active</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
+            );
+          })()}
 
           {/* Swap Button with approval/execution states */}
           <SwapButtonStyles />
