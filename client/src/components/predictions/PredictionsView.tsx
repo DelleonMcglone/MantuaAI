@@ -6,16 +6,14 @@
  */
 
 import { useState } from 'react';
-import { TrendingUp, Zap, Briefcase } from 'lucide-react';
+import { TrendingUp, Briefcase } from 'lucide-react';
 import { MarketsTab }        from './MarketsTab';
-import { ArbitrageTab }      from './ArbitrageTab';
 import { PositionsTab }      from './PositionsTab';
 import { usePolymarket }     from '../../hooks/usePolymarket';
 import { useMantualMarkets } from '../../hooks/useMantualMarkets';
-import { useArbitrage }      from '../../hooks/useArbitrage';
 import { getKalshiMarkets }  from '../../config/kalshiMock';
 
-type Tab = 'markets' | 'arbitrage' | 'positions';
+type Tab = 'markets' | 'positions';
 
 interface Props {
   theme?:  any;
@@ -27,12 +25,10 @@ export function PredictionsView({ theme, isDark }: Props) {
 
   const { markets: polyMarkets,   isLoading: polyLoading   } = usePolymarket();
   const { markets: mantuaMarkets, isLoading: mantuaLoading } = useMantualMarkets();
-  const kalshiMarkets    = getKalshiMarkets();
-  const arbOpportunities = useArbitrage(mantuaMarkets, polyMarkets, kalshiMarkets);
+  const kalshiMarkets = getKalshiMarkets();
 
   const allMarkets  = [...mantuaMarkets, ...polyMarkets, ...kalshiMarkets];
   const totalVolume = allMarkets.reduce((s, m) => s + (m.volume24h ?? 0), 0);
-  const bestSpread  = arbOpportunities[0]?.spreadPct ?? 0;
 
   const bgPrimary   = theme?.bgPrimary     ?? '#030712';
   const bgCard      = theme?.bgCard        ?? '#111827';
@@ -43,8 +39,6 @@ export function PredictionsView({ theme, isDark }: Props) {
 
   const TABS = [
     { id: 'markets'   as Tab, label: 'Markets',      icon: TrendingUp, badge: null as number | null },
-    { id: 'arbitrage' as Tab, label: 'Arbitrage',    icon: Zap,
-      badge: arbOpportunities.length > 0 ? arbOpportunities.length : null },
     { id: 'positions' as Tab, label: 'My Positions', icon: Briefcase,  badge: null as number | null },
   ];
 
@@ -57,10 +51,8 @@ export function PredictionsView({ theme, isDark }: Props) {
         {/* Title row */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <div>
-            <h1 style={{ fontSize: 24, fontWeight: 700, color: textPrimary, margin: '0 0 2px' }}>Prediction Markets</h1>
-            <p style={{ fontSize: 14, color: textSec, margin: 0 }}>
-              Unified view across Mantua, Polymarket &amp; Kalshi
-            </p>
+            <h1 style={{ fontSize: 24, fontWeight: 700, color: textPrimary, margin: 0 }}>Prediction Markets</h1>
+            <p style={{ fontSize: 13, color: textSec, marginTop: 6, marginBottom: 0 }}>{allMarkets.length} market{allMarkets.length !== 1 ? 's' : ''}</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 20 }}>
             <span className="animate-pulse" style={{ width: 8, height: 8, borderRadius: '50%', background: '#34d399', display: 'inline-block' }} />
@@ -69,7 +61,7 @@ export function PredictionsView({ theme, isDark }: Props) {
         </div>
 
         {/* ── STATS ROW ────────────────────────────────────────────── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 16, marginBottom: 20 }}>
           <div style={{ padding: 16, background: bgCard, border: `1px solid ${border}`, borderRadius: 12 }}>
             <p style={{ fontSize: 11, color: textSec, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500 }}>Total Markets</p>
             <p style={{ fontSize: 24, fontWeight: 700, color: textPrimary, margin: 0 }}>{allMarkets.length}</p>
@@ -83,13 +75,6 @@ export function PredictionsView({ theme, isDark }: Props) {
                 : `${(totalVolume / 1_000).toFixed(0)}K`}
             </p>
             <p style={{ fontSize: 11, color: textSec, marginTop: 2 }}>Across all venues</p>
-          </div>
-          <div style={{ padding: 16, background: bgCard, border: `1px solid ${border}`, borderRadius: 12 }}>
-            <p style={{ fontSize: 11, color: textSec, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500 }}>Best Arb Spread</p>
-            <p style={{ fontSize: 24, fontWeight: 700, color: bestSpread > 0 ? '#34d399' : textPrimary, margin: 0 }}>
-              {bestSpread > 0 ? `+${bestSpread.toFixed(1)}%` : '—'}
-            </p>
-            <p style={{ fontSize: 11, color: textSec, marginTop: 2 }}>{arbOpportunities.length} opportunities</p>
           </div>
         </div>
 
@@ -131,9 +116,6 @@ export function PredictionsView({ theme, isDark }: Props) {
             kalshiMarkets={kalshiMarkets}
             isLoading={polyLoading || mantuaLoading}
           />
-        )}
-        {activeTab === 'arbitrage' && (
-          <ArbitrageTab opportunities={arbOpportunities} />
         )}
         {activeTab === 'positions' && (
           <PositionsTab mantuaMarkets={mantuaMarkets} />

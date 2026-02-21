@@ -5,6 +5,7 @@
  * tick range, and liquidity delta. Tracks transaction lifecycle states.
  */
 
+import { useState } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, useChainId } from 'wagmi';
 import PoolModifyLiquidityTestABI from '../abis/PoolModifyLiquidityTest.json';
 import { getPoolModifyLiquidityTestAddress, type PoolKey } from '../lib/swap-utils';
@@ -19,6 +20,7 @@ export interface AddLiquidityParams {
 
 export function useAddLiquidity() {
   const chainId = useChainId();
+  const [setupError, setSetupError] = useState<Error | null>(null);
 
   const {
     writeContract,
@@ -31,11 +33,13 @@ export function useAddLiquidity() {
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
   const addLiquidity = (params: AddLiquidityParams) => {
+    setSetupError(null);
     let contractAddress: `0x${string}`;
     try {
       contractAddress = getPoolModifyLiquidityTestAddress(chainId);
     } catch (err) {
       console.error('[useAddLiquidity]', err);
+      setSetupError(err instanceof Error ? err : new Error('Contract not configured for this chain'));
       return;
     }
 
@@ -70,7 +74,7 @@ export function useAddLiquidity() {
     isPending,
     isConfirming,
     isSuccess,
-    error: writeError,
+    error: setupError ?? writeError,
     reset,
   };
 }

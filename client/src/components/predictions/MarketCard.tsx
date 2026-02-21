@@ -21,16 +21,6 @@ export interface AnyMarket {
   source:    string;
 }
 
-const VENUE_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
-  mantua:     { color: 'text-purple-300',  bg: 'bg-purple-600/20 border-purple-600/40',  label: 'Mantua'     },
-  polymarket: { color: 'text-blue-300',    bg: 'bg-blue-600/20 border-blue-600/40',      label: 'Polymarket' },
-  kalshi:     { color: 'text-emerald-300', bg: 'bg-emerald-600/20 border-emerald-600/40', label: 'Kalshi'    },
-};
-
-const CATEGORY_ICON: Record<string, string> = {
-  crypto: '₿', politics: '🗳', sports: '🏆', economics: '📈', other: '🔮',
-};
-
 const formatVol = (v: number) =>
   v >= 1_000_000 ? `$${(v / 1_000_000).toFixed(1)}M`
   : v >= 1_000   ? `$${(v / 1_000).toFixed(0)}K`
@@ -39,7 +29,6 @@ const formatVol = (v: number) =>
 export function MarketCard({ market, onClick }: { market: AnyMarket; onClick: () => void }) {
   const yesPct = Math.round(market.yesPrice * 100);
   const noPct  = 100 - yesPct;
-  const venue  = VENUE_CONFIG[market.source] ?? VENUE_CONFIG.mantua;
 
   const endLabel = market.endDate
     ? new Date(market.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
@@ -54,18 +43,6 @@ export function MarketCard({ market, onClick }: { market: AnyMarket; onClick: ()
                  border border-gray-800 hover:border-gray-600
                  rounded-2xl transition-all duration-150 group"
     >
-      {/* ── ROW 1: Venue badge + category ──────────────────────── */}
-      <div className="flex items-center justify-between mb-3">
-        <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs
-                         font-semibold border ${venue.bg} ${venue.color}`}>
-          {venue.label}
-        </span>
-        <span className="text-xs text-gray-500">
-          {CATEGORY_ICON[market.category] ?? '🔮'}{' '}
-          <span className="capitalize">{market.category}</span>
-        </span>
-      </div>
-
       {/* ── ROW 2: Question ────────────────────────────────────── */}
       <p className="text-sm font-semibold text-white leading-snug mb-4
                    group-hover:text-gray-100 line-clamp-2 min-h-[2.5rem]">

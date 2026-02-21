@@ -21,13 +21,12 @@ import VoiceConfirmationModal from '../components/voice/VoiceConfirmationModal';
 import { parseVoiceCommand } from '@shared/voiceCommandParser';
 import { FaucetButton } from '../components/FaucetButton';
 import { classifyQuery } from '../utils/queryClassifier';
-import { TrendingUp, BarChart2, PieChart as PieIcon, Activity, Layers } from 'lucide-react';
+import { TrendingUp, BarChart2, PieChart as PieIcon, Activity } from 'lucide-react';
 import { isAnalyticsQuery, generateAnalyticsQuery } from '../lib/analyticsEngine';
 import { gqlQuery } from '../lib/graphql';
 import { normalizeForChart } from '../lib/normalizeSubgraphData';
 // Heavy views loaded lazily for bundle splitting
 const PredictionsView   = lazy(() => import('../components/predictions/PredictionsView').then(m => ({ default: m.PredictionsView })));
-const VaultsView        = lazy(() => import('../components/vaults/VaultsView').then(m => ({ default: m.VaultsView })));
 import { TxHistoryPanel }  from '../components/portfolio/TxHistoryPanel';
 import { useTxHistory }    from '../hooks/useTxHistory';
 import { sanitizeInput }   from '../lib/sanitize';
@@ -50,6 +49,7 @@ import {
   getTVLData
 } from '../utils/mockAnalyticsData';
 import { calculateUsdValue as calcUsdValue, getPriceBySymbol } from '../services/priceService';
+import { useLivePriceUSD, useLivePairRate } from '../hooks/useLivePriceUSD';
 import {
   WalletIcon,
   TrendUpIcon,
@@ -80,7 +80,6 @@ import {
   CodeIcon,
   CheckIcon,
   InfoIcon,
-  SettingsIcon,
   CloseIcon,
   StarIcon,
   BotIcon,
@@ -1150,7 +1149,7 @@ const TokenSelectModal = ({ isOpen, onClose, onSelect, theme, isDark, getTokenBa
   );
 };
 
-const TokenSelect = ({ token, tokenData, balance, usdValue, side, amount, theme, onTokenClick, onAmountChange }) => {
+const TokenSelect = ({ token, tokenData, balance, usdValue, side, amount, theme, onTokenClick, onAmountChange, livePrice, isPriceLoading }) => {
   // Use tokenData if available, otherwise fall back to string-based logic
   const tokenSymbol = tokenData?.symbol || token;
   const tokenLogoURI = tokenData?.logoURI;
@@ -1274,7 +1273,7 @@ const TokenSelect = ({ token, tokenData, balance, usdValue, side, amount, theme,
           fontSize: '13px',
           fontWeight: '600'
         }}>
-          ${getPriceBySymbol(tokenSymbol).toFixed(2)}
+          {isPriceLoading ? '—' : livePrice !== null && livePrice !== undefined ? `$${livePrice < 0.01 ? livePrice.toFixed(6) : livePrice < 1 ? livePrice.toFixed(4) : livePrice.toFixed(2)}` : 'unavailable'}
         </span>
       </div>
     </div>
@@ -1686,6 +1685,11 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
     return calcUsdValue(amount, tokenSymbol);
   };
 
+  // Live CoinGecko prices for from/to tokens and pair rate
+  const { price: fromTokenLivePrice, isLoading: fromPriceLoading } = useLivePriceUSD(fromToken);
+  const { price: toTokenLivePrice, isLoading: toPriceLoading } = useLivePriceUSD(toToken);
+  const { rate: livePairRate, isLoading: rateLoading } = useLivePairRate(fromToken, toToken);
+
   // Update toAmount when quote changes
   useEffect(() => {
     if (quote && quote.outputAmount > BigInt(0)) {
@@ -1887,9 +1891,6 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <h2 style={{ color: theme.textPrimary, fontSize: '20px', fontWeight: '700', margin: 0, letterSpacing: '-0.02em' }}>Swap</h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <button style={{ background: 'transparent', border: 'none', color: theme.textMuted, cursor: 'pointer', padding: '8px', borderRadius: '50%' }}>
-                <SettingsIcon />
-              </button>
               <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: theme.textMuted, cursor: 'pointer', padding: '8px', borderRadius: '50%' }}>
                 <CloseIcon />
               </button>
@@ -1907,6 +1908,8 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
               theme={theme}
               onTokenClick={() => openTokenSelector('from')}
               onAmountChange={(val) => setFromAmount(val)}
+              livePrice={fromTokenLivePrice}
+              isPriceLoading={fromPriceLoading}
             />
             
             <div style={{ 
@@ -1942,6 +1945,8 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
               amount={toAmount}
               theme={theme}
               onTokenClick={() => openTokenSelector('to')}
+              livePrice={toTokenLivePrice}
+              isPriceLoading={toPriceLoading}
             />
           </div>
 
@@ -1996,13 +2001,10 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
           <div style={{ marginTop: '12px', padding: '12px 16px', background: theme.bgSecondary, borderRadius: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px' }}>
               <span style={{ color: theme.textSecondary }}>Rate</span>
-              <span style={{ color: theme.textPrimary, fontWeight: '500' }}>1 ETH = 3,245.50 USDC</span>
+              <span style={{ color: theme.textPrimary, fontWeight: '500' }}>
+                {rateLoading ? '—' : livePairRate !== null ? `1 ${fromToken} = ${livePairRate < 0.001 ? livePairRate.toExponential(3) : livePairRate < 1 ? livePairRate.toFixed(6) : livePairRate >= 1000 ? livePairRate.toLocaleString(undefined, { maximumFractionDigits: 2 }) : livePairRate.toFixed(4)} ${toToken}` : 'Rate unavailable'}
+              </span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px' }}>
-              <span style={{ color: theme.textSecondary }}>Network Fee</span>
-              <span style={{ color: theme.textPrimary, fontWeight: '500' }}>~$2.45</span>
-            </div>
-            
             <div style={{ borderTop: `1px solid ${theme.border}`, margin: '8px 0', padding: '8px 0' }}>
               <div style={{ color: theme.textSecondary, fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', marginBottom: '6px' }}>Fee Architecture</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '13px' }}>
@@ -2040,10 +2042,12 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
                   {quote ? `${formatTokenAmount(quote.minimumReceived, toTokenData.decimals)} ${toToken}` : '-'}
                 </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                <span style={{ color: theme.textSecondary }}>Hook Benefit</span>
-                <span style={{ color: '#10b981', fontWeight: '700' }}>+$14.60 saved</span>
-              </div>
+              {selectedHook !== 'none' && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                  <span style={{ color: theme.textSecondary }}>Hook</span>
+                  <span style={{ color: '#10b981', fontWeight: '700' }}>Active</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -2323,9 +2327,9 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
 
         {/* Stats Cards */}
         <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
-          <StatsCard label="TVL [Testnet]" value={`$${totalTVL.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} change="+12.5%" />
-          <StatsCard label="Volume 24H [Testnet]" value={`$${totalVolume.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} change="+8.3%" />
-          <StatsCard label="Fees 24H [Testnet]" value={`$${totalFees.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} change="+5.2%" />
+          <StatsCard label="TVL [Testnet]" value={`$${totalTVL.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} change={null} />
+          <StatsCard label="Volume 24H [Testnet]" value={`$${totalVolume.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} change={null} />
+          <StatsCard label="Fees 24H [Testnet]" value={`$${totalFees.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} change={null} />
         </div>
 
         {/* Filters */}
@@ -2449,12 +2453,12 @@ const AgentWalletPanel = ({ theme, isDark, address, balance }) => {
         </div>
         <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981' }} />
-          <span style={{ fontSize: '12px', color: '#10b981' }}>Active on Base Sepolia</span>
+          <span style={{ fontSize: '12px', color: '#10b981' }}>Active</span>
         </div>
       </div>
 
       <div style={fieldStyle}>
-        <div style={{ fontSize: '11px', color: theme.textMuted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>AgentKit Wallet (CDP)</div>
+        <div style={{ fontSize: '11px', color: theme.textMuted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>Agent Wallet</div>
         {created && agentWalletAddress ? (
           <div>
             <div style={{ fontFamily: 'monospace', fontSize: '13px', color: theme.textPrimary, marginBottom: '8px' }}>
@@ -2468,21 +2472,21 @@ const AgentWalletPanel = ({ theme, isDark, address, balance }) => {
         ) : (
           <div>
             <div style={{ fontSize: '13px', color: theme.textMuted, marginBottom: '14px', lineHeight: '1.5' }}>
-              Create a Coinbase Developer Platform managed wallet for autonomous onchain operations.
+              Create an agent-managed wallet for autonomous onchain operations.
             </div>
             <button
               onClick={handleCreateWallet}
               disabled={isCreating}
               style={{ padding: '10px 22px', background: 'linear-gradient(135deg, #3b82f6, #6366f1)', border: 'none', borderRadius: '8px', color: 'white', fontSize: '14px', fontWeight: '600', cursor: isCreating ? 'not-allowed' : 'pointer', opacity: isCreating ? 0.7 : 1 }}
             >
-              {isCreating ? 'Creating...' : 'Create AgentKit Wallet'}
+              {isCreating ? 'Creating...' : 'Create Agent Wallet'}
             </button>
           </div>
         )}
       </div>
 
       <div style={{ padding: '12px 16px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.06)', border: '1px solid rgba(59, 130, 246, 0.15)', fontSize: '12px', color: theme.textSecondary, lineHeight: '1.5' }}>
-        💡 AgentKit wallets are server-managed via Coinbase CDP and can execute transactions autonomously without requiring manual signing.
+        💡 Agent wallets are server-managed and can execute transactions autonomously without requiring manual signing.
       </div>
     </div>
   );
@@ -2663,6 +2667,7 @@ const AgentNavPanel = ({ theme, title, description, features, cta, onNavigate, a
 // Main AgentBuilder component
 const AgentBuilderInterface = ({ onClose, theme, isDark, onNavigate }) => {
   const [activeAction, setActiveAction] = useState(null);
+  const [showInfoCard, setShowInfoCard] = useState(true);
   const { address } = useAccount();
   const { data: balance } = useBalance({ address });
 
@@ -2685,9 +2690,9 @@ const AgentBuilderInterface = ({ onClose, theme, isDark, onNavigate }) => {
         return (
           <AgentNavPanel
             theme={theme}
-            title="Swap Tokens via AgentKit"
+            title="Swap Tokens"
             description="Execute token swaps through Uniswap v4 with intelligent hook selection. The agent analyzes pool liquidity and routes through the optimal path automatically."
-            features={['Automatic route optimization across liquidity pools', 'Support for 20+ tokens on Base Sepolia', 'Hook-aware swapping: ALO, TWAMM, Stable Protection', 'Real-time price impact analysis before execution']}
+            features={['Automatic route optimization across liquidity pools', 'Support for 20+ tokens on testnet', 'Hook-aware swapping: TWAMM, Stable Protection', 'Real-time price impact analysis before execution']}
             cta="Open Swap Interface →"
             onNavigate={() => onNavigate('swap')}
             accentColor="#f59e0b"
@@ -2726,32 +2731,26 @@ const AgentBuilderInterface = ({ onClose, theme, isDark, onNavigate }) => {
 
   return (
     <div style={{ width: '100%', fontFamily: '"DM Sans", sans-serif' }}>
-      {/* Header */}
-      <div style={{ background: theme.bgCard, borderRadius: '16px', border: `1px solid ${theme.border}`, padding: '28px 32px', marginBottom: '20px', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: 0, right: 0, width: '220px', height: '100%', background: 'linear-gradient(135deg, transparent, rgba(139, 92, 246, 0.06))', pointerEvents: 'none' }} />
-        <button onClick={onClose} style={{ position: 'absolute', top: '20px', right: '20px', background: 'transparent', border: 'none', color: theme.textMuted, cursor: 'pointer', padding: '8px', borderRadius: '50%', zIndex: 1 }}>
-          <CloseIcon />
-        </button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
-          <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>
-            🤖
-          </div>
-          <div>
-            <h1 style={{ color: theme.textPrimary, fontSize: '22px', fontWeight: '700', margin: '0 0 6px 0' }}>AgentKit</h1>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 10px', borderRadius: '20px', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', fontSize: '11px', fontWeight: '600' }}>
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#3b82f6' }} /> Coinbase CDP
-              </div>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 10px', borderRadius: '20px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', fontSize: '11px', fontWeight: '600' }}>
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} /> Base Sepolia
-              </div>
+      {/* Header info card — dismissed by X, action buttons remain */}
+      {showInfoCard && (
+        <div style={{ background: theme.bgCard, borderRadius: '16px', border: `1px solid ${theme.border}`, padding: '28px 32px', marginBottom: '20px', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: 0, right: 0, width: '220px', height: '100%', background: 'linear-gradient(135deg, transparent, rgba(139, 92, 246, 0.06))', pointerEvents: 'none' }} />
+          <button onClick={() => setShowInfoCard(false)} style={{ position: 'absolute', top: '20px', right: '20px', background: 'transparent', border: 'none', color: theme.textMuted, cursor: 'pointer', padding: '8px', borderRadius: '50%', zIndex: 1 }}>
+            <CloseIcon />
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '12px' }}>
+            <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>
+              🤖
+            </div>
+            <div>
+              <h1 style={{ color: theme.textPrimary, fontSize: '22px', fontWeight: '700', margin: '0 0 6px 0' }}>Your Agent Assistant</h1>
             </div>
           </div>
+          <p style={{ color: theme.textSecondary, fontSize: '14px', lineHeight: '1.6', margin: 0 }}>
+            AI-powered agents that autonomously execute DeFi operations — wallet management, token transfers, swaps, liquidity provisioning, and more.
+          </p>
         </div>
-        <p style={{ color: theme.textSecondary, fontSize: '14px', lineHeight: '1.6', margin: 0 }}>
-          AI-powered agents that autonomously execute DeFi operations — wallet management, token transfers, swaps, liquidity provisioning, and more.
-        </p>
-      </div>
+      )}
 
       {/* Action Cards Grid — 3 columns */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', marginBottom: activeAction ? '20px' : '0' }}>
@@ -3061,9 +3060,9 @@ export default function MantuaApp() {
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const [showAddLiquidityModal, setShowAddLiquidityModal] = useState(false);
   const [showPredictions,  setShowPredictions]  = useState(false);
-  const [showVaults,       setShowVaults]       = useState(false);
   const [selectedPool, setSelectedPool] = useState(null);
   const [addLiquidityMode, setAddLiquidityMode] = useState<'add' | 'create' | 'remove'>('add');
+  const [liquidityInitialTokens, setLiquidityInitialTokens] = useState<{tokenA?: string; tokenB?: string} | null>(null);
   const [portfolioType, setPortfolioType] = useState('User');
   const [swapDetails, setSwapDetails] = useState(null);
   // Voice command state
@@ -3081,7 +3080,6 @@ export default function MantuaApp() {
   }, [chatMessages, analyticsMessages]);
 
   const walletAddress = truncatedAddress || '0xbaac...DC87';
-  const walletBalance = '0.0021 ETH'; // TODO: Fetch real balance
 
   // Track wallet connection event
   useEffect(() => {
@@ -3250,6 +3248,11 @@ export default function MantuaApp() {
 
     if (command.type === 'addLiquidity') {
        resetModals();
+       if (command.params?.tokenA || command.params?.tokenB) {
+         setLiquidityInitialTokens({ tokenA: command.params.tokenA, tokenB: command.params.tokenB });
+       } else {
+         setLiquidityInitialTokens(null);
+       }
        setShowAddLiquidityModal(true);
        sendMessage(inputValue);
        return;
@@ -3454,7 +3457,6 @@ export default function MantuaApp() {
               setShowLiquidity(false);
               setShowAgentBuilder(false);
               setShowPredictions(false);
-              setShowVaults(false);
               setShowPortfolioModal(false);
               setShowAddLiquidityModal(false);
               setHasInteracted(false);
@@ -3485,7 +3487,6 @@ export default function MantuaApp() {
               setShowLiquidity(false);
               setShowAgentBuilder(false);
               setShowPredictions(false);
-              setShowVaults(false);
               setShowPortfolioModal(false);
               setShowAddLiquidityModal(false);
               setSwapDetails(null);
@@ -3503,7 +3504,6 @@ export default function MantuaApp() {
               setShowSwap(false);
               setShowAgentBuilder(false);
               setShowPredictions(false);
-              setShowVaults(false);
               setShowPortfolioModal(false);
               setShowAddLiquidityModal(false);
               setHasInteracted(true);
@@ -3513,24 +3513,6 @@ export default function MantuaApp() {
             <DropletsIcon /> Liquidity
           </button>
 
-          {/* Vaults */}
-          <button
-            onClick={() => {
-              setShowVaults(true);
-              setShowPredictions(false);
-              setShowSwap(false);
-              setShowLiquidity(false);
-              setShowAgentBuilder(false);
-              setShowPortfolioModal(false);
-              setShowAddLiquidityModal(false);
-              setHasInteracted(true);
-            }}
-            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', background: showVaults ? `${theme.accent}20` : 'transparent', border: 'none', borderRadius: 8, color: showVaults ? theme.accent : theme.textPrimary, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
-          >
-            <Layers size={16} /> Vaults
-            <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, background: '#7c3aed', color: 'white', padding: '1px 6px', borderRadius: 10 }}>NEW</span>
-          </button>
-
           {/* Predictions */}
           <button
             onClick={() => {
@@ -3538,7 +3520,6 @@ export default function MantuaApp() {
               setShowSwap(false);
               setShowLiquidity(false);
               setShowAgentBuilder(false);
-              setShowVaults(false);
               setShowPortfolioModal(false);
               setShowAddLiquidityModal(false);
               setHasInteracted(true);
@@ -3554,7 +3535,6 @@ export default function MantuaApp() {
             onClick={() => {
               setShowAgentBuilder(true);
               setShowPredictions(false);
-              setShowVaults(false);
               setShowSwap(false);
               setShowLiquidity(false);
               setShowPortfolioModal(false);
@@ -3563,7 +3543,7 @@ export default function MantuaApp() {
             }}
             style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', background: showAgentBuilder ? `${theme.accent}20` : 'transparent', border: 'none', borderRadius: 8, color: showAgentBuilder ? theme.accent : theme.textPrimary, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
           >
-            <BotIcon /> Agent
+            <BotIcon /> Your Agent Assistant
             <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', color: 'white', padding: '1px 6px', borderRadius: 10 }}>AI</span>
           </button>
 
@@ -3679,14 +3659,6 @@ export default function MantuaApp() {
             </div>
           )}
 
-          {/* Vaults — full-page sibling, not inside chat scroll container */}
-          {showVaults && !showSwap && !showLiquidity && !showAgentBuilder && !showAddLiquidityModal && !showPredictions && (
-            <div style={{ position: 'absolute', inset: 0, zIndex: 110, overflow: 'auto', background: theme.bgPrimary }}>
-              <Suspense fallback={<div style={{ padding: 40, color: '#6b7280' }}>Loading…</div>}>
-                <VaultsView theme={theme} isDark={isDark} />
-              </Suspense>
-            </div>
-          )}
 
           {/* Portfolio Overlay */}
           {showPortfolioModal && (
@@ -3795,11 +3767,13 @@ export default function MantuaApp() {
                   {showAddLiquidityModal && !showSwap && !showAgentBuilder && !showLiquidity && (
                     <div style={{ width: '100%', marginTop: 20, marginBottom: 20, display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
                       <AddLiquidityModal
-                        onClose={() => { setShowAddLiquidityModal(false); setSelectedPool(null); }}
+                        onClose={() => { setShowAddLiquidityModal(false); setSelectedPool(null); setLiquidityInitialTokens(null); }}
                         theme={theme}
                         isDark={isDark}
                         pool={selectedPool}
                         mode={addLiquidityMode}
+                        initialTokenA={liquidityInitialTokens?.tokenA}
+                        initialTokenB={liquidityInitialTokens?.tokenB}
                       />
                     </div>
                   )}
@@ -3817,7 +3791,6 @@ export default function MantuaApp() {
                           if (view === 'swap') setShowSwap(true);
                           if (view === 'liquidity') setShowLiquidity(true);
                           if (view === 'predictions') setShowPredictions(true);
-                          if (view === 'vaults') setShowVaults(true);
                         }}
                       />
                     </div>

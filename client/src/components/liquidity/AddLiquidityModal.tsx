@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldIcon, TrendIcon, BoltIcon, SwapIcon } from '../icons';
+import { ShieldIcon, SwapIcon } from '../icons';
 import { getTokenBySymbol, type Token } from '../../config/tokens';
 import PoolActivityChart from './PoolActivityChart';
 import HookSelector from './HookSelector';
@@ -20,20 +20,20 @@ interface AddLiquidityModalProps {
   isDark: boolean;
   pool?: LiquidityPool | null;
   mode?: 'add' | 'create' | 'remove';
+  initialTokenA?: string;
+  initialTokenB?: string;
 }
 
 const HOOKS = [
-  { id: 'mev',        name: 'MEV Protection',  icon: <ShieldIcon />, benefit: 'Save ~0.3% on trades >$1k',      color: '#8b5cf6', description: 'Randomized execution timing protects against sandwich attacks', recommended: true },
-  { id: 'directional',name: 'Directional Fee',  icon: <TrendIcon />,  benefit: 'Reduce IL by ~15% on trending', color: '#f59e0b', description: 'Dynamic fees based on trade direction (Nezlobin algorithm)' },
-  { id: 'jit',        name: 'JIT Rebalancing',  icon: <BoltIcon />,   benefit: 'Optimize fee capture',          color: '#10b981', description: 'Concentrates liquidity around your trade for better execution' },
-  { id: 'none',       name: 'No Hook',          icon: <SwapIcon />,   benefit: 'Standard execution',            color: '#6b7280', description: 'Standard Uniswap v4 swap without modifications' },
+  { id: 'sp',   name: 'Stable Protection',  icon: <ShieldIcon />, color: '#8b5cf6', description: 'Protects stable pair liquidity from depeg events', benefit: 'Depeg protection' },
+  { id: 'none', name: 'No Hook',             icon: <SwapIcon />,   color: '#6b7280', description: 'Standard Uniswap v4 pool without hook modifications', benefit: 'Standard execution' },
 ];
 
 const tokenGrad = (s?: string) => !s ? 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)' : s.includes('ETH') ? 'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)' : s.includes('BTC') ? 'linear-gradient(135deg, #F7931A 0%, #FFAB4A 100%)' : (s.includes('USD') || s.includes('DAI')) ? 'linear-gradient(135deg, #2775CA 0%, #4A9FE8 100%)' : 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)';
 const tokenGlyph = (s?: string) => !s ? '?' : s.includes('ETH') ? 'Ξ' : s.includes('BTC') ? '₿' : (s.includes('USD') || s.includes('DAI')) ? '$' : s.charAt(0);
 
 const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
-  onClose, theme, isDark, pool, mode = 'add',
+  onClose, theme, isDark, pool, mode = 'add', initialTokenA, initialTokenB,
 }) => {
   const [selectedHook, setSelectedHook] = useState('none');
   const [isHookModalOpen, setIsHookModalOpen] = useState(false);
@@ -53,13 +53,16 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
     if ((mode === 'add' || mode === 'remove') && pool) {
       setTokenA(getTokenBySymbol(pool.token1) ?? null);
       setTokenB(getTokenBySymbol(pool.token2) ?? null);
+    } else if (initialTokenA || initialTokenB) {
+      if (initialTokenA) setTokenA(getTokenBySymbol(initialTokenA) ?? null);
+      if (initialTokenB) setTokenB(getTokenBySymbol(initialTokenB) ?? null);
     } else {
       setTokenA(null);
       setTokenB(null);
     }
-  }, [pool, mode]);
+  }, [pool, mode, initialTokenA, initialTokenB]);
 
-  const hookObj = HOOKS.find((h) => h.id === selectedHook) ?? HOOKS[2];
+  const hookObj = HOOKS.find((h) => h.id === selectedHook) ?? HOOKS[1];
   const hookColor = hookObj.color;
   const displayA = tokenA?.symbol ?? (mode === 'create' ? 'Token A' : 'ETH');
   const displayB = tokenB?.symbol ?? (mode === 'create' ? 'Token B' : 'mBTC');

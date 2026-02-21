@@ -107,6 +107,7 @@ export function useSwapExecution(): UseSwapExecutionReturn {
     if (isTxError && status === 'confirming' && !hasShownErrorToast.current) {
       hasShownErrorToast.current = true;
       setStatus('failed');
+      console.error('[SwapExecution] On-chain transaction failed:', { txHash, chainId });
       setError(new Error('Transaction failed on-chain'));
       toast.error('Swap Failed', {
         description: 'Transaction failed. Please try again.',
@@ -191,9 +192,10 @@ export function useSwapExecution(): UseSwapExecutionReturn {
 
     } catch (err) {
       toast.dismiss('swap-pending');
-      
+
       const errorMessage = err instanceof Error ? err.message : 'Swap failed';
-      
+      console.error('[SwapExecution] Swap failed:', err);
+
       if (errorMessage.includes('User rejected') || errorMessage.includes('user rejected')) {
         setError(new Error('Transaction cancelled by user'));
         toast.warning('Transaction Cancelled', {
@@ -207,7 +209,7 @@ export function useSwapExecution(): UseSwapExecutionReturn {
           duration: 0,
         });
       }
-      
+
       setStatus('failed');
     }
   }, [userAddress, writeContractAsync]);

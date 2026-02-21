@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAccount, useChainId } from 'wagmi';
 import type { Token } from '../../config/tokens';
 import { getPriceBySymbol } from '../../services/priceService';
-import { SettingsIcon, ArrowLeftRightIcon } from '../icons';
+import { ArrowLeftRightIcon } from '../icons';
 import { parseError } from '../../lib/errorMessages';
 import { useAddLiquidity } from '../../hooks/useAddLiquidity';
 import { createPoolKey, getHookAddress } from '../../lib/swap-utils';
@@ -76,7 +76,6 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <h2 style={{ color: theme.textPrimary, fontSize: '20px', fontWeight: '700', margin: 0, letterSpacing: '-0.02em' }}>Add Liquidity</h2>
-        <button style={{ background: 'transparent', border: 'none', color: theme.textMuted, cursor: 'pointer', padding: '8px', borderRadius: '50%' }}><SettingsIcon /></button>
       </div>
 
       {/* Token Inputs — matching swap modal's TokenSelect style */}

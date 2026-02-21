@@ -15,7 +15,6 @@ import {
   ResponsiveContainer, CartesianGrid,
 } from 'recharts';
 import { COINGECKO_IDS, COINGECKO_DAYS, PRICE_CACHE_TTL_MS } from '../../config/tokenMetadata';
-import { getPriceBySymbol } from '../../services/priceService';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -56,25 +55,23 @@ function setCache(key: string, data: PricePoint[]) {
   priceCache.set(key, { data, timestamp: Date.now() });
 }
 
-// ─── Mock data generator ─────────────────────────────────────────────────────
+// ─── Mock data generator — flat line at 1.0 to show price data is unavailable ─
 
 function generateMockData(
-  basePrice: number,
+  _basePrice: number,
   days: number,
 ): PricePoint[] {
   const points: PricePoint[] = [];
   const now = Date.now();
   const interval = (days * 24 * 60 * 60 * 1000) / 30;
-  let price = basePrice * (0.92 + Math.random() * 0.16);
 
   for (let i = 30; i >= 0; i--) {
     const ts = now - i * interval;
-    price = price * (1 + (Math.random() - 0.5) * 0.04);
     const date = new Date(ts);
     const label = days <= 1
       ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-    points.push({ time: label, price: parseFloat(price.toFixed(6)) });
+    points.push({ time: label, price: 1.0 });
   }
   return points;
 }
@@ -208,21 +205,13 @@ export const SwapPriceChart: React.FC<Props> = ({ fromToken, toToken, theme, isD
     } catch (err: any) {
       if (err?.name === 'AbortError') return;
 
-      // Fall back to mock data
-      const baseFrom = getPriceBySymbol(from) || getPriceBySymbol(from.replace(/^m/, '')) || 1;
-      const baseTo   = getPriceBySymbol(to)   || getPriceBySymbol(to.replace(/^m/, ''))   || 1;
-      const basePrice = baseTo > 0 ? baseFrom / baseTo : baseFrom;
-      const mockData  = generateMockData(basePrice, days);
-      const currentPrice = mockData[mockData.length - 1]?.price ?? basePrice;
-      const dayAgoPrice  = mockData[0]?.price ?? currentPrice;
-      const change24h = dayAgoPrice !== 0
-        ? ((currentPrice - dayAgoPrice) / dayAgoPrice) * 100
-        : 0;
+      // Fall back to flat mock data — no invented prices
+      const mockData = generateMockData(1.0, days);
 
       setState({
         data: mockData,
-        currentPrice,
-        change24h,
+        currentPrice: 1.0,
+        change24h: 0,
         isMock: true,
         isLoading: false,
         error: null,

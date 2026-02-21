@@ -9,10 +9,29 @@ export interface ClassifiedQuery {
   params?: any;
 }
 
+// Normalize common token names to the testnet token symbols used in the app
+const normalizeTokenSymbol = (sym: string): string => {
+  const upper = sym.toUpperCase();
+  const aliases: Record<string, string> = {
+    'USDC': 'mUSDC', 'USDT': 'mUSDT', 'DAI': 'mDAI',
+    'USDE': 'mUSDe', 'FRAX': 'mFRAX',
+    'BTC': 'mBTC', 'WBTC': 'mWBTC',
+    'SOL': 'mWSOL', 'AVAX': 'mWAVAX', 'MATIC': 'mWMATIC',
+    'WETH': 'mWETH', 'STETH': 'mstETH',
+  };
+  return aliases[upper] ?? upper;
+};
+
 const extractPoolFromMessage = (msg: string) => {
   const poolMatch = msg.match(/([a-zA-Z0-9]+)\/([a-zA-Z0-9]+)/);
   if (poolMatch) {
-    return { pool: `${poolMatch[1]}/${poolMatch[2]}` };
+    const tokenA = normalizeTokenSymbol(poolMatch[1]);
+    const tokenB = normalizeTokenSymbol(poolMatch[2]);
+    return {
+      pool: `${tokenA}/${tokenB}`,
+      tokenA,
+      tokenB,
+    };
   }
   return null;
 };
