@@ -130,7 +130,7 @@ const PoolActivityChart: React.FC<PoolActivityChartProps> = ({ theme, isDark, to
   const gradId = `pool-chart-grad-${pairKey.replace(/\W/g, '')}`;
 
   return (
-    <div style={{ width: '100%', height: '100%', minHeight: '200px' }}>
+    <div style={{ width: '100%', minHeight: '220px' }}>
       {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <div style={{ fontSize: 11, color: theme.textSecondary, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -164,14 +164,13 @@ const PoolActivityChart: React.FC<PoolActivityChartProps> = ({ theme, isDark, to
       {isLoading ? (
         <div style={{
           width: '100%',
-          height: '85%',
+          height: 180,
           borderRadius: 8,
           background: 'rgba(148,163,184,0.08)',
           animation: 'poolChartShimmer 1.4s ease-in-out infinite',
-          minHeight: 140,
         }} />
       ) : (
-        <ResponsiveContainer width="100%" height="85%">
+        <ResponsiveContainer width="100%" height={180}>
           <AreaChart data={chartData}>
             <defs>
               <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">

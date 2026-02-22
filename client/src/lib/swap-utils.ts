@@ -55,8 +55,8 @@ export const POOL_SWAP_TEST_ADDRESS = POOL_SWAP_TEST_ADDRESSES[84532];
  * TODO: Replace placeholder addresses with actual deployed addresses.
  */
 export const POOL_MODIFY_LIQUIDITY_TEST_ADDRESSES: Record<number, Address> = {
-  84532: '0x0000000000000000000000000000000000000000' as Address,  // Base Sepolia — update with actual address
-  1301: '0x0000000000000000000000000000000000000000' as Address,   // Unichain Sepolia — update with actual address
+  84532: '0x4b69e8d500d7c48285c8b4abbe41dfa5303a8982' as Address,  // Base Sepolia — MinimalLiquidityHelper
+  1301: '0x5fa728c0a5cfd51bee4b060773f50554c0c8a7ab' as Address,   // Unichain Sepolia — PoolModifyLiquidityTest
 };
 
 /**

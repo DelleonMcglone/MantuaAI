@@ -23,8 +23,17 @@ export function parseError(err: unknown): string {
   if (msg.includes('network') || msg.includes('fetch') || msg.includes('ECONNREFUSED'))
     return 'Network error. Check your connection and try again.';
 
+  if (msg.includes('not configured') || msg.includes('not deployed'))
+    return 'Contract not available on this network. Please switch to Base Sepolia.';
+
+  if (msg.includes('ERC20InsufficientAllowance') || msg.includes('allowance'))
+    return 'Token approval needed. Please approve the token first.';
+
+  if (msg.includes('ERC20InsufficientBalance'))
+    return 'Insufficient token balance for this operation.';
+
   if (msg.includes('execution reverted') || msg.includes('revert'))
-    return 'Transaction reverted. The contract rejected this operation.';
+    return 'Transaction reverted. The pool may not be initialized or parameters are invalid.';
 
   if (msg.includes('gas') || msg.includes('Gas'))
     return 'Transaction failed due to gas estimation. Try again.';
