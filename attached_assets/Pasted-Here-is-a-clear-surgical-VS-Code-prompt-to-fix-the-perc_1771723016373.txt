@@ -1,0 +1,183 @@
+Here is a **clear, surgical VS Code prompt** to fix the percentage button logic in your Swap component.
+
+This assumes:
+
+* You are using Reown wallet
+* You are using Wagmi + viem
+* You have a controlled `sellAmount` state
+* You have percentage buttons like 25% / 50% / 75% / 100%
+
+---
+
+# 🔧 TASK: Fix Percentage Button Clearing Sell Amount Instead of Adjusting It
+
+## 🐛 Current Bug
+
+When clicking a percentage button (ex: 25%, 50%, 75%, 100%),
+the **sell input amount gets cleared** instead of being updated to the correct percentage of the wallet balance.
+
+This means:
+
+* The button click is either:
+
+  * Setting state to empty string `""`
+  * Setting undefined
+  * Overwriting state incorrectly
+  * Running before balance is loaded
+  * Parsing incorrectly
+
+---
+
+# 🎯 Expected Behavior
+
+When user clicks:
+
+* 25% → Sell amount = 0.25 × tokenBalance
+* 50% → Sell amount = 0.5 × tokenBalance
+* 75% → Sell amount = 0.75 × tokenBalance
+* 100% → Sell amount = full tokenBalance
+
+The input field must:
+
+* Update visually
+* Not clear
+* Not flicker
+* Not reset to empty
+* Trigger quote recalculation
+
+---
+
+# 🛠 REQUIRED FIX
+
+## 1️⃣ Ensure Sell Amount Is a Controlled Input
+
+Confirm:
+
+```ts
+const [sellAmount, setSellAmount] = useState<string>("")
+```
+
+Input must be:
+
+```tsx
+<input
+  value={sellAmount}
+  onChange={(e) => setSellAmount(e.target.value)}
+/>
+```
+
+If `value` is missing, React will treat it as uncontrolled and clear it.
+
+---
+
+## 2️⃣ Fix Percentage Button Handler
+
+Replace any existing percentage logic with:
+
+```ts
+const handlePercentageClick = (percentage: number) => {
+  if (!tokenBalance || tokenBalance === "0") return;
+
+  const balance = Number(tokenBalance);
+  if (isNaN(balance)) return;
+
+  const calculated = (balance * percentage).toFixed(6);
+
+  setSellAmount(calculated);
+};
+```
+
+Then buttons:
+
+```tsx
+<button onClick={() => handlePercentageClick(0.25)}>25%</button>
+<button onClick={() => handlePercentageClick(0.5)}>50%</button>
+<button onClick={() => handlePercentageClick(0.75)}>75%</button>
+<button onClick={() => handlePercentageClick(1)}>100%</button>
+```
+
+---
+
+## 3️⃣ Prevent Clearing From useEffect
+
+Search for any `useEffect` like:
+
+```ts
+useEffect(() => {
+  setSellAmount("");
+}, [selectedToken]);
+```
+
+If present:
+
+* Only reset amount when token changes intentionally
+* Do NOT reset on balance change
+* Do NOT reset on percentage click
+
+Make sure no effect is wiping state.
+
+---
+
+## 4️⃣ If Using BigInt or formatUnits (Recommended Fix)
+
+If you are storing balance as BigInt:
+
+```ts
+import { formatUnits } from "viem";
+
+const handlePercentageClick = (percentage: number) => {
+  if (!rawBalance) return;
+
+  const formatted = Number(formatUnits(rawBalance, tokenDecimals));
+  const calculated = (formatted * percentage).toFixed(6);
+
+  setSellAmount(calculated);
+};
+```
+
+This prevents precision mismatch.
+
+---
+
+## 5️⃣ Prevent Empty State Override
+
+If you see logic like:
+
+```ts
+if (!sellAmount) {
+  setSellAmount("");
+}
+```
+
+Remove it.
+
+Percentage click should always explicitly set the value.
+
+---
+
+# ✅ After Fix Test These Cases
+
+* Click 25% → value appears correctly
+* Click 50% → value updates (does NOT clear)
+* Click 100% → full balance appears
+* Change token → input resets once
+* Switch chains → input does NOT flicker
+* Swap executes successfully
+
+---
+
+# 🧠 Most Likely Root Cause
+
+Based on your video behavior, it is likely one of:
+
+1. State being set to undefined
+2. tokenBalance not loaded when button fires
+3. Input is uncontrolled
+4. useEffect resetting sellAmount
+5. Decimal mismatch causing NaN
+
+This prompt fixes all 5.
+
+---
+
+If you'd like, I can also give you a **more production-safe version using BigNumber math instead of floating point**, which is safer for DEX precision.
