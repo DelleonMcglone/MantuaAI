@@ -1,12 +1,19 @@
 /**
  * Price Service
  *
- * Centralized price management for mock testnet tokens.
- * Future: Replace with Chainlink price feeds or Uniswap TWAP.
+ * Provides USD price lookups for mock testnet tokens.
+ * Prefers live CoinGecko prices from the module-level cache in useLivePriceUSD.
+ * Falls back to approximate reference prices only when the cache is empty.
+ *
+ * NOTE: Reference prices below are FALLBACK VALUES for when CoinGecko is
+ * unavailable. They do NOT update automatically. The UI uses useLivePriceUSD
+ * for all displayed prices — this service is only used for USD-value estimates
+ * in the token selector and swap input "≈ $" display.
  */
 
 import type { Address } from 'viem';
 import { getTokenByAddress, getTokenBySymbol } from '../config/tokens';
+import { getCachedPrice } from '../hooks/useLivePriceUSD';
 
 export interface TokenPrice {
   symbol: string;
@@ -16,51 +23,40 @@ export interface TokenPrice {
 }
 
 /**
- * Mock price data for testnet tokens
- * In production, this would come from Chainlink, Uniswap TWAP, or other oracles
+ * Approximate reference prices for testnet tokens (fallback only).
+ * These values are intentionally approximate and should never be displayed
+ * as authoritative prices. The UI uses useLivePriceUSD for all price display.
  */
-const MOCK_PRICES: Record<string, number> = {
+const REFERENCE_PRICES: Record<string, number> = {
   // Native & Wrapped ETH
-  'ETH': 3245.50,
-  'mETH': 3245.50,
-  'mWETH': 3245.50,
-
-  // Liquid Staking Tokens (slightly higher due to staking rewards)
-  'mstETH': 3250.00,
-  'mcbETH': 3248.00,
-  'mrETH': 3255.00,
-  'mwstETH': 3260.00,
-  'mrsETH': 3252.00,
-
+  'ETH':    2000,
+  'mWETH':  2000,
+  // Liquid Staking Tokens
+  'mstETH': 2010,
+  'mcbETH': 2005,
   // BTC variants
-  'mBTC': 95000.00,
-  'mWBTC': 95000.00,
-
-  // Stablecoins (base $1)
-  'mUSDC': 1.00,
-  'mUSDT': 1.00,
-  'mDAI': 1.00,
-  'mUSDe': 1.00,
-  'mFRAX': 1.00,
-
-  // RWA tokens (roughly $1 with slight variations)
-  'mOUSG': 1.02,  // Yield-bearing
-  'mUSDY': 1.01,  // Yield-bearing
+  'mBTC':   90000,
+  'mWBTC':  90000,
+  // Stablecoins
+  'mUSDC':  1.00,
+  'mUSDT':  1.00,
+  'mUSDE':  1.00,
+  'mUSDS':  1.00,
+  // RWA tokens (~$1)
+  'mUSDY':  1.01,
   'mBUIDL': 1.00,
-  'mTBILL': 1.00,
-  'mSTEUR': 1.10,  // EUR-denominated
-
-  // Other wrapped assets
-  'mWSOL': 185.00,
-  'mWAVAX': 42.50,
-  'mWMATIC': 0.95,
+  // Wrapped assets
+  'mWSOL':  150,
 };
 
 /**
- * Get price in USD for a token by symbol
+ * Get price in USD for a token by symbol.
+ * Checks the live CoinGecko cache first; falls back to reference price.
  */
 export function getPriceBySymbol(symbol: string): number {
-  return MOCK_PRICES[symbol] || 0;
+  const live = getCachedPrice(symbol);
+  if (live !== null) return live;
+  return REFERENCE_PRICES[symbol] ?? 0;
 }
 
 /**
@@ -69,14 +65,12 @@ export function getPriceBySymbol(symbol: string): number {
 export function getPriceByAddress(address: Address): number {
   const token = getTokenByAddress(address);
   if (!token) return 0;
-  return MOCK_PRICES[token.symbol] || 0;
+  return getPriceBySymbol(token.symbol);
 }
 
 /**
  * Calculate exchange rate between two tokens
  * Returns: How much of tokenOut you get per 1 tokenIn
- *
- * Example: getExchangeRate(ETH, USDC) = 3245.50 (1 ETH = 3245.50 USDC)
  */
 export function getExchangeRate(
   tokenInAddress: Address,
@@ -84,26 +78,18 @@ export function getExchangeRate(
 ): number {
   const priceIn = getPriceByAddress(tokenInAddress);
   const priceOut = getPriceByAddress(tokenOutAddress);
-
   if (priceOut === 0) return 0;
-
   return priceIn / priceOut;
 }
 
 /**
  * Calculate exchange rate as BigInt with 18 decimals precision
- * This is used for BigInt swap calculations
- *
- * Returns: exchange rate * 10^18
  */
 export function getExchangeRateBigInt(
   tokenInAddress: Address,
   tokenOutAddress: Address
 ): bigint {
   const rate = getExchangeRate(tokenInAddress, tokenOutAddress);
-
-  // Convert to BigInt with 18 decimal precision
-  // Multiply by 1e6 first to preserve 6 decimal places, then by 1e12
   const rateScaled = Math.floor(rate * 1_000_000);
   return BigInt(rateScaled) * BigInt(10 ** 12);
 }
@@ -118,22 +104,21 @@ export function calculateUsdValue(
   if (!amount || amount === '' || parseFloat(amount.toString()) === 0) {
     return '0.00';
   }
-
   const price = getPriceBySymbol(tokenSymbol);
   const value = parseFloat(amount.toString()) * price;
   return value.toFixed(2);
 }
 
 /**
- * Get all prices (useful for debugging or batch operations)
+ * Get all reference prices (useful for debugging)
  */
 export function getAllPrices(): Record<string, number> {
-  return { ...MOCK_PRICES };
+  return { ...REFERENCE_PRICES };
 }
 
 /**
  * Check if price data exists for a token
  */
 export function hasPriceData(symbol: string): boolean {
-  return symbol in MOCK_PRICES;
+  return symbol in REFERENCE_PRICES || getCachedPrice(symbol) !== null;
 }

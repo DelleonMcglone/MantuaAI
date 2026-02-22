@@ -1,15 +1,16 @@
 /**
  * Token Approval Hook
- * 
+ *
  * Handles ERC-20 token approval flow for swap execution.
  * - Checks current allowance before swap
  * - Supports unlimited vs exact approval options
  * - Shows approval status and pending state
  * - Skips approval for native ETH swaps
+ * - approve() awaits on-chain confirmation before returning
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useChainId } from 'wagmi';
+import { useAccount, useReadContract, useWriteContract, usePublicClient, useChainId } from 'wagmi';
 import type { Address } from 'viem';
 import { ERC20_ABI, isNativeEth, getPoolSwapTestAddress } from '../lib/swap-utils';
 
@@ -44,6 +45,7 @@ export function useTokenApproval({
 }: UseTokenApprovalOptions): UseTokenApprovalReturn {
   const { address: userAddress } = useAccount();
   const chainId = useChainId();
+  const publicClient = usePublicClient();
   const [status, setStatus] = useState<ApprovalStatus>('idle');
   const [error, setError] = useState<Error | null>(null);
   const [approvalTxHash, setApprovalTxHash] = useState<`0x${string}` | undefined>();
@@ -51,7 +53,7 @@ export function useTokenApproval({
   const isNative = isNativeEth(tokenAddress);
 
   // Get chain-specific spender address if not provided
-  const resolvedSpenderAddress = spenderAddress || (() => {
+  const resolvedSpenderAddress = spenderAddress ?? (() => {
     try {
       return getPoolSwapTestAddress(chainId);
     } catch {
@@ -73,59 +75,55 @@ export function useTokenApproval({
     },
   });
 
-  const { writeContractAsync, isPending: isWritePending } = useWriteContract();
+  const { writeContractAsync } = useWriteContract();
 
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
-    hash: approvalTxHash,
-  });
-
-  const needsApproval = !isNative && 
-    amount > BigInt(0) && 
+  const needsApproval = !isNative &&
+    amount > BigInt(0) &&
     (currentAllowance === undefined || currentAllowance < amount);
 
   const isApproved = isNative || (!needsApproval && amount > BigInt(0));
 
+  // Sync status from derived state — never override 'approving' (managed by approve())
   useEffect(() => {
     if (isNative) {
       setStatus('approved');
       return;
     }
-
     if (isLoadingAllowance) {
       setStatus('checking');
       return;
     }
+    // Don't overwrite in-progress approval state
+    setStatus(prev => {
+      if (prev === 'approving') return prev;
+      if (needsApproval) return 'needs-approval';
+      if (amount > BigInt(0)) return 'approved';
+      return 'idle';
+    });
+  }, [isNative, isLoadingAllowance, needsApproval, amount]);
 
-    if (isWritePending || isConfirming) {
-      setStatus('approving');
-      return;
-    }
-
-    if (isConfirmed) {
-      setStatus('approved');
-      refetchAllowance();
-      return;
-    }
-
-    if (needsApproval) {
-      setStatus('needs-approval');
-    } else if (amount > BigInt(0)) {
-      setStatus('approved');
-    } else {
-      setStatus('idle');
-    }
-  }, [isNative, isLoadingAllowance, isWritePending, isConfirming, isConfirmed, needsApproval, amount, refetchAllowance]);
-
-  const approve = useCallback(async (unlimited: boolean = false) => {
+  /**
+   * Submit the approval transaction and wait for on-chain confirmation.
+   * Throws on user rejection or on-chain failure so callers can handle sequentially.
+   */
+  const approve = useCallback(async (unlimited: boolean = false): Promise<void> => {
     if (isNative) {
       setStatus('approved');
       return;
     }
 
     if (!userAddress) {
-      setError(new Error('Wallet not connected'));
+      const err = new Error('Wallet not connected');
+      setError(err);
       setStatus('error');
-      return;
+      throw err;
+    }
+
+    if (!resolvedSpenderAddress) {
+      const err = new Error('Swap contract not available on this chain');
+      setError(err);
+      setStatus('error');
+      throw err;
     }
 
     try {
@@ -133,10 +131,6 @@ export function useTokenApproval({
       setError(null);
 
       const approvalAmount = unlimited ? MAX_UINT256 : amount;
-
-      if (!resolvedSpenderAddress) {
-        throw new Error('Swap contract not available on this chain');
-      }
 
       const hash = await writeContractAsync({
         address: tokenAddress,
@@ -146,17 +140,26 @@ export function useTokenApproval({
       });
 
       setApprovalTxHash(hash);
+
+      // Wait for on-chain confirmation
+      const receipt = await publicClient!.waitForTransactionReceipt({ hash });
+      if (receipt.status === 'reverted') {
+        throw new Error('Approval transaction reverted on-chain');
+      }
+
+      setStatus('approved');
+      refetchAllowance();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Approval failed';
-      
-      if (errorMessage.includes('User rejected') || errorMessage.includes('user rejected')) {
-        setError(new Error('Approval cancelled by user'));
-      } else {
-        setError(new Error(errorMessage));
-      }
+      const wrappedErr =
+        errorMessage.includes('User rejected') || errorMessage.includes('user rejected')
+          ? new Error('Approval cancelled by user')
+          : new Error(errorMessage);
+      setError(wrappedErr);
       setStatus('error');
+      throw wrappedErr;
     }
-  }, [isNative, userAddress, tokenAddress, spenderAddress, amount, writeContractAsync]);
+  }, [isNative, userAddress, tokenAddress, resolvedSpenderAddress, amount, writeContractAsync, publicClient, refetchAllowance]);
 
   return {
     status,

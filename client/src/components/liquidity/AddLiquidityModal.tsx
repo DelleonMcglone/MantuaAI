@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldIcon, SwapIcon } from '../icons';
+import { SwapIcon } from '../icons';
 import { getTokenBySymbol, type Token } from '../../config/tokens';
 import PoolActivityChart from './PoolActivityChart';
 import HookSelector from './HookSelector';
@@ -25,12 +25,43 @@ interface AddLiquidityModalProps {
 }
 
 const HOOKS = [
-  { id: 'sp',   name: 'Stable Protection',  icon: <ShieldIcon />, color: '#8b5cf6', description: 'Protects stable pair liquidity from depeg events', benefit: 'Depeg protection' },
-  { id: 'none', name: 'No Hook',             icon: <SwapIcon />,   color: '#6b7280', description: 'Standard Uniswap v4 pool without hook modifications', benefit: 'Standard execution' },
+  { id: 'none', name: 'No Hook', icon: <SwapIcon />, color: '#6b7280', description: 'Standard Uniswap v4 pool without hook modifications', benefit: 'Standard execution' },
 ];
 
-const tokenGrad = (s?: string) => !s ? 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)' : s.includes('ETH') ? 'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)' : s.includes('BTC') ? 'linear-gradient(135deg, #F7931A 0%, #FFAB4A 100%)' : (s.includes('USD') || s.includes('DAI')) ? 'linear-gradient(135deg, #2775CA 0%, #4A9FE8 100%)' : 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)';
-const tokenGlyph = (s?: string) => !s ? '?' : s.includes('ETH') ? 'Ξ' : s.includes('BTC') ? '₿' : (s.includes('USD') || s.includes('DAI')) ? '$' : s.charAt(0);
+const tokenGrad = (s?: string) => !s ? 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)' : s.includes('ETH') ? 'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)' : s.includes('BTC') ? 'linear-gradient(135deg, #F7931A 0%, #FFAB4A 100%)' : (s.includes('USD') || s.includes('DAI')) ? 'linear-gradient(135deg, #2775CA 0%, #4A9FE8 100%)' : s.includes('SOL') ? 'linear-gradient(135deg, #9945FF 0%, #14F195 100%)' : 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)';
+const tokenGlyph = (s?: string) => !s ? '?' : (s.includes('ETH') || s.includes('stETH') || s.includes('cbETH')) ? 'Ξ' : s.includes('BTC') ? '₿' : (s.includes('USD') || s.includes('DAI')) ? '$' : s.includes('SOL') ? '◎' : s.replace(/^m/, '').charAt(0);
+
+// PairTokenIcon: shows logoURI if available, otherwise falls back to colored glyph
+const PairTokenIcon = ({ token, size = 36 }: { token: Token | null; size?: number }) => {
+  const bg = tokenGrad(token?.symbol);
+  const glyph = tokenGlyph(token?.symbol);
+  if (token?.logoURI) {
+    return (
+      <div style={{ width: size, height: size, position: 'relative' }}>
+        <img
+          src={token.logoURI}
+          alt={token.symbol}
+          width={size}
+          height={size}
+          style={{ borderRadius: '50%', display: 'block' }}
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+            const sibling = e.currentTarget.nextElementSibling as HTMLElement;
+            if (sibling) sibling.style.display = 'flex';
+          }}
+        />
+        <div style={{ position: 'absolute', top: 0, left: 0, width: size, height: size, borderRadius: '50%', background: bg, display: 'none', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.5, fontWeight: '600', color: 'white' }}>
+          {glyph}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ width: size, height: size, borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.5, fontWeight: '600', color: 'white' }}>
+      {glyph}
+    </div>
+  );
+};
 
 const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
   onClose, theme, isDark, pool, mode = 'add', initialTokenA, initialTokenB,
@@ -97,8 +128,12 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
               <button onClick={onClose} style={{ background: theme.bgSecondary, border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: theme.textSecondary }}>←</button>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: tokenGrad(tokenA?.symbol), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: '600', color: 'white', marginRight: '-12px', zIndex: 2, border: `3px solid ${theme.bgCard}` }}>{tokenGlyph(tokenA?.symbol)}</div>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: tokenGrad(tokenB?.symbol), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: '700', color: 'white', border: `3px solid ${theme.bgCard}` }}>{tokenGlyph(tokenB?.symbol)}</div>
+                  <div style={{ marginRight: '-12px', zIndex: 2, border: `3px solid ${theme.bgCard}`, borderRadius: '50%' }}>
+                    <PairTokenIcon token={tokenA} size={36} />
+                  </div>
+                  <div style={{ border: `3px solid ${theme.bgCard}`, borderRadius: '50%' }}>
+                    <PairTokenIcon token={tokenB} size={36} />
+                  </div>
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -107,8 +142,8 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px' }}>
                     <span style={{ color: '#10b981', fontSize: '13px', fontWeight: '600' }}>↗ 0.029% Fee</span>
-                    <span style={{ color: theme.textSecondary, fontSize: '13px' }}>TVL <span style={{ color: theme.textPrimary, fontWeight: '600' }}>$315,790</span> <span style={{ background: 'rgba(107,114,128,0.2)', color: '#9ca3af', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, verticalAlign: 'middle' }}>Testnet</span></span>
-                    <span style={{ color: theme.textSecondary, fontSize: '13px' }}>APY <span style={{ color: '#10b981', fontWeight: '600' }}>1.45%</span></span>
+                    <span style={{ color: theme.textSecondary, fontSize: '13px' }}>TVL <span style={{ color: '#9ca3af', fontWeight: '600' }}>—</span> <span style={{ background: 'rgba(107,114,128,0.2)', color: '#9ca3af', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, verticalAlign: 'middle' }}>Testnet</span></span>
+                    <span style={{ color: theme.textSecondary, fontSize: '13px' }}>APY <span style={{ color: '#9ca3af', fontWeight: '600' }}>—</span> <span style={{ background: 'rgba(107,114,128,0.2)', color: '#9ca3af', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, verticalAlign: 'middle' }}>Testnet</span></span>
                   </div>
                 </div>
               </div>

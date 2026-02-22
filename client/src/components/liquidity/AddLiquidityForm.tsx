@@ -15,7 +15,7 @@ const RANGE_TICKS: Record<RangeType, { tickLower: number; tickUpper: number }> =
   'Narrow':     { tickLower: -600,    tickUpper: 600    },
   'Custom':     { tickLower: -887272, tickUpper: 887272 },
 };
-const HOOK_ID_MAP: Record<string, string> = { mev: 'sp', directional: 'df', jit: 'ym', none: 'none' };
+const HOOK_ID_MAP: Record<string, string> = { directional: 'df', jit: 'ym', none: 'none' };
 const EXPLORERS: Record<number, string> = { 84532: 'https://sepolia.basescan.org', 1301: 'https://sepolia.uniscan.xyz' };
 
 interface AddLiquidityFormProps {

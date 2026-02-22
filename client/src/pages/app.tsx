@@ -11,7 +11,6 @@ import { useLocation } from 'wouter';
 import { useAccount, useBalance, useSwitchChain, useChainId } from 'wagmi';
 import logoWhite from '@assets/Mantua_logo_white_1768946648374.png';
 import logoBlack from '@assets/Mantua_logo_black_1768946648374.png';
-import AnalysisCard from '../components/chat/AnalysisCard';
 import { ChatMessageList } from '../components/chat/ChatMessageList';
 import { ChatInput } from '../components/chat/ChatInput';
 import { useChat } from '../hooks/useChat';
@@ -21,7 +20,6 @@ import VoiceConfirmationModal from '../components/voice/VoiceConfirmationModal';
 import { parseVoiceCommand } from '@shared/voiceCommandParser';
 import { FaucetButton } from '../components/FaucetButton';
 import { classifyQuery } from '../utils/queryClassifier';
-import { TrendingUp, BarChart2, PieChart as PieIcon, Activity } from 'lucide-react';
 import { isAnalyticsQuery, generateAnalyticsQuery } from '../lib/analyticsEngine';
 import { gqlQuery } from '../lib/graphql';
 import { normalizeForChart } from '../lib/normalizeSubgraphData';
@@ -34,19 +32,11 @@ import { ConnectButton } from '../components/wallet/ConnectButton';
 import { useWalletConnection } from '../hooks/useWalletConnection';
 import { useTokenApproval } from '../hooks/useTokenApproval';
 import { useSwapQuote, getPriceImpactSeverity } from '../hooks/useSwapQuote';
-import { useSwapExecution } from '../hooks/useSwapExecution';
+import { useSwapExecution, getExplorerLink } from '../hooks/useSwapExecution';
 import { useTokenBalances } from '../hooks/useTokenBalances';
 import { PriceImpact, SwapButton, SwapButtonStyles, SwapConfirmation, SwapPriceChart } from '../components/swap';
 import { parseTokenAmount, formatTokenAmount, isNativeEth, getZeroAddress, getHookAddress } from '../lib/swap-utils';
 import { ALL_TOKENS, NATIVE_ETH } from '../config/tokens';
-import {
-  getPriceData,
-  getVolumeData,
-  getComparisonData,
-  getPortfolioData,
-  getPerformanceData,
-  getTVLData
-} from '../utils/mockAnalyticsData';
 import { calculateUsdValue as calcUsdValue, getPriceBySymbol } from '../services/priceService';
 import { useLivePriceUSD, useLivePairRate } from '../hooks/useLivePriceUSD';
 import {
@@ -96,50 +86,77 @@ import {
 // Icons are now imported from ../components/icons.tsx
 
 
-// Token icon component
+// Token icon component — uses logoURI from token config with character fallback
 const TokenIcon = ({ token, size = 32 }) => {
-  const baseToken = token.startsWith('m') && token.length > 1 && /^[A-Z]/.test(token[1]) ? token.substring(1) : token;
-  
-  const getTokenColor = (t) => {
-    const colors = {
-      'ETH': 'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)',
-      'USDC': 'linear-gradient(135deg, #2775CA 0%, #4A9FE8 100%)',
-      'USDT': 'linear-gradient(135deg, #26A17B 0%, #4DB193 100%)',
-      'DAI': 'linear-gradient(135deg, #F5AC37 0%, #FFD166 100%)',
-      'BTC': 'linear-gradient(135deg, #F7931A 0%, #FFAB4A 100%)',
-      'WBTC': 'linear-gradient(135deg, #F7931A 0%, #FFAB4A 100%)',
-      'LINK': 'linear-gradient(135deg, #2A5ADA 0%, #5480F0 100%)',
-      'UNI': 'linear-gradient(135deg, #FF007A 0%, #FF4D9E 100%)',
-      'AAVE': 'linear-gradient(135deg, #B6509E 0%, #D485C2 100%)',
-      'LP': 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+  const tokenData = ALL_TOKENS.find(t => t.symbol === token || t.symbol === `m${token}`);
+  const logoURI = tokenData?.logoURI ?? null;
+
+  const getTokenColor = (t: string) => {
+    const colors: Record<string, string> = {
+      'ETH':    'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)',
+      'mUSDC':  'linear-gradient(135deg, #2775CA 0%, #4A9FE8 100%)',
+      'mUSDT':  'linear-gradient(135deg, #26A17B 0%, #4DB193 100%)',
+      'mUSDS':  'linear-gradient(135deg, #F5AC37 0%, #FFD166 100%)',
+      'mUSDE':  'linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)',
+      'mBTC':   'linear-gradient(135deg, #F7931A 0%, #FFAB4A 100%)',
+      'mWBTC':  'linear-gradient(135deg, #F7931A 0%, #FFAB4A 100%)',
+      'mWETH':  'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)',
+      'mWSOL':  'linear-gradient(135deg, #9945FF 0%, #14F195 100%)',
+      'mstETH': 'linear-gradient(135deg, #00A3FF 0%, #5AC8FA 100%)',
+      'mcbETH': 'linear-gradient(135deg, #0052FF 0%, #3B7BF7 100%)',
+      'mBUIDL': 'linear-gradient(135deg, #1F2937 0%, #374151 100%)',
+      'mUSDY':  'linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%)',
     };
-    return colors[t] || 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)';
+    return colors[t] || colors[`m${t}`] || 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)';
   };
 
-  const getTokenSymbol = (t) => {
-    if (t === 'ETH') return 'Ξ';
-    if (t === 'USDC' || t === 'USDT' || t === 'DAI') return '$';
-    if (t === 'BTC' || t === 'WBTC') return '₿';
-    if (t === 'LINK') return '⬡';
-    if (t === 'UNI') return '🦄';
-    if (t === 'LP') return '◈';
-    return t.charAt(0);
+  const getTokenSymbol = (t: string) => {
+    if (t === 'ETH' || t.endsWith('ETH') || t.endsWith('stETH') || t.endsWith('cbETH')) return 'Ξ';
+    if (t.includes('USD') || t.includes('DAI')) return '$';
+    if (t.includes('BTC')) return '₿';
+    if (t.includes('SOL')) return '◎';
+    return t.replace(/^m/, '').charAt(0);
   };
+
+  const fallbackChar = getTokenSymbol(token);
+  const bg = getTokenColor(token);
+
+  if (logoURI) {
+    return (
+      <div style={{ width: size, height: size, position: 'relative', flexShrink: 0 }}>
+        <img
+          src={logoURI}
+          alt={token}
+          width={size}
+          height={size}
+          style={{ borderRadius: '50%', display: 'block' }}
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+            const sibling = e.currentTarget.nextElementSibling as HTMLElement;
+            if (sibling) sibling.style.display = 'flex';
+          }}
+        />
+        <div style={{
+          position: 'absolute', top: 0, left: 0,
+          width: size, height: size, borderRadius: '50%',
+          background: bg, display: 'none',
+          alignItems: 'center', justifyContent: 'center',
+          fontSize: size * 0.45, fontWeight: '600', color: 'white',
+        }}>
+          {fallbackChar}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{
-      width: size,
-      height: size,
-      borderRadius: '50%',
-      background: getTokenColor(baseToken),
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontSize: size * 0.45,
-      fontWeight: '600',
-      color: 'white',
+      width: size, height: size, borderRadius: '50%',
+      background: bg, display: 'flex',
+      alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.45, fontWeight: '600', color: 'white',
     }}>
-      {getTokenSymbol(baseToken)}
+      {fallbackChar}
     </div>
   );
 };
@@ -165,7 +182,6 @@ const StatusBadge = ({ status, type = 'default' }) => {
     'Completed': { color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' },
     'Failed': { color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
     'Standard': { color: '#6b7280', bg: 'rgba(107, 114, 128, 0.1)' },
-    'Stable Protection': { color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' },
     'None': { color: '#6b7280', bg: 'rgba(107, 114, 128, 0.1)' },
   };
 
@@ -706,43 +722,68 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
   const [activityFilter, setActivityFilter] = useState('All');
   const [showHistory, setShowHistory] = useState(false);
 
-  // Mock data tailored for empty/filled states based on requirements
   const isAgent = type === 'Agent';
-  const hasData = !isAgent && isConnected;
+  const { address } = useAccount();
 
-  const portfolioData = hasData ? {
-    totalValue: 12450.25,
-    ethBalance: 3.245,
-    ethPrice: 3245.50,
-    usdcBalance: 1850.45,
-    lpPositions: 2,
-    lpValue: 4250.80,
-    netPnl: 12.5,
-    netPnlUsd: 1450.20
-  } : {
-    totalValue: 0,
-    ethBalance: 0,
-    ethPrice: 0,
-    usdcBalance: 0,
+  // Live ETH balance
+  const { data: liveEthBalance } = useBalance({
+    address,
+    query: { enabled: !!address && isConnected },
+  });
+
+  // Live ERC-20 balances
+  const { balancesBySymbol } = useTokenBalances();
+
+  // Live ETH price in USD
+  const { price: ethPriceUSD, isLoading: ethPriceLoading } = useLivePriceUSD('ETH');
+
+  // Derive live portfolio data from on-chain balances + live prices
+  const ethBalanceNum = liveEthBalance ? parseFloat(liveEthBalance.formatted) : 0;
+  const ethPrice = ethPriceUSD ?? 0;
+  const ethValueUSD = ethBalanceNum * ethPrice;
+
+  const usdcBalance = parseFloat(balancesBySymbol['mUSDC']?.formatted ?? '0');
+  const usdtBalance = parseFloat(balancesBySymbol['mUSDT']?.formatted ?? '0');
+  const stableValueUSD = usdcBalance + usdtBalance; // stablecoins are 1:1
+
+  const totalValue = ethValueUSD + stableValueUSD;
+
+  const hasData = !isAgent && isConnected && address;
+
+  const portfolioData = {
+    totalValue,
+    ethBalance: ethBalanceNum,
+    ethPrice,
+    usdcBalance,
     lpPositions: 0,
     lpValue: 0,
     netPnl: 0,
-    netPnlUsd: 0
+    netPnlUsd: 0,
   };
 
-  const assets = hasData ? [
-    { name: 'Ethereum', symbol: 'ETH', balance: 3.245, usdValue: 10531.64, percentage: 84.5 },
-    { name: 'USD Coin', symbol: 'USDC', balance: 1850.45, usdValue: 1850.45, percentage: 14.8 },
-  ] : [];
+  // Build assets list from live balances — only tokens with non-zero balance
+  const assets: { name: string; symbol: string; balance: number; usdValue: number; percentage: number }[] = [];
+  if (hasData) {
+    if (ethBalanceNum > 0) {
+      assets.push({ name: 'Ethereum', symbol: 'ETH', balance: ethBalanceNum, usdValue: ethValueUSD, percentage: totalValue > 0 ? (ethValueUSD / totalValue) * 100 : 0 });
+    }
+    ALL_TOKENS.filter(t => t.symbol !== 'ETH').forEach(t => {
+      const bal = parseFloat(balancesBySymbol[t.symbol]?.formatted ?? '0');
+      if (bal > 0) {
+        // For stablecoins use 1:1 USD, for others show balance without USD conversion (no hardcoded price)
+        const isStable = t.category === 'stablecoin';
+        const usdVal = isStable ? bal : 0; // non-stables need live price — show 0 if not available
+        assets.push({ name: t.name, symbol: t.symbol, balance: bal, usdValue: usdVal, percentage: 0 });
+      }
+    });
+    // Recalculate percentages from stable-only total to avoid showing 0% for non-stables
+    const stableTotal = assets.reduce((sum, a) => sum + a.usdValue, 0);
+    assets.forEach(a => { a.percentage = stableTotal > 0 ? (a.usdValue / stableTotal) * 100 : 0; });
+  }
 
-  const liquidityPositions = hasData ? [
-    { token1: 'ETH', token2: 'USDC', status: 'Active', hookName: 'None', tvl: 2450.50, feesEarned: 124.50, feeTier: 0.05, rangeLow: 2800, rangeHigh: 3600 }
-  ] : [];
+  const liquidityPositions: { token1: string; token2: string; status: string; hookName: string; tvl: number; feesEarned: number; feeTier: number; rangeLow: number; rangeHigh: number }[] = [];
 
-  const activities = hasData ? [
-    { type: 'Swap', status: 'Completed', description: 'Swapped ETH for USDC', initiator: 'User', timestamp: '2 mins ago', txHash: '0x123...abc', amount: '1.2 ETH', amountUsd: '3,894.50' },
-    { type: 'Add Liquidity', status: 'Completed', description: 'Added liquidity to ETH/USDC', initiator: 'User', timestamp: '4 hours ago', txHash: '0x456...def', amount: '2.5 ETH', amountUsd: '8,113.75' },
-  ] : [];
+  const activities: { type: string; status: string; description: string; initiator: string; timestamp: string; txHash: string; amount: string; amountUsd: string }[] = [];
 
   return (
     <div style={{ width: '100%', fontFamily: '"DM Sans", sans-serif' }}>
@@ -898,7 +939,7 @@ const MiniChart = ({ data, color = "#10b981" }) => {
 
 
 // Token Select Modal
-const TokenSelectModal = ({ isOpen, onClose, onSelect, theme, isDark, getTokenBalance, calculateUsdValue }) => {
+const TokenSelectModal = ({ isOpen, onClose, onSelect, theme, isDark, getTokenBalance, calculateUsdValue, selectingSide }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
 
@@ -918,20 +959,13 @@ const TokenSelectModal = ({ isOpen, onClose, onSelect, theme, isDark, getTokenBa
     address: token.address,
     displayAddress: abbreviateAddress(token.address),
     category: token.category,
-    // Add icon based on symbol
-    icon: token.symbol.includes('ETH') || token.symbol === 'ETH' ? 'Ξ'
-      : token.symbol.includes('USDC') || token.symbol.includes('USDT') || token.symbol.includes('USD') ? '$'
-      : token.symbol.includes('DAI') ? '◇'
-      : token.symbol.includes('FRAX') ? 'F'
-      : token.symbol.includes('OUSG') ? 'O'
-      : token.symbol.includes('USDY') ? 'Y'
+    logoURI: token.logoURI,
+    // Single-character fallback if logoURI fails to load
+    icon: token.symbol === 'ETH' || token.symbol.includes('ETH') ? 'Ξ'
+      : token.symbol.includes('USD') ? '$'
       : token.symbol.includes('BUIDL') ? 'B'
-      : token.symbol.includes('TBILL') ? 'T'
-      : token.symbol.includes('STEUR') ? '€'
       : token.symbol.includes('BTC') ? '₿'
-      : token.symbol.includes('SOL') ? 'S'
-      : token.symbol.includes('AVAX') ? 'A'
-      : token.symbol.includes('MATIC') ? 'M'
+      : token.symbol.includes('SOL') ? '◎'
       : '◆',
   }));
 
@@ -955,50 +989,65 @@ const TokenSelectModal = ({ isOpen, onClose, onSelect, theme, isDark, getTokenBa
 
   const getTokenIcon = (token) => {
     const symbol = token.symbol;
-    
-    // Color mapping for different token types
+
+    // Color mapping for canonical token set — used as fallback background
     const colorMap = {
-      ETH: 'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)',
-      mUSDC: 'linear-gradient(135deg, #2775CA 0%, #4A9FE8 100%)',
-      mUSDT: 'linear-gradient(135deg, #26A17B 0%, #50C878 100%)',
-      mDAI: 'linear-gradient(135deg, #F5AC37 0%, #FFD166 100%)',
-      mUSDe: 'linear-gradient(135deg, #2775CA 0%, #4A9FE8 100%)',
-      mFRAX: 'linear-gradient(135deg, #000000 0%, #333333 100%)',
-      mOUSG: 'linear-gradient(135deg, #1a237e 0%, #3949ab 100%)',
-      mUSDY: 'linear-gradient(135deg, #2775CA 0%, #4A9FE8 100%)',
-      mBUIDL: 'linear-gradient(135deg, #000000 0%, #333333 100%)',
-      mTBILL: 'linear-gradient(135deg, #26A17B 0%, #50C878 100%)',
-      mSTEUR: 'linear-gradient(135deg, #FF6B35 0%, #F7931A 100%)',
+      ETH:    'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)',
+      mUSDC:  'linear-gradient(135deg, #2775CA 0%, #4A9FE8 100%)',
+      mUSDT:  'linear-gradient(135deg, #26A17B 0%, #50C878 100%)',
+      mUSDE:  'linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)',
+      mUSDS:  'linear-gradient(135deg, #F59E0B 0%, #FCD34D 100%)',
+      mUSDY:  'linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%)',
+      mBUIDL: 'linear-gradient(135deg, #1F2937 0%, #374151 100%)',
       mstETH: 'linear-gradient(135deg, #00A3FF 0%, #5AC8FA 100%)',
       mcbETH: 'linear-gradient(135deg, #0052FF 0%, #3B7BF7 100%)',
-      mrETH: 'linear-gradient(135deg, #FF6B35 0%, #F7931A 100%)',
-      mwstETH: 'linear-gradient(135deg, #00A3FF 0%, #5AC8FA 100%)',
-      mWBTC: 'linear-gradient(135deg, #F7931A 0%, #FFAB4A 100%)',
-      mWETH: 'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)',
-      mWSOL: 'linear-gradient(135deg, #9945FF 0%, #14F195 100%)',
-      mWAVAX: 'linear-gradient(135deg, #E84142 0%, #FF6B6B 100%)',
-      mWMATIC: 'linear-gradient(135deg, #8247E5 0%, #A47AE8 100%)',
-      mBTC: 'linear-gradient(135deg, #F7931A 0%, #FFAB4A 100%)',
+      mWBTC:  'linear-gradient(135deg, #F7931A 0%, #FFAB4A 100%)',
+      mWETH:  'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)',
+      mWSOL:  'linear-gradient(135deg, #9945FF 0%, #14F195 100%)',
+      mBTC:   'linear-gradient(135deg, #F7931A 0%, #FFAB4A 100%)',
     };
 
     const background = colorMap[symbol] || 'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)';
+    const fallbackChar = token.icon || symbol.charAt(0);
+
+    if (token.logoURI) {
+      return (
+        <div style={{ width: '40px', height: '40px', position: 'relative', flexShrink: 0 }}>
+          <img
+            src={token.logoURI}
+            alt={symbol}
+            width={40}
+            height={40}
+            style={{ borderRadius: '50%', display: 'block', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              const sibling = e.currentTarget.nextElementSibling as HTMLElement;
+              if (sibling) sibling.style.display = 'flex';
+            }}
+          />
+          <div style={{
+            position: 'absolute', top: 0, left: 0,
+            width: '40px', height: '40px', borderRadius: '50%',
+            background, display: 'none',
+            alignItems: 'center', justifyContent: 'center',
+            fontSize: '18px', fontWeight: '700', color: 'white',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          }}>
+            {fallbackChar}
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div style={{
-        width: '40px',
-        height: '40px',
-        borderRadius: '50%',
-        background: background,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: '18px',
-        fontWeight: '700',
-        color: 'white',
-        flexShrink: 0,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+        width: '40px', height: '40px', borderRadius: '50%',
+        background, display: 'flex',
+        alignItems: 'center', justifyContent: 'center',
+        fontSize: '18px', fontWeight: '700', color: 'white',
+        flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
       }}>
-        {token.icon}
+        {fallbackChar}
       </div>
     );
   };
@@ -1032,7 +1081,7 @@ const TokenSelectModal = ({ isOpen, onClose, onSelect, theme, isDark, getTokenBa
       }}>
         {/* Header */}
         <div style={{ padding: '20px 24px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: theme.textPrimary }}>Swap From Token</h3>
+          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: theme.textPrimary }}>{selectingSide === 'to' ? 'Select Token to Buy' : 'Select Token to Sell'}</h3>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: theme.textSecondary, padding: '4px' }}>
             <CloseIcon />
           </button>
@@ -1267,27 +1316,24 @@ const TokenSelect = ({ token, tokenData, balance, usdValue, side, amount, theme,
             borderRadius: '50%',
             background: tokenSymbol.includes('ETH')
               ? 'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)'
-              : tokenSymbol.includes('USDC')
+              : tokenSymbol.includes('USD')
                 ? 'linear-gradient(135deg, #2775CA 0%, #4A9FE8 100%)'
-                : tokenSymbol.includes('DAI')
-                  ? 'linear-gradient(135deg, #F5AC37 0%, #FFD166 100%)'
-                  : tokenSymbol.includes('BTC')
-                    ? 'linear-gradient(135deg, #F7931A 0%, #FFAB4A 100%)'
-                    : tokenSymbol.includes('LINK')
-                      ? 'linear-gradient(135deg, #2A5ADA 0%, #5480F0 100%)'
-                      : 'linear-gradient(135deg, #9ca3af 0%, #d1d5db 100%)',
+                : tokenSymbol.includes('BTC')
+                  ? 'linear-gradient(135deg, #F7931A 0%, #FFAB4A 100%)'
+                  : tokenSymbol.includes('SOL')
+                    ? 'linear-gradient(135deg, #9945FF 0%, #14F195 100%)'
+                    : 'linear-gradient(135deg, #9ca3af 0%, #d1d5db 100%)',
             display: tokenLogoURI ? 'none' : 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: tokenSymbol.includes('ETH') ? '16px' : '12px',
+            fontSize: '12px',
             fontWeight: '700',
             color: 'white',
           }}>
             {tokenSymbol.includes('ETH') ? 'Ξ' :
-             tokenSymbol.includes('USDC') ? '$' :
-             tokenSymbol.includes('DAI') ? '◈' :
+             tokenSymbol.includes('USD') ? '$' :
              tokenSymbol.includes('BTC') ? '₿' :
-             tokenSymbol.includes('LINK') ? '⬡' : '?'}
+             tokenSymbol.includes('SOL') ? '◎' : '◆'}
           </div>
           {tokenSymbol || 'Select'}
           <ChevronDownIcon />
@@ -1375,7 +1421,7 @@ const HookSelectorModal = ({ isOpen, onClose, hooks, selectedHook, onSelect, the
               <div>
                 <div style={{ fontWeight: '600', color: theme.textPrimary, marginBottom: '4px' }}>AI Recommendation</div>
                 <div style={{ fontSize: '13px', color: theme.textSecondary, lineHeight: '1.5' }}>
-                  Based on your stablecoin swap, we recommend <span style={{ fontWeight: '600', color: '#3b82f6' }}>Stable Protection</span> to guard against depeg events.
+                  For most swaps, <span style={{ fontWeight: '600', color: '#6b7280' }}>No Hook</span> provides standard Uniswap v4 constant-product execution.
                 </div>
               </div>
             </div>
@@ -1563,7 +1609,7 @@ const HookSelectorModal = ({ isOpen, onClose, hooks, selectedHook, onSelect, the
                     cursor: 'pointer'
                   }}>
                     <div>
-                      <div style={{ fontSize: '14px', fontWeight: '500', color: theme.textPrimary }}>Stable Protection Hook</div>
+                      <div style={{ fontSize: '14px', fontWeight: '500', color: theme.textPrimary }}>No Hook</div>
                       <div style={{ fontSize: '12px', color: theme.textSecondary, fontFamily: 'monospace' }}>0x1234...5678</div>
                     </div>
                     <div style={{ fontSize: '12px', color: theme.textMuted }}>2 days ago</div>
@@ -1623,7 +1669,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
   const { isConnected, address } = useAccount();
   const currentChainId = useChainId();
   const { openModal } = useWalletConnection();
-  const [selectedHook, setSelectedHook] = useState(swapDetails?.hook || 'sp');
+  const [selectedHook, setSelectedHook] = useState(swapDetails?.hook || 'none');
   const [isHookModalOpen, setIsHookModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -1753,25 +1799,6 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
      }
   }, [swapDetails]);
 
-  const pendingSwapAfterApproval = useRef(false);
-  const swapParamsRef = useRef<{
-    tokenIn: `0x${string}`;
-    tokenOut: `0x${string}`;
-    amountIn: bigint;
-    hookAddress: `0x${string}`;
-    hookId: string;
-  } | null>(null);
-
-  useEffect(() => {
-    if (pendingSwapAfterApproval.current && isApproved && !needsApproval && swapParamsRef.current) {
-      pendingSwapAfterApproval.current = false;
-      const params = swapParamsRef.current;
-      swapParamsRef.current = null;
-      setShowConfirmation(true);
-      executeSwap(params);
-    }
-  }, [isApproved, needsApproval, executeSwap]);
-
   const handleSwap = async () => {
     if (!isConnected || !quote) return;
 
@@ -1783,15 +1810,16 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
       hookId: selectedHook,
     };
 
-    if (needsApproval) {
-      pendingSwapAfterApproval.current = true;
-      swapParamsRef.current = params;
-      await approve(true);
-      return;
+    try {
+      // approve() now awaits on-chain confirmation before returning
+      if (needsApproval) {
+        await approve(true);
+      }
+      setShowConfirmation(true);
+      await executeSwap(params);
+    } catch {
+      // Errors set inside approve() / executeSwap() and surfaced via approvalError / swapError
     }
-
-    setShowConfirmation(true);
-    await executeSwap(params);
   };
 
   const handleCloseConfirmation = () => {
@@ -1842,7 +1870,6 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
   };
 
   const hooks = [
-    { id: 'sp', name: 'Stable Protection', abbr: 'SP', description: 'Peg monitoring and depeg circuit breaker for stablecoins', icon: <LockIcon />, benefit: 'Protects against depeg events', recommended: true },
     { id: 'none', name: 'No Hook', description: 'Standard Uniswap v4 swap without modifications', icon: <SwapIcon /> },
   ];
 
@@ -1890,6 +1917,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
         isDark={isDark}
         getTokenBalance={getTokenBalance}
         calculateUsdValue={calculateUsdValue}
+        selectingSide={selectingSide}
       />
 
       {/* AI Response Banner */}
@@ -1922,11 +1950,8 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
               Swapping {swapDetails.fromAmount} {swapDetails.fromToken} → {swapDetails.toToken}
             </div>
             <div style={{ color: theme.textSecondary, fontSize: '13px' }}>
-              Auto-selected <span style={{ color: '#3b82f6', fontWeight: '600' }}>Stable Protection</span> for safer stablecoin swaps
+              Executing via pure Uniswap v4 (no hook)
             </div>
-          </div>
-          <div style={{ paddingRight: '10px' }}>
-             <MiniChart data={[3200, 3180, 3220, 3250, 3230, 3280, 3245]} color="#8b5cf6" />
           </div>
         </div>
       )}
@@ -2106,16 +2131,14 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
             const fmtImpact = (v) => v < 0.01 ? `${v.toFixed(4)}%` : `${v.toFixed(2)}%`;
 
             // Pool routing label based on token pair + hook
-            const STABLES = ['USDC', 'USDT', 'DAI', 'FRAX', 'USDE'];
+            const STABLES = ['USDC', 'USDT', 'USDE', 'USDS'];
             const normA = fromToken.replace(/^m/, '').toUpperCase();
             const normB = toToken.replace(/^m/, '').toUpperCase();
             const aIsStable = STABLES.includes(normA);
             const bIsStable = STABLES.includes(normB);
-            const poolRoute = selectedHook === 'sp' || (aIsStable && bIsStable)
-              ? 'StablePoolV1'
-              : normA === 'ETH' || normB === 'ETH'
-                ? `ETH/${normA === 'ETH' ? normB : normA} CorePool`
-                : `${normA}/${normB} CorePool`;
+            const poolRoute = normA === 'ETH' || normB === 'ETH'
+              ? `ETH/${normA === 'ETH' ? normB : normA} CorePool`
+              : `${normA}/${normB} CorePool`;
 
             return (
               <div style={{ marginTop: '12px' }}>
@@ -2239,9 +2262,9 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
           )}
 
           {swapError && (
-            <div style={{ 
-              marginTop: '8px', 
-              padding: '10px 12px', 
+            <div style={{
+              marginTop: '8px',
+              padding: '10px 12px',
               borderRadius: '10px',
               background: 'rgba(239, 68, 68, 0.1)',
               border: '1px solid rgba(239, 68, 68, 0.2)',
@@ -2249,6 +2272,31 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
               fontSize: '13px'
             }}>
               {swapError.message}
+            </div>
+          )}
+
+          {swapStatus === 'confirmed' && txHash && (
+            <div style={{
+              marginTop: '8px',
+              padding: '10px 12px',
+              borderRadius: '10px',
+              background: 'rgba(16, 185, 129, 0.1)',
+              border: '1px solid rgba(16, 185, 129, 0.2)',
+              color: '#10b981',
+              fontSize: '13px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}>
+              <span>Swap confirmed!</span>
+              <a
+                href={getExplorerLink(txHash, currentChainId)}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: '#10b981', textDecoration: 'underline', fontWeight: 600 }}
+              >
+                View on explorer
+              </a>
             </div>
           )}
         </div>
@@ -2299,12 +2347,12 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
   const [sort, setSort] = useState({ key: 'liquidity', direction: 'desc' });
   
   const pools = [
-    { 
-      token1: 'mUSDC', token2: 'mUSDT', type: 'Stable', hook: 'Stable Protection',
+    {
+      token1: 'mUSDC', token2: 'mUSDT', type: 'Stable', hook: 'None',
       volume: 80.55, fees: 0.40, liquidity: 971950.29, yield: '0.01'
     },
     {
-      token1: 'mUSDC', token2: 'mDAI', type: 'Stable', hook: 'Stable Protection',
+      token1: 'mUSDC', token2: 'mUSDS', type: 'Stable', hook: 'None',
       volume: 0.00, fees: 0.00, liquidity: 4040.35, yield: '0.00'
     },
     {
@@ -2324,20 +2372,12 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
       volume: 4366.80, fees: 1.69, liquidity: 370896.77, yield: '0.17'
     },
     {
-      token1: 'mrETH', token2: 'ETH', type: 'Standard', hook: 'None',
-      volume: 1250.00, fees: 0.85, liquidity: 24750.85, yield: '1.12'
-    },
-    {
-      token1: 'mOUSG', token2: 'mUSDC', type: 'Standard', hook: 'Stable Protection',
-      volume: 15780.25, fees: 8.45, liquidity: 125000.00, yield: '3.45'
-    },
-    {
-      token1: 'mBUIDL', token2: 'mUSDC', type: 'Standard', hook: 'Stable Protection',
+      token1: 'mBUIDL', token2: 'mUSDC', type: 'Standard', hook: 'None',
       volume: 8500.00, fees: 4.25, liquidity: 85000.00, yield: '2.15'
     },
   ];
 
-  const hookOptions = ['All', 'Stable Protection', 'None'];
+  const hookOptions = ['All', 'None'];
   const typeOptions = ['All', 'Standard', 'Stable'];
 
   // Filter and sort pools
@@ -2397,7 +2437,6 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
 
   const HookBadge = ({ hook }) => {
     const hookConfig = {
-      'Stable Protection': { icon: <LockIcon />, color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' },
       'None': { icon: null, color: theme.textSecondary, bg: theme.bgSecondary },
     };
     const config = hookConfig[hook] || hookConfig['None'];
@@ -2461,7 +2500,7 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
         <div style={{ flex: 1 }}>
           <span style={{ color: theme.textSecondary, fontSize: '14px', lineHeight: '1.5' }}>
             <span style={{ color: theme.accent, fontWeight: '600' }}>Showing {filteredPools.length} liquidity pools</span>
-            {' '}• Pools with <strong>Stable Protection</strong> hooks help guard against stablecoin depeg events. 
+            {' '}• All pools use pure Uniswap v4 constant-product execution.
           </span>
         </div>
       </div>
@@ -2654,7 +2693,7 @@ const AgentTransferPanel = ({ theme, isDark }) => {
   const [txStatus, setTxStatus] = useState(null);
   const [txHash, setTxHash] = useState('');
 
-  const quickTokens = ['ETH', 'mUSDC', 'mUSDT', 'mDAI', 'mWBTC', 'mWETH'];
+  const quickTokens = ['ETH', 'mUSDC', 'mUSDT', 'mUSDS', 'mWBTC', 'mWETH'];
 
   const handleTransfer = async () => {
     if (!toAddress || !amount || !address) return;
@@ -2825,8 +2864,8 @@ const AgentBuilderInterface = ({ onClose, theme, isDark, onNavigate }) => {
   const { data: balance } = useBalance({ address });
 
   const actions = [
-    { id: 'wallet',    color: '#3b82f6', emoji: '💼', title: 'Create / Manage Wallet',     subtitle: 'CDP-managed wallets for autonomous agents', tag: null },
-    { id: 'transfer',  color: '#10b981', emoji: '📤', title: 'Send Tokens',                subtitle: 'Transfer tokens to any address on Base',    tag: null },
+    { id: 'wallet',    color: '#3b82f6', emoji: '💼', title: 'Create / Manage Wallet',     subtitle: 'Agent-managed wallets for autonomous operations', tag: null },
+    { id: 'transfer',  color: '#10b981', emoji: '📤', title: 'Send Tokens',                subtitle: 'Transfer tokens to any address on-chain',        tag: null },
     { id: 'swap',      color: '#f59e0b', emoji: '🔄', title: 'Swap Tokens',                subtitle: 'Execute swaps via Uniswap v4 hooks',        tag: null },
     { id: 'liquidity', color: '#8b5cf6', emoji: '💧', title: 'Add / Remove Liquidity',     subtitle: 'Manage LP positions across pools',          tag: null },
     { id: 'analytics', color: '#06b6d4', emoji: '🔍', title: 'Query Onchain Data',         subtitle: 'Analyze on-chain metrics and pool data',    tag: null },
@@ -2844,7 +2883,7 @@ const AgentBuilderInterface = ({ onClose, theme, isDark, onNavigate }) => {
             theme={theme}
             title="Swap Tokens"
             description="Execute token swaps through Uniswap v4 with intelligent hook selection. The agent analyzes pool liquidity and routes through the optimal path automatically."
-            features={['Automatic route optimization across liquidity pools', 'Support for 20+ tokens on testnet', 'Hook-aware swapping: TWAMM, Stable Protection', 'Real-time price impact analysis before execution']}
+            features={['Automatic route optimization across liquidity pools', 'Support for 20+ tokens on testnet', 'Pure Uniswap v4 constant-product execution', 'Real-time price impact analysis before execution']}
             cta="Open Swap Interface →"
             onNavigate={() => onNavigate('swap')}
             accentColor="#f59e0b"
@@ -3467,114 +3506,8 @@ export default function MantuaApp() {
       return;
     }
 
-    // Check for Analytical Queries or General Chat
-    if (command.type !== 'general' && command.type !== 'action') {
-         let data = [];
-         let title = '';
-         let summary = '';
-         let insights = [];
-         let chartType: 'area' | 'bar' | 'pie' | 'line' = 'area';
-         let icon = <TrendingUp size={20} />;
-         
-         const asset = command.assets[0] || 'ETH';
-         
-         switch(command.type) {
-           case 'price':
-             data = getPriceData(asset, command.timeRange);
-             title = `${asset} Price Analysis`;
-             summary = `${asset} has shown moderate volatility over the last ${command.timeRange}, with a net positive trend driven by market sentiment.`;
-             const prices = data.map(d => d.value);
-             const currentPrice = prices[prices.length - 1];
-             const maxPrice = Math.max(...prices);
-             const minPrice = Math.min(...prices);
-             const change = ((currentPrice - prices[0]) / prices[0]) * 100;
-             chartType = 'area';
-             icon = <TrendingUp size={20} />;
-             insights = [
-               { icon: '📈', label: 'Highest', value: `$${maxPrice.toLocaleString()}` },
-               { icon: '📉', label: 'Lowest', value: `$${minPrice.toLocaleString()}` },
-               { icon: '🪙', label: 'Change', value: `${change > 0 ? '+' : ''}${change.toFixed(2)}%` },
-               { icon: '📊', label: 'Current', value: `$${currentPrice.toLocaleString()}` }
-             ];
-             break;
-             
-           case 'volume':
-             data = getVolumeData(asset, command.timeRange);
-             title = `${asset} Volume Analysis`;
-             summary = `Trading volume for ${asset} has been consistent, with a significant spike observed mid-period indicating increased market interest.`;
-             chartType = 'bar';
-             icon = <BarChart2 size={20} />;
-             insights = [
-               { icon: '📊', label: 'Avg Vol', value: '$2.4M' },
-               { icon: '💰', label: 'Peak Vol', value: '$5.1M' },
-               { icon: '📈', label: 'Trend', value: 'High' },
-               { icon: '⚡', label: 'Activity', value: 'Active' }
-             ];
-             break;
-             
-           case 'comparison':
-             data = getComparisonData(['Nezlobin', 'JIT']);
-             title = 'Fee Comparison';
-             summary = 'Stable Protection hooks demonstrated superior protection during depeg events compared to standard pools.';
-             chartType = 'bar';
-             icon = <Activity size={20} />;
-             insights = [
-               { icon: '💰', label: 'Nezlobin', value: '$142/day' },
-               { icon: '⚡', label: 'JIT', value: '$118/day' },
-               { icon: '💡', label: 'Insight', value: '+20% Eff' },
-               { icon: '🏆', label: 'Winner', value: 'Nezlobin' }
-             ];
-             break;
-             
-           case 'portfolio': // Fallback if classify returns 'portfolio' here for some reason, though handled above
-             data = getPortfolioData();
-             title = 'Portfolio Allocation';
-             summary = 'Your portfolio is heavily weighted towards ETH and Stablecoins, maintaining a balanced risk profile.';
-             chartType = 'pie';
-             icon = <PieIcon size={20} />;
-             insights = [
-               { icon: '💰', label: 'Total', value: '$3,245' },
-               { icon: '📊', label: 'Top Asset', value: 'ETH' },
-               { icon: '🛡️', label: 'Stables', value: '30%' },
-               { icon: '⚡', label: 'Risk', value: 'Moderate' }
-             ];
-             break;
-             
-           case 'performance':
-             data = getPerformanceData(command.timeRange);
-             title = 'LP Performance';
-             summary = 'Your liquidity positions have outperformed holding by 4.2% due to high trading fees captured in the ETH/mUSDC pool.';
-             chartType = 'area';
-             icon = <Activity size={20} />;
-             insights = [
-               { icon: '📈', label: 'Net Profit', value: '+$420' },
-               { icon: '💰', label: 'Fees', value: '$125' },
-               { icon: '⚡', label: 'IL', value: '-$45' },
-               { icon: '🔥', label: 'APR', value: '18.5%' }
-             ];
-             break;
-
-           case 'tvl':
-             const pool = 'ETH/mUSDC';
-             data = getTVLData(pool);
-             title = `${pool} TVL Trends`;
-             summary = `Total Value Locked in the ${pool} pool has grown steadily, indicating strong liquidity provider confidence.`;
-             chartType = 'area';
-             icon = <TrendingUp size={20} />;
-             insights = [
-               { icon: '💰', label: 'TVL', value: '$5.2M' },
-               { icon: '📈', label: 'Growth', value: '+12%' },
-               { icon: '👥', label: 'LPs', value: '1,240' },
-               { icon: '💧', label: 'Util', value: '85%' }
-             ];
-             break;
-         }
-
-         // Persist via useChat; AI will respond with text about the analysis
-         sendMessage(inputValue);
-    } else {
-      sendMessage(inputValue);
-    }
+    // All other queries (price, volume, comparison, performance, tvl, general) go to the AI chat
+    sendMessage(inputValue);
   };
 
   return (

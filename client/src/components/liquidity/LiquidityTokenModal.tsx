@@ -24,14 +24,53 @@ function getGradient(symbol: string): string {
   if (symbol.includes('BTC')) return 'linear-gradient(135deg, #F7931A 0%, #FFAB4A 100%)';
   if (symbol.includes('USD') || symbol.includes('DAI') || symbol.includes('FRAX'))
     return 'linear-gradient(135deg, #2775CA 0%, #4A9FE8 100%)';
+  if (symbol.includes('SOL')) return 'linear-gradient(135deg, #9945FF 0%, #14F195 100%)';
   return 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)';
 }
 
 function getGlyph(symbol: string): string {
-  if (symbol.includes('ETH')) return 'Ξ';
+  if (symbol.includes('ETH') || symbol.includes('stETH') || symbol.includes('cbETH')) return 'Ξ';
   if (symbol.includes('BTC')) return '₿';
   if (symbol.includes('USD') || symbol.includes('DAI') || symbol.includes('FRAX')) return '$';
-  return symbol.charAt(0);
+  if (symbol.includes('SOL')) return '◎';
+  return symbol.replace(/^m/, '').charAt(0);
+}
+
+function TokenLogo({ token, size = 40 }: { token: Token; size?: number }) {
+  const bg = getGradient(token.symbol);
+  const glyph = getGlyph(token.symbol);
+  if (token.logoURI) {
+    return (
+      <div style={{ width: size, height: size, position: 'relative', flexShrink: 0, marginRight: '16px' }}>
+        <img
+          src={token.logoURI}
+          alt={token.symbol}
+          width={size}
+          height={size}
+          style={{ borderRadius: '50%', display: 'block' }}
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+            const sibling = e.currentTarget.nextElementSibling as HTMLElement;
+            if (sibling) sibling.style.display = 'flex';
+          }}
+        />
+        <div style={{
+          position: 'absolute', top: 0, left: 0,
+          width: size, height: size, borderRadius: '50%',
+          background: bg, display: 'none',
+          alignItems: 'center', justifyContent: 'center',
+          fontSize: size * 0.45, fontWeight: '700', color: 'white',
+        }}>
+          {glyph}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ width: size, height: size, borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.45, fontWeight: '700', color: 'white', marginRight: '16px', flexShrink: 0 }}>
+      {glyph}
+    </div>
+  );
 }
 
 export const LiquidityTokenModal: React.FC<LiquidityTokenModalProps> = ({
@@ -102,9 +141,7 @@ export const LiquidityTokenModal: React.FC<LiquidityTokenModalProps> = ({
               onMouseEnter={(e) => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.05)' : '#f3f4f6'; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             >
-              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: getGradient(token.symbol), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: '700', color: 'white', marginRight: '16px', flexShrink: 0 }}>
-                {getGlyph(token.symbol)}
-              </div>
+              <TokenLogo token={token} size={40} />
               <div>
                 <div style={{ color: theme.textPrimary, fontWeight: '600', fontSize: '15px' }}>{token.symbol}</div>
                 <div style={{ color: theme.textMuted, fontSize: '12px' }}>{token.name}</div>

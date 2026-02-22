@@ -15,7 +15,6 @@ const BADGE_COLORS: Record<string, { bg: string; text: string }> = {
 };
 
 const HOOK_LABELS: Record<string, string> = {
-  "stable-protection": "Stable Protection",
   jit: "JIT Rebalancing",
   "mev-protection": "MEV Protection",
 };

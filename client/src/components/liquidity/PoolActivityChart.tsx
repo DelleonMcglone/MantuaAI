@@ -17,7 +17,7 @@ interface CacheEntry { data: [number, number][]; fetchedAt: number; }
 const chartCache = new Map<string, CacheEntry>();
 
 const STABLECOINS = new Set([
-  'USDC','USDT','DAI','FRAX','USDe','mUSDC','mUSDT','mDAI','mFRAX','mUSDe',
+  'USDC','USDT','USDE','USDS','mUSDC','mUSDT','mUSDE','mUSDS',
 ]);
 
 async function fetchChartData(id: string, days: number): Promise<[number, number][] | null> {
@@ -162,9 +162,14 @@ const PoolActivityChart: React.FC<PoolActivityChartProps> = ({ theme, isDark, to
       </div>
 
       {isLoading ? (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '80%', color: theme.textMuted, fontSize: 13 }}>
-          Loading…
-        </div>
+        <div style={{
+          width: '100%',
+          height: '85%',
+          borderRadius: 8,
+          background: 'rgba(148,163,184,0.08)',
+          animation: 'poolChartShimmer 1.4s ease-in-out infinite',
+          minHeight: 140,
+        }} />
       ) : (
         <ResponsiveContainer width="100%" height="85%">
           <AreaChart data={chartData}>
@@ -191,6 +196,7 @@ const PoolActivityChart: React.FC<PoolActivityChartProps> = ({ theme, isDark, to
           </AreaChart>
         </ResponsiveContainer>
       )}
+      <style>{`@keyframes poolChartShimmer { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
     </div>
   );
 };

@@ -9,7 +9,6 @@ import type { HookType } from '@shared/voiceCommandTypes';
 type ParsedCommand = SwapCommand | LiquidityCommand;
 
 const HOOK_LABELS: Record<HookType, string> = {
-  'stable-protection': 'Stable Protection Hook',
   jit: 'JIT Hook',
   'mev-protection': 'MEV Protection Hook',
 };

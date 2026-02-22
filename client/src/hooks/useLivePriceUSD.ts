@@ -22,14 +22,14 @@ export interface UseLivePriceUSDReturn {
 
 // ── Module-level cache shared across all hook instances ────────────────────
 
-const priceCache = new Map<string, CacheEntry>();
+export const priceCache = new Map<string, CacheEntry>();
 
 // ── Stablecoins — always $1.00, no API call needed ─────────────────────────
 
 const STABLECOINS = new Set([
-  'USDC', 'USDT', 'DAI', 'FRAX', 'USDeC', 'USDe',
-  'mUSDC', 'mUSDT', 'mDAI', 'mFRAX', 'mUSDe',
-  'mOUSG', 'mUSDY', 'mBUIDL', 'mTBILL', // ~$1 RWA tokens
+  'USDC', 'USDT', 'USDS', 'USDeC',
+  'mUSDC', 'mUSDT', 'mUSDE', 'mUSDS',
+  'mBUIDL', 'mUSDY', // ~$1 RWA tokens
 ]);
 
 // ── Fetch helper ──────────────────────────────────────────────────────────
@@ -126,4 +126,19 @@ export function useLivePairRate(symbolA: string, symbolB: string) {
     rate,
     isLoading: a.isLoading || b.isLoading,
   };
+}
+
+/**
+ * Synchronous price lookup from cache (best-effort, no network call).
+ * Returns null if not cached.
+ */
+export function getCachedPrice(symbol: string): number | null {
+  if (STABLECOINS.has(symbol)) return 1.00;
+  const coingeckoId = COINGECKO_IDS[symbol];
+  if (!coingeckoId) return null;
+  const cached = priceCache.get(coingeckoId);
+  if (cached && Date.now() - cached.fetchedAt < PRICE_CACHE_TTL_MS) {
+    return cached.price;
+  }
+  return null;
 }

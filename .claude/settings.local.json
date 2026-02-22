@@ -59,7 +59,9 @@
       "Bash(__NEW_LINE_2264f930196b279e__ echo \"=== HOOK SELECT ===\")",
       "Bash(python3:*)",
       "Bash(sort:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(/home/runner/workspace/client/src/utils/queryClassifier.ts:*)",
+      "Bash(grep:*)"
     ]
   }
 }

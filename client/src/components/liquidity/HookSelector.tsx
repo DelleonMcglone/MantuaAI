@@ -63,7 +63,7 @@ const HookSelector: React.FC<HookSelectorProps> = ({ isOpen, onClose, hooks, sel
               <div>
                 <div style={{ fontWeight: '600', color: theme.textPrimary, marginBottom: '4px' }}>AI Recommendation</div>
                 <div style={{ fontSize: '13px', color: theme.textSecondary, lineHeight: '1.5' }}>
-                  For stable pair liquidity, we recommend <span style={{ fontWeight: '600', color: '#8b5cf6' }}>Stable Protection</span> to protect against depeg events. For standard pools, select No Hook.
+                  For most pools, select <span style={{ fontWeight: '600', color: '#8b5cf6' }}>No Hook</span> for standard Uniswap v4 constant-product execution.
                 </div>
               </div>
             </div>

@@ -113,7 +113,7 @@ function buildPairData(
 
 // ─── USD stablecoins (show toToken price in USD directly) ───────────────────
 
-const USD_STABLES = new Set(['mUSDC', 'mUSDT', 'mDAI', 'USDC', 'USDT', 'DAI', 'mFRAX', 'FRAX', 'mUSDe']);
+const USD_STABLES = new Set(['mUSDC', 'mUSDT', 'mUSDE', 'mUSDS', 'USDC', 'USDT', 'USDE', 'USDS']);
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
@@ -162,27 +162,43 @@ export const SwapPriceChart: React.FC<Props> = ({ fromToken, toToken, theme, isD
       if (!fetchFromId) throw new Error('no-coingecko-id');
 
       const cacheKeyA = `${fetchFromId}:${r}`;
-      let pricesA = getCached(cacheKeyA);
-      if (!pricesA) {
-        const raw = await fetchCoinGeckoPrices(fetchFromId, COINGECKO_DAYS[r]);
-        pricesA = buildPairData(raw, null, days);
+      const cacheKeyB = fetchToId ? `${fetchToId}:${r}` : null;
+
+      const cachedA = getCached(cacheKeyA);
+      const cachedB = cacheKeyB ? getCached(cacheKeyB) : null;
+
+      // Parallel-fetch any uncached data
+      const [rawA, rawB] = await Promise.all([
+        cachedA ? Promise.resolve(null as number[][] | null) : fetchCoinGeckoPrices(fetchFromId, COINGECKO_DAYS[r]),
+        cacheKeyB && !cachedB && fetchToId
+          ? fetchCoinGeckoPrices(fetchToId, COINGECKO_DAYS[r])
+          : Promise.resolve(null as number[][] | null),
+      ]);
+
+      if (abortRef.current?.signal.aborted) return;
+
+      let pricesA: PricePoint[];
+      if (cachedA) {
+        pricesA = cachedA;
+      } else {
+        pricesA = buildPairData(rawA!, null, days);
         setCache(cacheKeyA, pricesA);
       }
 
       let finalData: PricePoint[];
 
-      if (fetchToId) {
-        const cacheKeyB = `${fetchToId}:${r}`;
-        let pricesB = getCached(cacheKeyB);
-        if (!pricesB) {
-          const rawB = await fetchCoinGeckoPrices(fetchToId, COINGECKO_DAYS[r]);
-          pricesB = buildPairData(rawB, null, days);
+      if (fetchToId && cacheKeyB) {
+        let pricesB: PricePoint[];
+        if (cachedB) {
+          pricesB = cachedB;
+        } else {
+          pricesB = buildPairData(rawB!, null, days);
           setCache(cacheKeyB, pricesB);
         }
-        // Combine: price = priceA / priceB
+        // Combine: pair price = priceA / priceB
         finalData = pricesA.map((pt, i) => ({
           time: pt.time,
-          price: parseFloat((pt.price / (pricesB![i]?.price || 1)).toFixed(6)),
+          price: parseFloat((pt.price / (pricesB[i]?.price || 1)).toFixed(6)),
         }));
       } else {
         finalData = pricesA;

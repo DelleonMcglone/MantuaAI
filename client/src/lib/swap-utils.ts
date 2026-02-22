@@ -98,7 +98,6 @@ export const IS_DEV_MODE = false;
 export const HOOK_ADDRESSES: { [hookId: string]: Address } = {
   'alo': '0x0000000000000000000000000000000000000000' as Address,  // Async Limit Order
   'df': '0x0000000000000000000000000000000000000000' as Address,   // Dynamic Fee
-  'sp': '0x0000000000000000000000000000000000000000' as Address,   // Stable Protection
   'twamm': '0x0000000000000000000000000000000000000000' as Address, // TWAMM Rebalance
   'ym': '0x0000000000000000000000000000000000000000' as Address,   // Yield Maximizer
   'none': '0x0000000000000000000000000000000000000000' as Address,  // No hook (standard swap)

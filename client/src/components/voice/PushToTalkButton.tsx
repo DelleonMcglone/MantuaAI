@@ -2,6 +2,8 @@
  * PushToTalkButton — voice input with push-to-talk, text fallback, and error handling.
  * P1-039 (recording), P1-045 (text fallback), P1-046 (error states).
  * Uses only MediaRecorder API and fetch; no external audio libraries.
+ *
+ * Minimum recording duration: 3 seconds to ensure reliable transcription.
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAudioRecorder } from '../../hooks/useAudioRecorder';
@@ -9,6 +11,13 @@ import { MicSVG, SpinnerSVG, XSvg, SendSVG } from './VoiceIcons';
 
 type ButtonState = 'idle' | 'recording' | 'processing' | 'error';
 const FALLBACK_KEY = 'mantua_voice_fallback_preferred';
+
+/** Minimum recording duration before the blob is sent to transcription */
+const MIN_RECORDING_MS = 3_000;
+/** Timer tick interval in milliseconds */
+const TICK_INTERVAL_MS = 100;
+/** Minimum blob size — anything below is considered empty/silent */
+const MIN_BLOB_BYTES = 1_000;
 
 export interface PushToTalkButtonProps {
   onTranscription: (text: string) => void;
@@ -20,13 +29,22 @@ export default function PushToTalkButton({ onTranscription, disabled = false, cl
   const { startRecording, stopRecording, isRecording, error: recorderError, clearError } = useAudioRecorder();
   const [buttonState, setButtonState] = useState<ButtonState>('idle');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [elapsed, setElapsed] = useState(0); // ms since recording started
   const [fallbackOpen, setFallbackOpen] = useState<boolean>(() => {
     try { return localStorage.getItem(FALLBACK_KEY) === 'true'; } catch { return false; }
   });
   const [fallbackText, setFallbackText] = useState('');
+
   const errorDismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fallbackInputRef = useRef<HTMLInputElement>(null);
   const isRecordingRef = useRef(false);
+  const recordingStartRef = useRef<number | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearTimer = useCallback(() => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    setElapsed(0);
+  }, []);
 
   const showError = useCallback((msg: string) => {
     setErrorMsg(msg); setButtonState('error');
@@ -58,16 +76,63 @@ export default function PushToTalkButton({ onTranscription, disabled = false, cl
 
   const handlePressStart = useCallback(async () => {
     if (disabled || isRecordingRef.current || fallbackOpen) return;
-    clearError(); setErrorMsg(null); isRecordingRef.current = true; setButtonState('recording');
-    try { await startRecording(); } catch { isRecordingRef.current = false; }
-  }, [disabled, fallbackOpen, startRecording, clearError]);
+    clearError();
+    setErrorMsg(null);
+    isRecordingRef.current = true;
+    setButtonState('recording');
+
+    // Start elapsed timer
+    recordingStartRef.current = Date.now();
+    setElapsed(0);
+    timerRef.current = setInterval(() => {
+      if (recordingStartRef.current) {
+        setElapsed(Date.now() - recordingStartRef.current);
+      }
+    }, TICK_INTERVAL_MS);
+
+    try {
+      await startRecording();
+    } catch {
+      isRecordingRef.current = false;
+      clearTimer();
+      recordingStartRef.current = null;
+    }
+  }, [disabled, fallbackOpen, startRecording, clearError, clearTimer]);
 
   const handlePressEnd = useCallback(async () => {
     if (!isRecordingRef.current) return;
-    isRecordingRef.current = false; setButtonState('processing');
+
+    // Enforce minimum 3-second recording duration
+    const start = recordingStartRef.current;
+    if (start) {
+      const remaining = MIN_RECORDING_MS - (Date.now() - start);
+      if (remaining > 0) {
+        // Keep recording state active, wait for minimum duration
+        await new Promise<void>(resolve => setTimeout(resolve, remaining));
+      }
+    }
+
+    clearTimer();
+    recordingStartRef.current = null;
+    isRecordingRef.current = false;
+    setButtonState('processing');
+
     let blob: Blob;
-    try { blob = await stopRecording(); } catch { showError('Failed to stop recording. Please try again.'); return; }
-    if (!blob || blob.size === 0) { showError('No speech detected. Please try again.'); return; }
+    try {
+      blob = await stopRecording();
+    } catch {
+      showError('Failed to stop recording. Please try again.');
+      return;
+    }
+
+    // Log blob size for debugging
+    console.log('[PushToTalkButton] audio blob size:', blob.size, 'bytes, type:', blob.type);
+
+    if (!blob || blob.size < MIN_BLOB_BYTES) {
+      showError('No speech detected. Please try again.');
+      return;
+    }
+
     try {
       const form = new FormData();
       form.append('audio', blob, 'audio.webm');
@@ -83,12 +148,13 @@ export default function PushToTalkButton({ onTranscription, disabled = false, cl
       const data = await resp.json() as { transcript?: string };
       const transcript = data.transcript?.trim() ?? '';
       if (!transcript) { showError('No speech detected. Please try again.'); return; }
-      setButtonState('idle'); onTranscription(transcript);
+      setButtonState('idle');
+      onTranscription(transcript);
     } catch (err) {
       console.error('[PushToTalkButton] network error:', err);
       showError('Voice transcription failed. Please try again or type your command.');
     }
-  }, [stopRecording, onTranscription, showError]);
+  }, [stopRecording, onTranscription, showError, clearTimer]);
 
   const handleFallbackSubmit = useCallback(() => {
     const text = fallbackText.trim(); if (!text) return;
@@ -100,6 +166,8 @@ export default function PushToTalkButton({ onTranscription, disabled = false, cl
       if (next) setTimeout(() => fallbackInputRef.current?.focus(), 0); return next; });
   }, []);
 
+  const elapsedSec = elapsed / 1000;
+  const isMinMet = elapsed >= MIN_RECORDING_MS;
   const btnBg = buttonState === 'recording' ? '#ef4444' : buttonState === 'error' ? '#ef4444' : buttonState === 'processing' ? '#6366f1' : 'transparent';
   const pulse: React.CSSProperties = buttonState === 'recording' ? { animation: 'ptb-pulse 1s ease-in-out infinite' } : {};
 
@@ -117,6 +185,14 @@ export default function PushToTalkButton({ onTranscription, disabled = false, cl
             opacity: disabled ? 0.4 : 1, transition: 'background 0.15s', ...pulse }}>
           {buttonState === 'processing' ? <SpinnerSVG /> : buttonState === 'error' ? <XSvg /> : <MicSVG />}
         </button>
+
+        {/* Recording timer — shown while recording */}
+        {buttonState === 'recording' && (
+          <p style={{ fontSize: 11, color: isMinMet ? '#10b981' : '#ef4444', textAlign: 'center', margin: 0, lineHeight: 1.3, fontVariantNumeric: 'tabular-nums' }}>
+            {elapsedSec.toFixed(1)}s{!isMinMet ? ' min' : ''}
+          </p>
+        )}
+
         {errorMsg && <p role="alert" style={{ fontSize: 11, color: '#ef4444', maxWidth: 160, textAlign: 'center', margin: 0, lineHeight: 1.3 }}>{errorMsg}</p>}
         <button type="button" onClick={toggleFallback} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: '#6b7280', textDecoration: 'underline', padding: '2px 0' }}>
           {fallbackOpen ? 'Use voice' : 'Type instead'}

@@ -81,8 +81,8 @@ export function isAnalyticsQuery(message: string): boolean {
     'show me', 'chart', 'graph', 'plot', 'volume over', 'tvl over',
     'stats for', 'analytics', 'history of', 'over time', 'breakdown',
     'distribution', 'how much total', 'how many total', 'total swaps',
-    'total volume', 'trend', 'compare pools', 'top pools', 'top vaults',
-    'my positions', 'my deposits', 'leaderboard', 'vault tvl',
+    'total volume', 'trend', 'compare pools', 'top pools',
+    'my positions', 'my deposits', 'leaderboard', 'pool tvl',
     'swap volume', 'market stats',
     'protocol stats', 'on-chain', 'onchain', 'subgraph',
   ];

@@ -13,11 +13,20 @@ export interface ClassifiedQuery {
 const normalizeTokenSymbol = (sym: string): string => {
   const upper = sym.toUpperCase();
   const aliases: Record<string, string> = {
-    'USDC': 'mUSDC', 'USDT': 'mUSDT', 'DAI': 'mDAI',
-    'USDE': 'mUSDe', 'FRAX': 'mFRAX',
-    'BTC': 'mBTC', 'WBTC': 'mWBTC',
-    'SOL': 'mWSOL', 'AVAX': 'mWAVAX', 'MATIC': 'mWMATIC',
-    'WETH': 'mWETH', 'STETH': 'mstETH',
+    'USDC':  'mUSDC',
+    'USDT':  'mUSDT',
+    'USDE':  'mUSDE',
+    'USDS':  'mUSDS',
+    'DAI':   'mUSDS', // mDAI has been renamed to mUSDS
+    'BTC':   'mBTC',
+    'WBTC':  'mWBTC',
+    'SOL':   'mWSOL',
+    'WETH':  'mWETH',
+    'STETH': 'mstETH',
+    'CBETH': 'mcbETH',
+    'BUIDL': 'mBUIDL',
+    'USDY':  'mUSDY',
+    'WBTC':  'mWBTC',
   };
   return aliases[upper] ?? upper;
 };
@@ -49,15 +58,9 @@ const extractSwapParams = (msg: string) => {
   return null;
 };
 
-const extractAnalysisParams = (msg: string) => {
-  // Simple extraction for now
-  return {};
-};
-
 export const classifyQuery = (input: string): ClassifiedQuery => {
   const msg = input.toLowerCase().trim();
   
-  // Default result structure
   const result: ClassifiedQuery = {
     type: 'general',
     assets: [],
@@ -65,8 +68,7 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
     chartType: 'line'
   };
 
-  // ADD LIQUIDITY - Must be specific
-  // Matches: "add liquidity", "add liquidity to ETH/USDC", "add lp"
+  // ADD LIQUIDITY
   if (
     msg.match(/^add\s+(liquidity|lp)/) ||
     msg.match(/add\s+(liquidity|lp)\s+to/) ||
@@ -77,8 +79,7 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
     return result;
   }
   
-  // LIQUIDITY POOLS LIST - Show pool list, NOT add modal
-  // Matches: "liquidity", "show liquidity", "liquidity pools", "view pools", "pool list"
+  // LIQUIDITY POOLS LIST
   if (
     msg === 'liquidity' ||
     msg.match(/^(show|view|open|display)\s*(liquidity|pools)/) ||
@@ -124,7 +125,7 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
     return result;
   }
   
-  // BALANCE — check before portfolio to avoid false positives
+  // BALANCE
   if (
     msg.includes("what's my balance") ||
     msg.includes("what is my balance") ||
@@ -139,7 +140,7 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
     return result;
   }
 
-  // PORTFOLIO — show my positions / LP positions / liquidity
+  // PORTFOLIO
   if (
     msg === 'portfolio' ||
     msg.match(/^(show|view|my)\s*portfolio/) ||
@@ -164,12 +165,11 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
     return result;
   }
   
-  // ANALYSIS/RESEARCH - Keep existing logic for analysis detection but wrapped
+  // ANALYSIS/RESEARCH
   if (
     msg.match(/(price|volume|tvl|apy)\s*(of|for)?/) ||
     msg.match(/^(what|how|show|compare)/)
   ) {
-    // Re-use existing detection logic for specific analysis type
     if (msg.includes('price') || msg.includes('cost') || msg.includes('worth') || msg.includes('trading at')) {
       result.type = 'price';
       result.chartType = 'line';
@@ -189,25 +189,23 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
       result.type = 'tvl';
       result.chartType = 'area';
     } else {
-       // If it matches broad analysis words but not specific types, default to general or price
-       result.type = 'price'; // Fallback
+      result.type = 'price';
     }
   } else {
-     // Default is general chat
-     result.type = 'general';
+    result.type = 'general';
   }
 
-  // Detect Assets (Common for all queries)
+  // Detect Assets
   const assetsMap: Record<string, string> = {
     'eth': 'ETH', 'ethereum': 'ETH',
-    'btc': 'BTC', 'bitcoin': 'BTC',
+    'btc': 'mBTC', 'bitcoin': 'mBTC',
     'usdc': 'mUSDC', 'musdc': 'mUSDC',
     'usdt': 'mUSDT', 'musdt': 'mUSDT',
-    'dai': 'mDAI', 'mdai': 'mDAI',
-    'link': 'LINK',
-    'uni': 'UNI',
-    'wbtc': 'WBTC',
-    'weth': 'WETH'
+    'usds': 'mUSDS', 'musds': 'mUSDS',
+    'usde': 'mUSDE', 'musde': 'mUSDE',
+    'wbtc': 'mWBTC', 'mwbtc': 'mWBTC',
+    'weth': 'mWETH', 'mweth': 'mWETH',
+    'wsol': 'mWSOL', 'mwsol': 'mWSOL',
   };
 
   for (const [key, value] of Object.entries(assetsMap)) {
@@ -230,10 +228,7 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
   }
 
   // Detect Hooks
-  if (msg.includes('nezlobin')) result.hook = 'Nezlobin';
-  else if (msg.includes('jit') || msg.includes('just-in-time')) result.hook = 'JIT Rebalancing';
-  else if (msg.includes('mev') || msg.includes('protection')) result.hook = 'MEV Protection';
-  else if (msg.includes('directional')) result.hook = 'Directional Fee';
+  if (msg.includes('no hook')) result.hook = 'None';
 
   return result;
 };
