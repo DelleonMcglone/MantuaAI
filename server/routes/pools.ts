@@ -1,0 +1,492 @@
+import { Router, Request, Response } from "express";
+import { createPublicClient, createWalletClient, http, parseAbi, encodeFunctionData, type Address, type Hex } from "viem";
+import { baseSepolia } from "viem/chains";
+import { privateKeyToAccount } from "viem/accounts";
+
+const router = Router();
+
+const POOL_MANAGER = "0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408" as Address;
+const POOL_SWAP_TEST = "0x8b5bcc363dde2614281ad875bad385e0a785d3b9" as Address;
+const ZERO_HOOK = "0x0000000000000000000000000000000000000000" as Address;
+
+const MOCK_TOKENS: Record<string, { address: Address; decimals: number; symbol: string }> = {
+  mUSDC:  { address: "0x3365571b822a54c01816bC75b586317F4c1B3E47", decimals: 6, symbol: "mUSDC" },
+  mUSDT:  { address: "0xB85e6FDaB14EAf2fEB9c59BceB97830b98572a2e", decimals: 6, symbol: "mUSDT" },
+  mUSDS:  { address: "0x5aDd6F9167E90A5d211C03Ee8f224108e3b8DC73", decimals: 18, symbol: "mUSDS" },
+  mUSDE:  { address: "0x36048415ecb7Ce82F5523adDCe0e56a37FE963b4", decimals: 18, symbol: "mUSDE" },
+  mUSDY:  { address: "0xb6639242Ba9A4799317C889De4c13314dAC6748D", decimals: 18, symbol: "mUSDY" },
+  mBUIDL: { address: "0x9f390f689954805A278b104cf5b5F59529cF779D", decimals: 6, symbol: "mBUIDL" },
+  mstETH: { address: "0xdECB63D9195f64aA5434C557b462F9a977E6ad01", decimals: 18, symbol: "mstETH" },
+  mcbETH: { address: "0x7C04d5ED23b229Cb659dc67dd7BF2D75455e339f", decimals: 18, symbol: "mcbETH" },
+  mWBTC:  { address: "0xcA927D36203DC588C66025B8535beFE9C8413237", decimals: 8, symbol: "mWBTC" },
+  mWETH:  { address: "0xFf445C40e5a1c88A703fcAC607A80DEd7A1bC129", decimals: 18, symbol: "mWETH" },
+  mWSOL:  { address: "0x2CD13A38372a65062BceBD980C1FEEA2355ee6e1", decimals: 9, symbol: "mWSOL" },
+  mBTC:   { address: "0xA6abc29Cd7F5D193c3B507152fF842f684E139E4", decimals: 8, symbol: "mBTC" },
+};
+
+const FAUCET_ADDRESS = "0xaa0D98c815C3003d35E571fD51C65d7F92391883" as Address;
+
+const POOL_PAIRS = [
+  { tokenA: "mUSDC", tokenB: "mWETH", fee: 3000, tickSpacing: 60, sqrtPriceX96: "1771595571142957166518320255467520" },
+  { tokenA: "mUSDC", tokenB: "mWBTC", fee: 3000, tickSpacing: 60, sqrtPriceX96: "1771595571142957166518320255467520" },
+  { tokenA: "mUSDC", tokenB: "mUSDT", fee: 500, tickSpacing: 10, sqrtPriceX96: "79228162514264337593543950336" },
+  { tokenA: "mUSDC", tokenB: "mUSDS", fee: 500, tickSpacing: 10, sqrtPriceX96: "79228162514264337593543950336" },
+  { tokenA: "mUSDC", tokenB: "mUSDE", fee: 500, tickSpacing: 10, sqrtPriceX96: "79228162514264337593543950336" },
+  { tokenA: "mWETH", tokenB: "mstETH", fee: 500, tickSpacing: 10, sqrtPriceX96: "79228162514264337593543950336" },
+  { tokenA: "mWETH", tokenB: "mcbETH", fee: 500, tickSpacing: 10, sqrtPriceX96: "79228162514264337593543950336" },
+  { tokenA: "mWBTC", tokenB: "mBTC", fee: 500, tickSpacing: 10, sqrtPriceX96: "79228162514264337593543950336" },
+  { tokenA: "mUSDC", tokenB: "mUSDY", fee: 3000, tickSpacing: 60, sqrtPriceX96: "79228162514264337593543950336" },
+  { tokenA: "mUSDC", tokenB: "mBUIDL", fee: 3000, tickSpacing: 60, sqrtPriceX96: "79228162514264337593543950336" },
+  { tokenA: "mWETH", tokenB: "mWSOL", fee: 3000, tickSpacing: 60, sqrtPriceX96: "79228162514264337593543950336" },
+];
+
+function sortTokens(a: Address, b: Address): [Address, Address] {
+  return a.toLowerCase() < b.toLowerCase() ? [a, b] : [b, a];
+}
+
+const POOL_MANAGER_ABI = parseAbi([
+  "function initialize((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint160 sqrtPriceX96) external returns (int24 tick)",
+]);
+
+const ERC20_ABI = parseAbi([
+  "function approve(address spender, uint256 amount) external returns (bool)",
+  "function balanceOf(address account) external view returns (uint256)",
+  "function allowance(address owner, address spender) external view returns (uint256)",
+]);
+
+const PMLT_ABI = parseAbi([
+  "function modifyLiquidity((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, (int24 tickLower, int24 tickUpper, int256 liquidityDelta, bytes32 salt) params, bytes hookData) external payable returns (int256)",
+  "function manager() external view returns (address)",
+  "constructor(address _manager)",
+]);
+
+const FAUCET_ABI = parseAbi([
+  "function claimAll() external",
+]);
+
+function getClients() {
+  const pk = process.env.PRIVATE_KEY;
+  if (!pk) throw new Error("PRIVATE_KEY not configured");
+  const rpcUrl = process.env.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org";
+  
+  const account = privateKeyToAccount(pk.startsWith("0x") ? pk as `0x${string}` : `0x${pk}` as `0x${string}`);
+  
+  const publicClient = createPublicClient({
+    chain: baseSepolia,
+    transport: http(rpcUrl),
+  });
+  
+  const walletClient = createWalletClient({
+    account,
+    chain: baseSepolia,
+    transport: http(rpcUrl),
+  });
+  
+  return { publicClient, walletClient, account };
+}
+
+let deployedPMLTAddress: Address | null = "0x4b69e8d500d7c48285c8b4abbe41dfa5303a8982" as Address;
+
+const PMLT_INIT_CODE = "0x60a060405234801561000f575f80fd5b506040516116a03803806116a0833981810160405281019061003191906100da565b8073ffffffffffffffffffffffffffffffffffffffff1660808173ffffffffffffffffffffffffffffffffffffffff168152505050610105565b5f80fd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f6100988261006f565b9050919050565b5f6100a98261008e565b9050919050565b6100b98161009f565b81146100c3575f80fd5b50565b5f815190506100d4816100b0565b92915050565b5f602082840312156100ef576100ee61006b565b5b5f6100fc848285016100c6565b91505092915050565b6080516115386101685f395f818160cf0152818160f501528181610223015281816102c40152818161038001528181610434015281816104d00152818161056b01528181610621015281816106bd01528181610758015261080a01526115385ff3fe608060405260043610610033575f3560e01c8063481c6a75146100375780635a6bcfda1461006157806391dd734614610091575b5f80fd5b348015610042575f80fd5b5061004b6100cd565b6040516100589190610956565b60405180910390f35b61007b60048036038101906100769190610a21565b6100f1565b6040516100889190610aac565b60405180910390f35b34801561009c575f80fd5b506100b760048036038101906100b29190610ac5565b61021f565b6040516100c49190610b80565b60405180910390f35b7f000000000000000000000000000000000000000000000000000000000000000081565b5f807f000000000000000000000000000000000000000000000000000000000000000073ffffffffffffffffffffffffffffffffffffffff166348c8949160405180606001604052803373ffffffffffffffffffffffffffffffffffffffff168152602001898036038101906101679190610d4e565b81526020018880360381019061017d9190610e4b565b8152506040516020016101909190610fbb565b6040516020818303038152906040526040518263ffffffff1660e01b81526004016101bb9190610b80565b5f604051808303815f875af11580156101d6573d5f803e3d5ffd5b505050506040513d5f823e3d601f19601f820116820180604052508101906101fe9190611077565b90508080602001905181019061021491906110d2565b915050949350505050565b60607f000000000000000000000000000000000000000000000000000000000000000073ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff16146102af576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016102a690611157565b60405180910390fd5b5f83838101906102bf91906111d7565b90505f7f000000000000000000000000000000000000000000000000000000000000000073ffffffffffffffffffffffffffffffffffffffff16635a6bcfda836020015184604001516040518363ffffffff1660e01b81526004016103259291906112df565b60408051808303815f875af1158015610340573d5f803e3d5ffd5b505050506040513d601f19601f82011682018060405250810190610364919061131b565b5090505f608082901d90505f8290505f82600f0b121561055e577f000000000000000000000000000000000000000000000000000000000000000073ffffffffffffffffffffffffffffffffffffffff1663a584119485602001515f01516040518263ffffffff1660e01b81526004016103de9190611368565b5f604051808303815f87803b1580156103f5575f80fd5b505af1158015610407573d5f803e3d5ffd5b5050505083602001515f015173ffffffffffffffffffffffffffffffffffffffff166323b872dd855f01517f00000000000000000000000000000000000000000000000000000000000000008561045d906113ba565b6fffffffffffffffffffffffffffffffff166040518463ffffffff1660e01b815260040161048d93929190611418565b6020604051808303815f875af11580156104a9573d5f803e3d5ffd5b505050506040513d601f19601f820116820180604052508101906104cd9190611482565b507f000000000000000000000000000000000000000000000000000000000000000073ffffffffffffffffffffffffffffffffffffffff166311da60b46040518163ffffffff1660e01b81526004016020604051808303815f875af1158015610538573d5f803e3d5ffd5b505050506040513d601f19601f8201168201806040525081019061055c91906114d7565b505b5f81600f0b121561074b577f000000000000000000000000000000000000000000000000000000000000000073ffffffffffffffffffffffffffffffffffffffff1663a58411948560200151602001516040518263ffffffff1660e01b81526004016105ca9190611368565b5f604051808303815f87803b1580156105e1575f80fd5b505af11580156105f3573d5f803e3d5ffd5b5050505083602001516020015173ffffffffffffffffffffffffffffffffffffffff166323b872dd855f01517f00000000000000000000000000000000000000000000000000000000000000008461064a906113ba565b6fffffffffffffffffffffffffffffffff166040518463ffffffff1660e01b815260040161067a93929190611418565b6020604051808303815f875af1158015610696573d5f803e3d5ffd5b505050506040513d601f19601f820116820180604052508101906106ba9190611482565b507f000000000000000000000000000000000000000000000000000000000000000073ffffffffffffffffffffffffffffffffffffffff166311da60b46040518163ffffffff1660e01b81526004016020604051808303815f875af1158015610725573d5f803e3d5ffd5b505050506040513d601f19601f8201168201806040525081019061074991906114d7565b505b5f82600f0b13156107fd577f000000000000000000000000000000000000000000000000000000000000000073ffffffffffffffffffffffffffffffffffffffff16630b0d9c0985602001515f0151865f0151856fffffffffffffffffffffffffffffffff166040518463ffffffff1660e01b81526004016107cf93929190611418565b5f604051808303815f87803b1580156107e6575f80fd5b505af11580156107f8573d5f803e3d5ffd5b505050505b5f81600f0b13156108b0577f000000000000000000000000000000000000000000000000000000000000000073ffffffffffffffffffffffffffffffffffffffff16630b0d9c09856020015160200151865f0151846fffffffffffffffffffffffffffffffff166040518463ffffffff1660e01b815260040161088293929190611418565b5f604051808303815f87803b158015610899575f80fd5b505af11580156108ab573d5f803e3d5ffd5b505050505b826040516020016108c19190610aac565b60405160208183030381529060405294505050505092915050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f819050919050565b5f61091e610919610914846108dc565b6108fb565b6108dc565b9050919050565b5f61092f82610904565b9050919050565b5f61094082610925565b9050919050565b61095081610936565b82525050565b5f6020820190506109695f830184610947565b92915050565b5f604051905090565b5f80fd5b5f80fd5b5f80fd5b5f60a0828403121561099957610998610980565b5b81905092915050565b5f608082840312156109b7576109b6610980565b5b81905092915050565b5f80fd5b5f80fd5b5f80fd5b5f8083601f8401126109e1576109e06109c0565b5b8235905067ffffffffffffffff8111156109fe576109fd6109c4565b5b602083019150836001820283011115610a1a57610a196109c8565b5b9250929050565b5f805f806101408587031215610a3a57610a39610978565b5b5f610a4787828801610984565b94505060a0610a58878288016109a2565b93505061012085013567ffffffffffffffff811115610a7a57610a7961097c565b5b610a86878288016109cc565b925092505092959194509250565b5f819050919050565b610aa681610a94565b82525050565b5f602082019050610abf5f830184610a9d565b92915050565b5f8060208385031215610adb57610ada610978565b5b5f83013567ffffffffffffffff811115610af857610af761097c565b5b610b04858286016109cc565b92509250509250929050565b5f81519050919050565b5f82825260208201905092915050565b8281835e5f83830152505050565b5f601f19601f8301169050919050565b5f610b5282610b10565b610b5c8185610b1a565b9350610b6c818560208601610b2a565b610b7581610b38565b840191505092915050565b5f6020820190508181035f830152610b988184610b48565b905092915050565b5f80fd5b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b610bda82610b38565b810181811067ffffffffffffffff82111715610bf957610bf8610ba4565b5b80604052505050565b5f610c0b61096f565b9050610c178282610bd1565b919050565b5f610c26826108dc565b9050919050565b610c3681610c1c565b8114610c40575f80fd5b50565b5f81359050610c5181610c2d565b92915050565b5f62ffffff82169050919050565b610c6e81610c57565b8114610c78575f80fd5b50565b5f81359050610c8981610c65565b92915050565b5f8160020b9050919050565b610ca481610c8f565b8114610cae575f80fd5b50565b5f81359050610cbf81610c9b565b92915050565b5f60a08284031215610cda57610cd9610ba0565b5b610ce460a0610c02565b90505f610cf384828501610c43565b5f830152506020610d0684828501610c43565b6020830152506040610d1a84828501610c7b565b6040830152506060610d2e84828501610cb1565b6060830152506080610d4284828501610c43565b60808301525092915050565b5f60a08284031215610d6357610d62610978565b5b5f610d7084828501610cc5565b91505092915050565b610d8281610a94565b8114610d8c575f80fd5b50565b5f81359050610d9d81610d79565b92915050565b5f819050919050565b610db581610da3565b8114610dbf575f80fd5b50565b5f81359050610dd081610dac565b92915050565b5f60808284031215610deb57610dea610ba0565b5b610df56080610c02565b90505f610e0484828501610cb1565b5f830152506020610e1784828501610cb1565b6020830152506040610e2b84828501610d8f565b6040830152506060610e3f84828501610dc2565b60608301525092915050565b5f60808284031215610e6057610e5f610978565b5b5f610e6d84828501610dd6565b91505092915050565b610e7f81610c1c565b82525050565b610e8e81610c57565b82525050565b610e9d81610c8f565b82525050565b60a082015f820151610eb75f850182610e76565b506020820151610eca6020850182610e76565b506040820151610edd6040850182610e85565b506060820151610ef06060850182610e94565b506080820151610f036080850182610e76565b50505050565b610f1281610a94565b82525050565b610f2181610da3565b82525050565b608082015f820151610f3b5f850182610e94565b506020820151610f4e6020850182610e94565b506040820151610f616040850182610f09565b506060820151610f746060850182610f18565b50505050565b61014082015f820151610f8f5f850182610e76565b506020820151610fa26020850182610ea3565b506040820151610fb560c0850182610f27565b50505050565b5f61014082019050610fcf5f830184610f7a565b92915050565b5f80fd5b5f67ffffffffffffffff821115610ff357610ff2610ba4565b5b610ffc82610b38565b9050602081019050919050565b5f61101b61101684610fd9565b610c02565b90508281526020810184848401111561103757611036610fd5565b5b611042848285610b2a565b509392505050565b5f82601f83011261105e5761105d6109c0565b5b815161106e848260208601611009565b91505092915050565b5f6020828403121561108c5761108b610978565b5b5f82015167ffffffffffffffff8111156110a9576110a861097c565b5b6110b58482850161104a565b91505092915050565b5f815190506110cc81610d79565b92915050565b5f602082840312156110e7576110e6610978565b5b5f6110f4848285016110be565b91505092915050565b5f82825260208201905092915050565b7f4e6f74206d616e616765720000000000000000000000000000000000000000005f82015250565b5f611141600b836110fd565b915061114c8261110d565b602082019050919050565b5f6020820190508181035f83015261116e81611135565b9050919050565b5f610140828403121561118b5761118a610ba0565b5b6111956060610c02565b90505f6111a484828501610c43565b5f8301525060206111b784828501610cc5565b60208301525060c06111cb84828501610dd6565b60408301525092915050565b5f61014082840312156111ed576111ec610978565b5b5f6111fa84828501611175565b91505092915050565b60a082015f8201516112175f850182610e76565b50602082015161122a6020850182610e76565b50604082015161123d6040850182610e85565b5060608201516112506060850182610e94565b5060808201516112636080850182610e76565b50505050565b608082015f82015161127d5f850182610e94565b5060208201516112906020850182610e94565b5060408201516112a36040850182610f09565b5060608201516112b66060850182610f18565b50505050565b50565b5f6112ca5f83610b1a565b91506112d5826112bc565b5f82019050919050565b5f610140820190506112f35f830185611203565b61130060a0830184611269565b818103610120830152611312816112bf565b90509392505050565b5f806040838503121561133157611330610978565b5b5f61133e858286016110be565b925050602061134f858286016110be565b9150509250929050565b61136281610c1c565b82525050565b5f60208201905061137b5f830184611359565b92915050565b5f81600f0b9050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52601160045260245ffd5b5f6113c482611381565b91507fffffffffffffffffffffffffffffffff8000000000000000000000000000000082036113f6576113f561138d565b5b815f039050919050565b5f819050919050565b61141281611400565b82525050565b5f60608201905061142b5f830186611359565b6114386020830185611359565b6114456040830184611409565b949350505050565b5f8115159050919050565b6114618161144d565b811461146b575f80fd5b50565b5f8151905061147c81611458565b92915050565b5f6020828403121561149757611496610978565b5b5f6114a48482850161146e565b91505092915050565b6114b681611400565b81146114c0575f80fd5b50565b5f815190506114d1816114ad565b92915050565b5f602082840312156114ec576114eb610978565b5b5f6114f9848285016114c3565b9150509291505056fea26469706673582212202f0d376c0797650eac924929ee8eb5cab50ad905719124831935c423fc18873664736f6c634300081a0033";
+
+router.get("/status", async (_req: Request, res: Response) => {
+  try {
+    const { publicClient, account } = getClients();
+    const balance = await publicClient.getBalance({ address: account.address });
+    
+    const poolStatuses = [];
+    for (const pair of POOL_PAIRS) {
+      const tokenA = MOCK_TOKENS[pair.tokenA];
+      const tokenB = MOCK_TOKENS[pair.tokenB];
+      if (!tokenA || !tokenB) continue;
+      
+      const [currency0, currency1] = sortTokens(tokenA.address, tokenB.address);
+      poolStatuses.push({
+        pair: `${pair.tokenA}/${pair.tokenB}`,
+        currency0,
+        currency1,
+        fee: pair.fee,
+        tickSpacing: pair.tickSpacing,
+      });
+    }
+    
+    res.json({
+      deployer: account.address,
+      balance: balance.toString(),
+      poolManager: POOL_MANAGER,
+      poolSwapTest: POOL_SWAP_TEST,
+      pmltAddress: deployedPMLTAddress,
+      pools: poolStatuses,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post("/deploy-pmlt", async (_req: Request, res: Response) => {
+  try {
+    const { publicClient, walletClient, account } = getClients();
+    
+    console.log("[pools] Deploying PoolModifyLiquidityTest...");
+    console.log("[pools] Using PoolManager:", POOL_MANAGER);
+    
+    const hash = await walletClient.deployContract({
+      abi: PMLT_ABI,
+      bytecode: PMLT_INIT_CODE as Hex,
+      args: [POOL_MANAGER],
+    });
+    
+    console.log("[pools] Deploy tx:", hash);
+    const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 60_000 });
+    
+    if (receipt.status !== "success") {
+      throw new Error("Deploy transaction failed");
+    }
+    
+    deployedPMLTAddress = receipt.contractAddress!;
+    console.log("[pools] PoolModifyLiquidityTest deployed at:", deployedPMLTAddress);
+    
+    const mgrResult = await publicClient.call({
+      to: deployedPMLTAddress,
+      data: "0x481c6a75" as Hex,
+    });
+    console.log("[pools] Verified manager:", mgrResult.data);
+    
+    res.json({
+      success: true,
+      address: deployedPMLTAddress,
+      manager: mgrResult.data ? ("0x" + mgrResult.data.slice(-40)) : "unknown",
+      txHash: hash,
+    });
+  } catch (err: any) {
+    console.error("[pools] Deploy error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post("/initialize", async (req: Request, res: Response) => {
+  try {
+    const { publicClient, walletClient, account } = getClients();
+    const { pairIndex } = req.body;
+    
+    const pairs = pairIndex !== undefined ? [POOL_PAIRS[pairIndex]] : POOL_PAIRS;
+    const results = [];
+    
+    for (const pair of pairs) {
+      if (!pair) continue;
+      const tokenA = MOCK_TOKENS[pair.tokenA];
+      const tokenB = MOCK_TOKENS[pair.tokenB];
+      if (!tokenA || !tokenB) continue;
+      
+      const [currency0, currency1] = sortTokens(tokenA.address, tokenB.address);
+      const poolKey = {
+        currency0,
+        currency1,
+        fee: pair.fee,
+        tickSpacing: pair.tickSpacing,
+        hooks: ZERO_HOOK,
+      };
+      
+      try {
+        console.log(`[pools] Initializing pool ${pair.tokenA}/${pair.tokenB}...`);
+        const hash = await walletClient.writeContract({
+          address: POOL_MANAGER,
+          abi: POOL_MANAGER_ABI,
+          functionName: "initialize",
+          args: [poolKey, BigInt(pair.sqrtPriceX96)],
+        });
+        
+        const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 60_000 });
+        results.push({
+          pair: `${pair.tokenA}/${pair.tokenB}`,
+          success: receipt.status === "success",
+          txHash: hash,
+        });
+        console.log(`[pools] Pool ${pair.tokenA}/${pair.tokenB} initialized: ${receipt.status}`);
+      } catch (err: any) {
+        console.error(`[pools] Failed to initialize ${pair.tokenA}/${pair.tokenB}:`, err.message);
+        results.push({
+          pair: `${pair.tokenA}/${pair.tokenB}`,
+          success: false,
+          error: err.message.slice(0, 200),
+        });
+      }
+    }
+    
+    res.json({ results });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post("/add-liquidity", async (req: Request, res: Response) => {
+  try {
+    const { publicClient, walletClient, account } = getClients();
+    const { pairIndex, pmltAddress: overrideAddr } = req.body;
+    
+    const pmlt = (overrideAddr || deployedPMLTAddress) as Address;
+    if (!pmlt) {
+      return res.status(400).json({ error: "PoolModifyLiquidityTest not deployed. Call /deploy-pmlt first." });
+    }
+    
+    const pairs = pairIndex !== undefined ? [POOL_PAIRS[pairIndex]] : POOL_PAIRS;
+    const results = [];
+    
+    for (const pair of pairs) {
+      if (!pair) continue;
+      const tokenA = MOCK_TOKENS[pair.tokenA];
+      const tokenB = MOCK_TOKENS[pair.tokenB];
+      if (!tokenA || !tokenB) continue;
+      
+      const [currency0, currency1] = sortTokens(tokenA.address, tokenB.address);
+      
+      try {
+        const maxApproval = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        
+        for (const token of [currency0, currency1]) {
+          const allowance = await publicClient.readContract({
+            address: token,
+            abi: ERC20_ABI,
+            functionName: "allowance",
+            args: [account.address, pmlt],
+          });
+          
+          if (allowance < maxApproval / 2n) {
+            console.log(`[pools] Approving ${token} for PMLT...`);
+            const approveTx = await walletClient.writeContract({
+              address: token,
+              abi: ERC20_ABI,
+              functionName: "approve",
+              args: [pmlt, maxApproval],
+            });
+            await publicClient.waitForTransactionReceipt({ hash: approveTx, timeout: 60_000 });
+          }
+        }
+        
+        const poolKey = {
+          currency0,
+          currency1,
+          fee: pair.fee,
+          tickSpacing: pair.tickSpacing,
+          hooks: ZERO_HOOK,
+        };
+        
+        const tickLower = -pair.tickSpacing * 100;
+        const tickUpper = pair.tickSpacing * 100;
+        
+        const minDecimals = Math.min(tokenA.decimals, tokenB.decimals);
+        let liquidityDelta: bigint;
+        if (minDecimals <= 8) {
+          liquidityDelta = BigInt("500000000");
+        } else {
+          liquidityDelta = BigInt("500000000000000000");
+        }
+        
+        const modifyParams = {
+          tickLower,
+          tickUpper,
+          liquidityDelta,
+          salt: "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`,
+        };
+        
+        console.log(`[pools] Adding liquidity to ${pair.tokenA}/${pair.tokenB} (L=${liquidityDelta.toString()})...`);
+        const hash = await walletClient.writeContract({
+          address: pmlt,
+          abi: PMLT_ABI,
+          functionName: "modifyLiquidity",
+          args: [poolKey, modifyParams, "0x"],
+        });
+        
+        const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 60_000 });
+        results.push({
+          pair: `${pair.tokenA}/${pair.tokenB}`,
+          success: receipt.status === "success",
+          txHash: hash,
+        });
+        console.log(`[pools] Liquidity added to ${pair.tokenA}/${pair.tokenB}: ${receipt.status}`);
+      } catch (err: any) {
+        console.error(`[pools] Failed to add liquidity ${pair.tokenA}/${pair.tokenB}:`, err.message);
+        results.push({
+          pair: `${pair.tokenA}/${pair.tokenB}`,
+          success: false,
+          error: err.message.slice(0, 200),
+        });
+      }
+    }
+    
+    res.json({ results });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post("/claim-faucet", async (_req: Request, res: Response) => {
+  try {
+    const { publicClient, walletClient } = getClients();
+    
+    console.log("[pools] Claiming faucet tokens...");
+    const hash = await walletClient.writeContract({
+      address: FAUCET_ADDRESS,
+      abi: FAUCET_ABI,
+      functionName: "claimAll",
+    });
+    
+    const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 60_000 });
+    res.json({ success: receipt.status === "success", txHash: hash });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post("/setup-all", async (_req: Request, res: Response) => {
+  try {
+    const { publicClient, walletClient, account } = getClients();
+    const steps: any[] = [];
+    
+    console.log("[pools] === FULL POOL SETUP ===");
+    console.log("[pools] Deployer:", account.address);
+    
+    const balance = await publicClient.getBalance({ address: account.address });
+    console.log("[pools] ETH balance:", balance.toString());
+    steps.push({ step: "check_balance", balance: balance.toString() });
+    
+    console.log("[pools] Step 1: Claiming faucet tokens...");
+    try {
+      const faucetHash = await walletClient.writeContract({
+        address: FAUCET_ADDRESS,
+        abi: FAUCET_ABI,
+        functionName: "claimAll",
+      });
+      const faucetReceipt = await publicClient.waitForTransactionReceipt({ hash: faucetHash, timeout: 60_000 });
+      steps.push({ step: "claim_faucet", success: faucetReceipt.status === "success", txHash: faucetHash });
+    } catch (err: any) {
+      steps.push({ step: "claim_faucet", success: false, error: err.message.slice(0, 100) });
+    }
+    
+    console.log("[pools] Step 2: Deploying PoolModifyLiquidityTest...");
+    if (!deployedPMLTAddress) {
+      try {
+        const hash = await walletClient.deployContract({
+          abi: PMLT_ABI,
+          bytecode: PMLT_INIT_CODE as Hex,
+          args: [POOL_MANAGER],
+        });
+        const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 60_000 });
+        if (receipt.status === "success" && receipt.contractAddress) {
+          deployedPMLTAddress = receipt.contractAddress;
+          steps.push({ step: "deploy_pmlt", success: true, address: deployedPMLTAddress, txHash: hash });
+        } else {
+          steps.push({ step: "deploy_pmlt", success: false, error: "Tx failed" });
+          return res.json({ steps, error: "PMLT deployment failed" });
+        }
+      } catch (err: any) {
+        steps.push({ step: "deploy_pmlt", success: false, error: err.message.slice(0, 200) });
+        return res.json({ steps, error: "PMLT deployment failed" });
+      }
+    } else {
+      steps.push({ step: "deploy_pmlt", success: true, address: deployedPMLTAddress, skipped: true });
+    }
+    
+    console.log("[pools] Step 3: Initializing pools...");
+    const initResults = [];
+    for (const pair of POOL_PAIRS) {
+      const tokenA = MOCK_TOKENS[pair.tokenA];
+      const tokenB = MOCK_TOKENS[pair.tokenB];
+      if (!tokenA || !tokenB) continue;
+      
+      const [currency0, currency1] = sortTokens(tokenA.address, tokenB.address);
+      const poolKey = { currency0, currency1, fee: pair.fee, tickSpacing: pair.tickSpacing, hooks: ZERO_HOOK };
+      
+      try {
+        const hash = await walletClient.writeContract({
+          address: POOL_MANAGER,
+          abi: POOL_MANAGER_ABI,
+          functionName: "initialize",
+          args: [poolKey, BigInt(pair.sqrtPriceX96)],
+        });
+        const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 60_000 });
+        initResults.push({ pair: `${pair.tokenA}/${pair.tokenB}`, success: receipt.status === "success" });
+      } catch (err: any) {
+        const alreadyInit = err.message.includes("PoolAlreadyInitialized") || err.message.includes("already");
+        initResults.push({ pair: `${pair.tokenA}/${pair.tokenB}`, success: alreadyInit, skipped: alreadyInit, error: alreadyInit ? "Already initialized" : err.message.slice(0, 100) });
+      }
+    }
+    steps.push({ step: "initialize_pools", results: initResults });
+    
+    console.log("[pools] Step 4: Approving tokens for PMLT...");
+    const allTokenAddresses = new Set<Address>();
+    for (const pair of POOL_PAIRS) {
+      const a = MOCK_TOKENS[pair.tokenA];
+      const b = MOCK_TOKENS[pair.tokenB];
+      if (a) allTokenAddresses.add(a.address);
+      if (b) allTokenAddresses.add(b.address);
+    }
+    
+    const maxApproval = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    for (const token of allTokenAddresses) {
+      try {
+        const approveTx = await walletClient.writeContract({
+          address: token,
+          abi: ERC20_ABI,
+          functionName: "approve",
+          args: [deployedPMLTAddress!, maxApproval],
+        });
+        await publicClient.waitForTransactionReceipt({ hash: approveTx, timeout: 60_000 });
+      } catch (err: any) {
+        console.log(`[pools] Approval for ${token} failed (may already be approved):`, err.message.slice(0, 50));
+      }
+    }
+    steps.push({ step: "approve_tokens", success: true });
+    
+    console.log("[pools] Step 5: Adding liquidity...");
+    const liqResults = [];
+    for (const pair of POOL_PAIRS) {
+      const tokenA = MOCK_TOKENS[pair.tokenA];
+      const tokenB = MOCK_TOKENS[pair.tokenB];
+      if (!tokenA || !tokenB) continue;
+      
+      const [currency0, currency1] = sortTokens(tokenA.address, tokenB.address);
+      const poolKey = { currency0, currency1, fee: pair.fee, tickSpacing: pair.tickSpacing, hooks: ZERO_HOOK };
+      
+      const tickLower = -pair.tickSpacing * 100;
+      const tickUpper = pair.tickSpacing * 100;
+      
+      const minDecimals = Math.min(tokenA.decimals, tokenB.decimals);
+      let liquidityDelta: bigint;
+      if (minDecimals <= 8) {
+        liquidityDelta = BigInt("500000000");
+      } else {
+        liquidityDelta = BigInt("500000000000000000");
+      }
+      
+      const modifyParams = {
+        tickLower,
+        tickUpper,
+        liquidityDelta,
+        salt: "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`,
+      };
+      
+      try {
+        const hash = await walletClient.writeContract({
+          address: deployedPMLTAddress!,
+          abi: PMLT_ABI,
+          functionName: "modifyLiquidity",
+          args: [poolKey, modifyParams, "0x"],
+        });
+        const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 60_000 });
+        liqResults.push({ pair: `${pair.tokenA}/${pair.tokenB}`, success: receipt.status === "success", txHash: hash });
+      } catch (err: any) {
+        liqResults.push({ pair: `${pair.tokenA}/${pair.tokenB}`, success: false, error: err.message.slice(0, 200) });
+      }
+    }
+    steps.push({ step: "add_liquidity", results: liqResults });
+    
+    console.log("[pools] === SETUP COMPLETE ===");
+    res.json({ success: true, steps, pmltAddress: deployedPMLTAddress });
+  } catch (err: any) {
+    console.error("[pools] Setup error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+export default router;

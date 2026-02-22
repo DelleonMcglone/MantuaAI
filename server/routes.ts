@@ -19,6 +19,7 @@ import { generalLimiter, agentLimiter } from "./lib/rateLimiter";
 import authRouter          from "./routes/auth";
 import analyticsRouter     from "./routes/analytics";
 import analyticsQueryRouter from "./routes/analyticsQuery";
+import poolsRouter         from "./routes/pools";
 
 // ============ VOICE TRANSCRIPTION SETUP ============
 
@@ -82,6 +83,7 @@ export async function registerRoutes(
   app.use('/api/auth',      authRouter);
   app.use('/api/analytics', analyticsRouter);
   app.use('/api/analytics', analyticsQueryRouter);
+  app.use('/api/pools',     poolsRouter);
 
   // Register new userId-based chat routes first (they fall through for legacy requests)
   registerChatRoutes(app);
