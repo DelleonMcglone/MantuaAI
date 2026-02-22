@@ -1833,11 +1833,28 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
 
   // Percentage-of-balance shortcut for the Sell input
   const handlePercentage = (pct: number) => {
-    const rawBalance = getTokenBalance(fromToken, fromTokenData);
-    const bal = parseFloat(rawBalance || '0');
-    if (isNaN(bal) || bal < 0) return;
-    const maxDecimals = Math.min(fromTokenData.decimals, 8);
-    const result = (bal * pct).toFixed(maxDecimals).replace(/\.?0+$/, '');
+    let rawBigInt: bigint | undefined;
+    const decimals = fromTokenData.decimals;
+
+    if (fromToken === 'ETH' || isNativeEth(fromTokenData.address)) {
+      rawBigInt = ethBalance?.value;
+    } else {
+      const entry = balancesBySymbol[fromToken] || balancesBySymbol[fromTokenData.symbol];
+      rawBigInt = entry?.balance;
+    }
+
+    if (!rawBigInt || rawBigInt <= 0n) return;
+
+    const pctMap: Record<number, [bigint, bigint]> = { 0.25: [1n, 4n], 0.5: [1n, 2n], 0.75: [3n, 4n], 1: [1n, 1n] };
+    const [num, den] = pctMap[pct] ?? [BigInt(Math.round(pct * 10000)), 10000n];
+    const scaledAmount = rawBigInt * num / den;
+
+    const divisor = 10n ** BigInt(decimals);
+    const wholePart = scaledAmount / divisor;
+    const fracPart = scaledAmount % divisor;
+    const maxDecimals = Math.min(decimals, 8);
+    const fracStr = fracPart.toString().padStart(decimals, '0').slice(0, maxDecimals).replace(/0+$/, '');
+    const result = fracStr ? `${wholePart}.${fracStr}` : `${wholePart}`;
     setFromAmount(result || '0');
   };
 
