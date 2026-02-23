@@ -9,7 +9,6 @@ export interface ClassifiedQuery {
   params?: any;
 }
 
-// Normalize common token names to the testnet token symbols used in the app
 const normalizeTokenSymbol = (sym: string): string => {
   const upper = sym.toUpperCase();
   const aliases: Record<string, string> = {
@@ -17,16 +16,7 @@ const normalizeTokenSymbol = (sym: string): string => {
     'USDT':  'mUSDT',
     'USDE':  'mUSDE',
     'USDS':  'mUSDS',
-    'DAI':   'mUSDS', // mDAI has been renamed to mUSDS
-    'BTC':   'mBTC',
-    'WBTC':  'mWBTC',
-    'SOL':   'mWSOL',
-    'WETH':  'mWETH',
-    'STETH': 'mstETH',
-    'CBETH': 'mcbETH',
-    'BUIDL': 'mBUIDL',
-    'USDY':  'mUSDY',
-    'WBTC':  'mWBTC',
+    'DAI':   'mUSDS',
   };
   return aliases[upper] ?? upper;
 };
@@ -68,7 +58,6 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
     chartType: 'line'
   };
 
-  // ADD LIQUIDITY
   if (
     msg.match(/^add\s+(liquidity|lp)/) ||
     msg.match(/add\s+(liquidity|lp)\s+to/) ||
@@ -79,7 +68,6 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
     return result;
   }
   
-  // LIQUIDITY POOLS LIST
   if (
     msg === 'liquidity' ||
     msg.match(/^(show|view|open|display)\s*(liquidity|pools)/) ||
@@ -92,7 +80,6 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
     return result;
   }
   
-  // SWAP
   if (
     msg.startsWith('swap') ||
     msg.match(/^(swap|exchange|trade)\s+\d*\.?\d*\s*\w+/)
@@ -102,7 +89,6 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
     return result;
   }
   
-  // AGENT
   if (
     msg === 'agent' ||
     msg.match(/^(show|open|view)\s*agent/) ||
@@ -114,7 +100,6 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
     return result;
   }
   
-  // NEW CHAT
   if (
     msg === 'new chat' ||
     msg === 'clear' ||
@@ -125,7 +110,6 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
     return result;
   }
   
-  // BALANCE
   if (
     msg.includes("what's my balance") ||
     msg.includes("what is my balance") ||
@@ -140,7 +124,6 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
     return result;
   }
 
-  // PORTFOLIO
   if (
     msg === 'portfolio' ||
     msg.match(/^(show|view|my)\s*portfolio/) ||
@@ -155,7 +138,6 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
     return result;
   }
   
-  // FAUCET
   if (
     msg === 'faucet' ||
     msg.match(/^(get|request)\s*(test)?\s*tokens?/) ||
@@ -165,7 +147,6 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
     return result;
   }
   
-  // ANALYSIS/RESEARCH
   if (
     msg.match(/(price|volume|tvl|apy)\s*(of|for)?/) ||
     msg.match(/^(what|how|show|compare)/)
@@ -195,17 +176,12 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
     result.type = 'general';
   }
 
-  // Detect Assets
   const assetsMap: Record<string, string> = {
     'eth': 'ETH', 'ethereum': 'ETH',
-    'btc': 'mBTC', 'bitcoin': 'mBTC',
     'usdc': 'mUSDC', 'musdc': 'mUSDC',
     'usdt': 'mUSDT', 'musdt': 'mUSDT',
     'usds': 'mUSDS', 'musds': 'mUSDS',
     'usde': 'mUSDE', 'musde': 'mUSDE',
-    'wbtc': 'mWBTC', 'mwbtc': 'mWBTC',
-    'weth': 'mWETH', 'mweth': 'mWETH',
-    'wsol': 'mWSOL', 'mwsol': 'mWSOL',
   };
 
   for (const [key, value] of Object.entries(assetsMap)) {
@@ -216,7 +192,6 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
     }
   }
 
-  // Detect Time Range
   if (msg.includes('yesterday') || msg.includes('24h') || msg.includes('24 hours') || msg.includes('today')) {
     result.timeRange = '24h';
   } else if (msg.includes('week') || msg.includes('7d') || msg.includes('7 days')) {
@@ -227,7 +202,6 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
     result.timeRange = '1y';
   }
 
-  // Detect Hooks
   if (msg.includes('no hook')) result.hook = 'None';
 
   return result;

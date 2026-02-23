@@ -3,9 +3,6 @@ import { useAccount, useWriteContract, useReadContract } from "wagmi";
 import {
   MOCK_TOKEN_FACTORY,
   STABLECOINS,
-  RWA_TOKENS,
-  LST_TOKENS,
-  WRAPPED_TOKENS,
   type Token,
 } from "../config/tokens";
 import { Button } from "./ui/button";
@@ -42,24 +39,13 @@ const TOKEN_ABI = [
   },
 ] as const;
 
-interface TokenCategory {
-  name: string;
-  tokens: Token[];
-}
-
-const TOKEN_CATEGORIES: TokenCategory[] = [
-  { name: "Stablecoins", tokens: STABLECOINS },
-  { name: "Real World Assets", tokens: RWA_TOKENS },
-  { name: "Liquid Staking", tokens: LST_TOKENS },
-  { name: "Wrapped Assets", tokens: WRAPPED_TOKENS },
-];
+const FAUCET_TOKENS: Token[] = STABLECOINS;
 
 export function Faucet() {
   const { address, isConnected } = useAccount();
   const { writeContract } = useWriteContract();
   const [countdowns, setCountdowns] = useState<{ [key: string]: number }>({});
 
-  // Read faucet status from factory
   const { data: faucetStatus, refetch } = useReadContract({
     address: MOCK_TOKEN_FACTORY,
     abi: FACTORY_ABI,
@@ -70,7 +56,6 @@ export function Faucet() {
     },
   });
 
-  // Update countdowns every second
   useEffect(() => {
     if (!faucetStatus) return;
 
@@ -161,7 +146,7 @@ export function Faucet() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>🚰 Token Faucet</CardTitle>
+          <CardTitle>Token Faucet</CardTitle>
           <CardDescription>Get testnet tokens for trading</CardDescription>
         </CardHeader>
         <CardContent>
@@ -178,78 +163,78 @@ export function Faucet() {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>🚰 Token Faucet</CardTitle>
-            <CardDescription>Claim testnet tokens every hour (21 tokens)</CardDescription>
+            <CardTitle>Token Faucet</CardTitle>
+            <CardDescription>Claim testnet stablecoins every hour</CardDescription>
           </div>
-          <Button onClick={handleClaimAll} size="sm">
+          <Button onClick={handleClaimAll} size="sm" data-testid="button-claim-all">
             Claim All
           </Button>
         </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          {TOKEN_CATEGORIES.map((category) => (
-            <div key={category.name}>
-              <h3 className="text-sm font-semibold text-muted-foreground mb-3">
-                {category.name}
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {category.tokens.map((token) => {
-                  const status = getTokenStatus(token.symbol);
-                  const countdown = countdowns[token.symbol] || status.timeRemaining;
+          <div>
+            <h3 className="text-sm font-semibold text-muted-foreground mb-3">
+              Stablecoins
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {FAUCET_TOKENS.map((token) => {
+                const status = getTokenStatus(token.symbol);
+                const countdown = countdowns[token.symbol] || status.timeRemaining;
 
-                  return (
-                    <div
-                      key={token.symbol}
-                      className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={token.logoURI}
-                          alt={token.symbol}
-                          className="w-8 h-8 rounded-full"
-                          onError={(e) => {
-                            e.currentTarget.src = 'https://via.placeholder.com/32';
-                          }}
-                        />
-                        <div>
-                          <div className="font-medium">{token.symbol}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {token.faucetAmount} per claim
-                          </div>
+                return (
+                  <div
+                    key={token.symbol}
+                    data-testid={`card-faucet-${token.symbol}`}
+                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={token.logoURI}
+                        alt={token.symbol}
+                        className="w-8 h-8 rounded-full"
+                        onError={(e) => {
+                          e.currentTarget.src = 'https://via.placeholder.com/32';
+                        }}
+                      />
+                      <div>
+                        <div className="font-medium">{token.symbol}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {token.faucetAmount} per claim
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        {status.canClaim ? (
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-green-600 dark:text-green-400 font-medium">
-                              Ready
-                            </span>
-                            <Button
-                              onClick={() => handleClaimSingle(token.address)}
-                              size="sm"
-                              variant="default"
-                            >
-                              Claim
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-yellow-600 dark:text-yellow-400 font-mono">
-                              {formatCountdown(countdown)}
-                            </span>
-                            <Button size="sm" disabled variant="outline">
-                              Claim
-                            </Button>
-                          </div>
-                        )}
-                      </div>
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="flex items-center gap-3">
+                      {status.canClaim ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-green-600 dark:text-green-400 font-medium">
+                            Ready
+                          </span>
+                          <Button
+                            onClick={() => handleClaimSingle(token.address)}
+                            size="sm"
+                            variant="default"
+                            data-testid={`button-claim-${token.symbol}`}
+                          >
+                            Claim
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-yellow-600 dark:text-yellow-400 font-mono">
+                            {formatCountdown(countdown)}
+                          </span>
+                          <Button size="sm" disabled variant="outline">
+                            Claim
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          ))}
+          </div>
         </div>
       </CardContent>
     </Card>

@@ -47,8 +47,9 @@ export function PriceImpact({
   const impactColor = getPriceImpactColor(priceImpact);
   const severity = getPriceImpactSeverity(priceImpact);
 
-  const formattedMinReceived = formatTokenAmount(minimumReceived, outputDecimals);
-  const formattedFee = formatTokenAmount(fee, inputDecimals);
+  const isOutputStable = outputSymbol.includes('USD');
+  const formattedMinReceived = formatTokenAmount(minimumReceived, outputDecimals, isOutputStable);
+  const formattedFee = formatTokenAmount(fee, inputDecimals, false);
 
   return (
     <div

@@ -80,7 +80,7 @@ export function TokenSelector({
     setSelectedCategory('all');
   };
 
-  const categories: Category[] = ['all', 'stablecoin', 'rwa', 'lst', 'wrapped'];
+  const categories: Category[] = ['all', 'stablecoin'];
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>

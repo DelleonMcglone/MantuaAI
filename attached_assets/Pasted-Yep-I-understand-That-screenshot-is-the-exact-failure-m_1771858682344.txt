@@ -1,0 +1,211 @@
+Yep — I understand. That screenshot is the **exact failure mode we must eliminate** before anything else matters.
+
+### What this error really means (in your context)
+
+Your wallet is rejecting the swap because the transaction being built (or gas-estimated) is coming out **above the chain’s per-tx gas cap** (“exceeds max transaction gas limit”). In practice this usually happens when:
+
+* The app **sets/overrides gas incorrectly** (e.g., hardcoded `gas`, `gasLimit`, or an absurd multiplier).
+* The app tries to call the wrong contract / wrong calldata (so simulation fails and gas estimate becomes nonsensical).
+* The pool isn’t initialized / liquidity isn’t seeded, causing revert-ish behavior during estimation.
+* Hook params or pool key fields are malformed (bad `hooks` address, wrong `tickSpacing`, wrong `fee`, wrong currency ordering), which makes the call extremely expensive or fails estimation.
+* The app is calling **PoolManager.swap directly** when it should use the correct router / settled flow for your current setup (depends on your architecture), and the call fails in simulation.
+
+So the updated prompt must include: **pre-swap simulation + sane gas estimation + no manual gas overrides + prevent sending a tx when simulation fails**.
+
+Below is the updated Replit prompt with an explicit “Fix the gas-limit swap failure” section and acceptance criteria.
+
+---
+
+## Replit Prompt: Lock Tokens to 5, Seed 4 Default Pools, Allow Any Pair Pool Creation, Verify Pools + Fix Swap Gas-Limit Failure (Base Sepolia + Unichain Sepolia)
+
+### Objective
+
+Update Mantua.AI so the app supports **only 5 tokens**, ships with **4 default pre-funded pools**, allows users to **create additional pools from any allowed pair**, and ensures **swaps DO NOT fail** with errors like **“exceeds max transaction gas limit.”** All actions must be verifiable on **Base Sepolia** and **Unichain Sepolia** explorers.
+
+---
+
+# 1) Token Universe (ONLY these 5 tokens exist anywhere)
+
+**Allowed tokens:**
+
+* Native **ETH**
+* **mUSDC**
+* **mUSDT**
+* **mUSDE**
+* **mUSDS**
+
+### Requirements
+
+* **Remove** every other token from the entire app (not hide):
+
+  * Swap selectors
+  * Liquidity selectors
+  * Pool creation selectors
+  * Faucet list
+  * Token search results / fallback lists
+* **Remove category tabs** like RWAs / LSTs / Wrapped if they imply extra tokens beyond these five.
+* Use a **single canonical token registry** (one source of truth) used everywhere.
+
+---
+
+# 2) Pools (Default 4 + User-Created Additional Pools)
+
+### Default pools (must exist + be seeded on both chains)
+
+1. mUSDC / mUSDT
+2. mUSDC / mUSDE
+3. ETH / mUSDC
+4. mUSDC / mUSDS
+
+### User-created pools
+
+* Users can create **ANY pool** using **ANY pair** from the allowed five tokens.
+
+  * Example: ETH/mUSDS is valid → becomes pool #5.
+  * Example: mUSDT/mUSDE is valid.
+
+---
+
+# 3) Pool Deployment + Verification (Base Sepolia + Unichain Sepolia)
+
+### Requirement
+
+Every pool (default or user-created) must be:
+
+* Created/initialized onchain using the correct Uniswap v4 flow for this project
+* Verifiable via explorer links for:
+
+  * Base Sepolia (BaseScan or correct explorer)
+  * Unichain Sepolia (its Etherscan-equivalent)
+
+UI must surface:
+
+* Pool identifier (key) and/or pool address
+* Tx hashes for create/init/add-liquidity
+* Direct explorer links
+
+---
+
+# 4) Seed/Prefund Default Pools (Both Chains)
+
+Implement a deterministic dev/admin “Seed Default Pools” flow (script or dev-only button) that runs on **both chains** and:
+
+* Ensures seeder wallet has:
+
+  * ETH gas
+  * minted faucet tokens for stables
+* Approves tokens where needed
+* Initializes + adds liquidity to the **4 default pools**
+* Seeds enough liquidity for multiple swaps
+
+**Constraints**
+
+* Stable Protection hook is NOT used.
+* If pool exists, detect it and add liquidity without breaking.
+
+---
+
+# 5) CRITICAL: Fix “exceeds max transaction gas limit” Swap Failure
+
+We must prevent the wallet from ever receiving a swap request that triggers:
+
+> “The contract function ‘swap’ reverted… exceeds max transaction gas limit”
+
+### Requirements (must implement all)
+
+1. **No hardcoded gas / gasLimit overrides**
+
+   * Remove any fixed `gas`, `gasLimit`, or overly aggressive multipliers.
+   * Do not submit txs with arbitrary gas values.
+
+2. **Preflight simulation before sending**
+
+   * Before calling `writeContract`, run:
+
+     * `simulateContract(...)` (viem) or equivalent
+     * and/or `estimateContractGas(...)`
+   * If simulation fails, do NOT send the transaction.
+   * Instead surface a user-facing error like:
+
+     * “Swap can’t be simulated. Pool may be uninitialized or parameters are invalid.”
+
+3. **Sane gas estimation + safety cap**
+
+   * Use the simulation result’s request object (viem pattern) for `writeContract`.
+   * Add a small buffer only (ex: 10–20%), not 5x/10x.
+   * Add a **max gas cap** guardrail:
+
+     * If estimated gas exceeds the network’s safe max (configurable), block submission and show a helpful message.
+
+4. **Correct swap construction (v4 params sanity)**
+
+   * Validate pool key inputs:
+
+     * correct token ordering (currency0/currency1)
+     * correct fee and tickSpacing combination
+     * correct hooks address (and hookData = `0x` when no hook)
+   * Validate `sqrtPriceLimitX96`:
+
+     * set to “no limit” value appropriate for your flow (avoid accidental extreme limits)
+   * Validate `amountSpecified` sign and meaning:
+
+     * make sure exact input vs exact output is intentional and correct
+   * Ensure pool exists + has liquidity before swap:
+
+     * if liquidity is zero/uninitialized, block swap and guide user to seed/add liquidity.
+
+5. **Actionable logging**
+
+   * Log and display (dev mode):
+
+     * chain, pool key, tokens, amount, simulation result, estimated gas, tx hash
+   * On failure, show the revert reason (not just “failed”).
+
+### Acceptance Criteria (must pass)
+
+* Swaps for the 4 default pools succeed on Base Sepolia and Unichain Sepolia:
+
+  * ETH ↔ mUSDC
+  * mUSDC ↔ mUSDT
+  * mUSDC ↔ mUSDE
+  * mUSDC ↔ mUSDS
+* At least one user-created pool swap per chain (ex: ETH/mUSDS) also succeeds.
+* No wallet popups show “exceeds max transaction gas limit.”
+* Every successful swap returns a tx hash with explorer link.
+
+---
+
+# 6) End-to-End Flow (Both Chains)
+
+1. Connect wallet
+2. Faucet (receive tokens)
+3. Add liquidity to an existing pool OR create a new allowed pool and add liquidity
+4. Verify on explorer
+5. Swap
+6. Verify on explorer
+7. No failures / no stuck pending / no silent errors
+
+---
+
+# 7) Stablecoin Display Precision Fix (UI)
+
+### Requirements
+
+* Stablecoins must never display long trailing decimals in UI.
+* Default display: **2 decimals** (ex: 9312.88)
+* Keep token decimals correct under the hood for transaction math.
+
+---
+
+## Deliverables
+
+* Token list restricted to ETH, mUSDC, mUSDT, mUSDE, mUSDS (no others exist)
+* Default 4 pools seeded on Base Sepolia + Unichain Sepolia
+* Pool creation supports any pair from allowed tokens
+* Swaps + liquidity actions verified on both explorers
+* Swap gas-limit failure eliminated via simulation + estimation guardrails
+* Stablecoin display precision fixed
+
+---
+
+If you want, I can also rewrite this into a **shorter “Replit Agent friendly” prompt** (same requirements, fewer words) — but this version is optimized to prevent Replit from missing the gas-limit root cause.

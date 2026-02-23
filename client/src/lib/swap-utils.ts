@@ -282,17 +282,41 @@ export function calculatePriceImpact(
   return Math.max(0.0025, totalImpact);
 }
 
-export function formatTokenAmount(amount: bigint, decimals: number): string {
+export function formatTokenAmount(amount: bigint, decimals: number, isStablecoin: boolean = false): string {
   const divisor = BigInt(10 ** decimals);
   const whole = amount / divisor;
   const fraction = amount % divisor;
   
-  const fractionStr = fraction.toString().padStart(decimals, '0').slice(0, 6).replace(/0+$/, '');
+  const displayDecimals = isStablecoin ? 2 : 6;
+  const fractionStr = fraction.toString().padStart(decimals, '0').slice(0, displayDecimals).replace(/0+$/, '');
   
   if (fractionStr) {
     return `${whole}.${fractionStr}`;
   }
+  if (isStablecoin) {
+    return `${whole}.00`;
+  }
   return whole.toString();
+}
+
+export function formatDisplayAmount(value: number, symbol: string): string {
+  const stableSymbols = ['mUSDC', 'mUSDT', 'mUSDE', 'mUSDS', 'USDC', 'USDT', 'USDE', 'USDS'];
+  const isStable = stableSymbols.some(s => symbol.toUpperCase().includes(s.replace('m', '').toUpperCase()));
+  
+  if (isStable) {
+    return value.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
+  
+  if (value < 0.01 && value > 0) {
+    return value.toFixed(6);
+  }
+  return value.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6,
+  });
 }
 
 export function parseTokenAmount(amount: string, decimals: number): bigint {

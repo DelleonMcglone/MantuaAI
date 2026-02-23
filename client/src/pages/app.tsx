@@ -98,23 +98,13 @@ const TokenIcon = ({ token, size = 32 }) => {
       'mUSDT':  'linear-gradient(135deg, #26A17B 0%, #4DB193 100%)',
       'mUSDS':  'linear-gradient(135deg, #F5AC37 0%, #FFD166 100%)',
       'mUSDE':  'linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)',
-      'mBTC':   'linear-gradient(135deg, #F7931A 0%, #FFAB4A 100%)',
-      'mWBTC':  'linear-gradient(135deg, #F7931A 0%, #FFAB4A 100%)',
-      'mWETH':  'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)',
-      'mWSOL':  'linear-gradient(135deg, #9945FF 0%, #14F195 100%)',
-      'mstETH': 'linear-gradient(135deg, #00A3FF 0%, #5AC8FA 100%)',
-      'mcbETH': 'linear-gradient(135deg, #0052FF 0%, #3B7BF7 100%)',
-      'mBUIDL': 'linear-gradient(135deg, #1F2937 0%, #374151 100%)',
-      'mUSDY':  'linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%)',
     };
     return colors[t] || colors[`m${t}`] || 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)';
   };
 
   const getTokenSymbol = (t: string) => {
-    if (t === 'ETH' || t.endsWith('ETH') || t.endsWith('stETH') || t.endsWith('cbETH')) return 'Ξ';
-    if (t.includes('USD') || t.includes('DAI')) return '$';
-    if (t.includes('BTC')) return '₿';
-    if (t.includes('SOL')) return '◎';
+    if (t === 'ETH' || t.endsWith('ETH')) return 'Ξ';
+    if (t.includes('USD')) return '$';
     return t.replace(/^m/, '').charAt(0);
   };
 
@@ -963,18 +953,12 @@ const TokenSelectModal = ({ isOpen, onClose, onSelect, theme, isDark, getTokenBa
     // Single-character fallback if logoURI fails to load
     icon: token.symbol === 'ETH' || token.symbol.includes('ETH') ? 'Ξ'
       : token.symbol.includes('USD') ? '$'
-      : token.symbol.includes('BUIDL') ? 'B'
-      : token.symbol.includes('BTC') ? '₿'
-      : token.symbol.includes('SOL') ? '◎'
       : '◆',
   }));
 
   const categories = [
     { id: 'all', label: 'All' },
     { id: 'stablecoin', label: 'Stables' },
-    { id: 'rwa', label: 'RWAs' },
-    { id: 'lst', label: 'LSTs' },
-    { id: 'wrapped', label: 'Wrapped' },
   ];
 
   // Filter tokens by category and search
@@ -997,14 +981,6 @@ const TokenSelectModal = ({ isOpen, onClose, onSelect, theme, isDark, getTokenBa
       mUSDT:  'linear-gradient(135deg, #26A17B 0%, #50C878 100%)',
       mUSDE:  'linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)',
       mUSDS:  'linear-gradient(135deg, #F59E0B 0%, #FCD34D 100%)',
-      mUSDY:  'linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%)',
-      mBUIDL: 'linear-gradient(135deg, #1F2937 0%, #374151 100%)',
-      mstETH: 'linear-gradient(135deg, #00A3FF 0%, #5AC8FA 100%)',
-      mcbETH: 'linear-gradient(135deg, #0052FF 0%, #3B7BF7 100%)',
-      mWBTC:  'linear-gradient(135deg, #F7931A 0%, #FFAB4A 100%)',
-      mWETH:  'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)',
-      mWSOL:  'linear-gradient(135deg, #9945FF 0%, #14F195 100%)',
-      mBTC:   'linear-gradient(135deg, #F7931A 0%, #FFAB4A 100%)',
     };
 
     const background = colorMap[symbol] || 'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)';
@@ -1783,7 +1759,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
   // Update toAmount when quote changes
   useEffect(() => {
     if (quote && quote.outputAmount > BigInt(0)) {
-      setToAmount(formatTokenAmount(quote.outputAmount, toTokenData.decimals));
+      setToAmount(formatTokenAmount(quote.outputAmount, toTokenData.decimals, toTokenData.category === 'stablecoin'));
     } else if (!fromAmount) {
       setToAmount('');
     }
@@ -2221,7 +2197,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '13px' }}>
                       <span style={{ color: theme.textSecondary }}>Min. Received</span>
                       <span style={{ color: theme.textPrimary }}>
-                        {quote ? `${formatTokenAmount(quote.minimumReceived, toTokenData.decimals)} ${toToken}` : '-'}
+                        {quote ? `${formatTokenAmount(quote.minimumReceived, toTokenData.decimals, toTokenData.category === 'stablecoin')} ${toToken}` : '-'}
                       </span>
                     </div>
 
@@ -2369,28 +2345,16 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
       volume: 80.55, fees: 0.40, liquidity: 971950.29, yield: '0.01'
     },
     {
-      token1: 'mUSDC', token2: 'mUSDS', type: 'Stable', hook: 'None',
-      volume: 0.00, fees: 0.00, liquidity: 4040.35, yield: '0.00'
+      token1: 'mUSDC', token2: 'mUSDE', type: 'Stable', hook: 'None',
+      volume: 125.30, fees: 0.63, liquidity: 250000.00, yield: '0.09'
     },
     {
       token1: 'ETH', token2: 'mUSDC', type: 'Standard', hook: 'None',
       volume: 59199.58, fees: 19.60, liquidity: 318789.34, yield: '2.24'
     },
     {
-      token1: 'mWBTC', token2: 'mUSDC', type: 'Standard', hook: 'None',
-      volume: 4500.00, fees: 12.50, liquidity: 368081.08, yield: '1.85'
-    },
-    {
-      token1: 'mstETH', token2: 'ETH', type: 'Standard', hook: 'None',
-      volume: 3195.71, fees: 1.20, liquidity: 1500.96, yield: '29.14'
-    },
-    {
-      token1: 'mcbETH', token2: 'ETH', type: 'Standard', hook: 'None',
-      volume: 4366.80, fees: 1.69, liquidity: 370896.77, yield: '0.17'
-    },
-    {
-      token1: 'mBUIDL', token2: 'mUSDC', type: 'Standard', hook: 'None',
-      volume: 8500.00, fees: 4.25, liquidity: 85000.00, yield: '2.15'
+      token1: 'mUSDC', token2: 'mUSDS', type: 'Stable', hook: 'None',
+      volume: 0.00, fees: 0.00, liquidity: 4040.35, yield: '0.00'
     },
   ];
 
@@ -2710,7 +2674,7 @@ const AgentTransferPanel = ({ theme, isDark }) => {
   const [txStatus, setTxStatus] = useState(null);
   const [txHash, setTxHash] = useState('');
 
-  const quickTokens = ['ETH', 'mUSDC', 'mUSDT', 'mUSDS', 'mWBTC', 'mWETH'];
+  const quickTokens = ['ETH', 'mUSDC', 'mUSDT', 'mUSDS', 'mUSDE'];
 
   const handleTransfer = async () => {
     if (!toAddress || !amount || !address) return;

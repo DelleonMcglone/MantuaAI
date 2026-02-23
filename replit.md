@@ -4,6 +4,28 @@
 
 Mantua.AI is a chat-native DeFi platform that combines natural language interactions with Uniswap v4 hooks and autonomous AI agents. Users interact with DeFi features (swaps, liquidity, vaults, portfolios) through a persistent chat interface, with modals rendered above the chatbot rather than page navigation. The platform supports both light and dark themes and targets Base Sepolia testnet for Web3 operations. Predictions feature has been removed.
 
+### Token Universe (5 tokens only)
+- **ETH** (native, 18 decimals)
+- **mUSDC** (stablecoin, 6 decimals)
+- **mUSDT** (stablecoin, 6 decimals)
+- **mUSDE** (stablecoin, 18 decimals)
+- **mUSDS** (stablecoin, 18 decimals)
+- All RWA, LST, and Wrapped token categories have been removed.
+- Stablecoin amounts display with 2 decimal places in UI.
+
+### Default Pools (4 pools)
+1. mUSDC / mUSDT (Stable)
+2. mUSDC / mUSDE (Stable)
+3. ETH / mUSDC (Standard)
+4. mUSDC / mUSDS (Stable)
+- Users can create additional pools from any pair of the 5 tokens.
+
+### Swap Safety
+- Preflight `simulateContract` is called before every swap to catch reverts early.
+- Gas estimation with 20% buffer and 15M gas cap guardrail.
+- No hardcoded gas limits — uses wallet defaults with simulation result.
+- Clear error messages for simulation failures, gas cap exceedance, and on-chain reverts.
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

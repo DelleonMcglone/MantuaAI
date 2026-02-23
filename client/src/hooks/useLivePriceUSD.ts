@@ -29,7 +29,6 @@ export const priceCache = new Map<string, CacheEntry>();
 const STABLECOINS = new Set([
   'USDC', 'USDT', 'USDS', 'USDeC',
   'mUSDC', 'mUSDT', 'mUSDE', 'mUSDS',
-  'mBUIDL', 'mUSDY', // ~$1 RWA tokens
 ]);
 
 // ── Fetch helper ──────────────────────────────────────────────────────────

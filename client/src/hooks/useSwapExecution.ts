@@ -1,16 +1,5 @@
-/**
- * Swap Execution Hook
- * 
- * Handles swap execution through PoolSwapTest contract with transaction tracking.
- * - Executes swap through Wagmi useWriteContract hook
- * - Tracks transaction states: idle, pending, confirming, confirmed, failed
- * - Shows transaction hash with block explorer link
- * - Handles user rejection gracefully
- * - Implements retry mechanism for failed transactions
- */
-
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt, useChainId } from 'wagmi';
+import { useAccount, useWriteContract, useWaitForTransactionReceipt, useChainId, usePublicClient } from 'wagmi';
 import { toast } from 'sonner';
 import type { Address } from 'viem';
 import { trackEvent } from '../lib/trackEvent';
@@ -26,7 +15,7 @@ import {
   type SwapParams,
 } from '../lib/swap-utils';
 
-export type SwapStatus = 'idle' | 'pending' | 'confirming' | 'confirmed' | 'failed';
+export type SwapStatus = 'idle' | 'pending' | 'simulating' | 'confirming' | 'confirmed' | 'failed';
 
 export interface SwapExecutionParams {
   tokenIn: Address;
@@ -48,18 +37,43 @@ export interface UseSwapExecutionReturn {
 }
 
 const EXPLORERS: Record<number, string> = {
-  84532: 'https://sepolia.basescan.org',  // Base Sepolia
-  1301: 'https://sepolia.uniscan.xyz',    // Unichain Sepolia
+  84532: 'https://sepolia.basescan.org',
+  1301: 'https://sepolia.uniscan.xyz',
 };
+
+const MAX_GAS_LIMIT = BigInt(15_000_000);
+const GAS_BUFFER_PERCENT = 20;
 
 export function getExplorerLink(txHash: string, chainId: number): string {
   const explorer = EXPLORERS[chainId] || EXPLORERS[84532];
   return `${explorer}/tx/${txHash}`;
 }
 
+function extractRevertReason(error: unknown): string {
+  const msg = error instanceof Error ? error.message : String(error);
+
+  if (msg.includes('User rejected') || msg.includes('user rejected')) {
+    return 'Transaction cancelled by user';
+  }
+
+  const revertMatch = msg.match(/reverted with reason string '([^']+)'/);
+  if (revertMatch) return revertMatch[1];
+
+  const customErrorMatch = msg.match(/reverted with custom error '([^']+)'/);
+  if (customErrorMatch) return `Contract error: ${customErrorMatch[1]}`;
+
+  if (msg.includes('insufficient funds')) return 'Insufficient balance for this swap';
+  if (msg.includes('exceeds max transaction gas')) return 'Transaction too expensive — pool may be uninitialized or have no liquidity';
+  if (msg.includes('execution reverted')) return 'Swap reverted — pool may not exist or have insufficient liquidity';
+
+  if (msg.length > 150) return msg.slice(0, 150) + '...';
+  return msg;
+}
+
 export function useSwapExecution(): UseSwapExecutionReturn {
   const { address: userAddress } = useAccount();
   const chainId = useChainId();
+  const publicClient = usePublicClient();
   const [status, setStatus] = useState<SwapStatus>('idle');
   const [error, setError] = useState<Error | null>(null);
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
@@ -74,7 +88,7 @@ export function useSwapExecution(): UseSwapExecutionReturn {
   });
 
   useEffect(() => {
-    if (isConfirming && status === 'pending') {
+    if (isConfirming && (status === 'pending' || status === 'simulating')) {
       setStatus('confirming');
     }
   }, [isConfirming, status]);
@@ -83,7 +97,6 @@ export function useSwapExecution(): UseSwapExecutionReturn {
     if (isConfirmed && status === 'confirming' && !hasShownConfirmToast.current) {
       hasShownConfirmToast.current = true;
       setStatus('confirmed');
-      // Track swap analytics — hookId is stored in lastParams
       if (lastParams) {
         const hasHook = !!lastParams.hookId && lastParams.hookId !== 'none';
         trackEvent(
@@ -127,12 +140,11 @@ export function useSwapExecution(): UseSwapExecutionReturn {
 
     setLastParams(params);
     setError(null);
-    setStatus('pending');
+    setStatus('simulating');
 
     try {
       const { tokenIn, tokenOut, amountIn, hookAddress, hookId, feeTier = 3000 } = params;
 
-      // Get chain-specific contract address with validation
       let contractAddress: Address;
       try {
         contractAddress = getPoolSwapTestAddress(chainId);
@@ -160,11 +172,77 @@ export function useSwapExecution(): UseSwapExecutionReturn {
       const isNativeIn = isNativeEth(tokenIn);
       const value = isNativeIn ? amountIn : BigInt(0);
 
-      toast.loading('Submitting swap...', {
-        id: 'swap-pending',
+      const contractCallArgs = {
+        address: contractAddress,
+        abi: POOL_SWAP_TEST_ABI,
+        functionName: 'swap' as const,
+        args: [
+          poolKey,
+          swapParams,
+          { takeClaims: false, settleUsingBurn: false },
+          hookData,
+        ] as const,
+        value,
+        account: userAddress,
+      };
+
+      console.log('[SwapExecution] Preflight simulation starting...', {
+        chain: chainId,
+        poolKey,
+        swapParams: {
+          zeroForOne: swapParams.zeroForOne,
+          amountSpecified: swapParams.amountSpecified.toString(),
+          sqrtPriceLimitX96: swapParams.sqrtPriceLimitX96.toString(),
+        },
+        value: value.toString(),
       });
 
-      const hash = await writeContractAsync({
+      toast.loading('Simulating swap...', { id: 'swap-simulate' });
+
+      let estimatedGas: bigint | undefined;
+
+      if (publicClient) {
+        try {
+          const simResult = await publicClient.simulateContract(contractCallArgs);
+          console.log('[SwapExecution] Simulation succeeded:', simResult.result?.toString());
+        } catch (simErr) {
+          toast.dismiss('swap-simulate');
+          const reason = extractRevertReason(simErr);
+          console.error('[SwapExecution] Simulation failed:', reason, simErr);
+          setError(new Error(reason));
+          setStatus('failed');
+          toast.error('Swap Simulation Failed', {
+            description: reason,
+            duration: 0,
+          });
+          return;
+        }
+
+        try {
+          estimatedGas = await publicClient.estimateContractGas(contractCallArgs);
+          console.log('[SwapExecution] Estimated gas:', estimatedGas.toString());
+
+          if (estimatedGas > MAX_GAS_LIMIT) {
+            toast.dismiss('swap-simulate');
+            const reason = `Gas estimate (${estimatedGas.toString()}) exceeds safety limit. The pool may be misconfigured.`;
+            setError(new Error(reason));
+            setStatus('failed');
+            toast.error('Swap Blocked', {
+              description: reason,
+              duration: 0,
+            });
+            return;
+          }
+        } catch (gasErr) {
+          console.warn('[SwapExecution] Gas estimation failed, proceeding with wallet default:', gasErr);
+        }
+      }
+
+      toast.dismiss('swap-simulate');
+      toast.loading('Submitting swap...', { id: 'swap-pending' });
+      setStatus('pending');
+
+      const writeArgs: any = {
         address: contractAddress,
         abi: POOL_SWAP_TEST_ABI,
         functionName: 'swap',
@@ -175,7 +253,13 @@ export function useSwapExecution(): UseSwapExecutionReturn {
           hookData,
         ],
         value,
-      });
+      };
+
+      if (estimatedGas) {
+        writeArgs.gas = estimatedGas + (estimatedGas * BigInt(GAS_BUFFER_PERCENT)) / BigInt(100);
+      }
+
+      const hash = await writeContractAsync(writeArgs);
 
       setTxHash(hash);
       setStatus('confirming');
@@ -190,29 +274,32 @@ export function useSwapExecution(): UseSwapExecutionReturn {
         duration: 10000,
       });
 
+      console.log('[SwapExecution] Tx submitted:', hash);
+
     } catch (err) {
+      toast.dismiss('swap-simulate');
       toast.dismiss('swap-pending');
 
-      const errorMessage = err instanceof Error ? err.message : 'Swap failed';
-      console.error('[SwapExecution] Swap failed:', err);
+      const reason = extractRevertReason(err);
+      console.error('[SwapExecution] Swap failed:', reason, err);
 
-      if (errorMessage.includes('User rejected') || errorMessage.includes('user rejected')) {
-        setError(new Error('Transaction cancelled by user'));
+      if (reason === 'Transaction cancelled by user') {
+        setError(new Error(reason));
         toast.warning('Transaction Cancelled', {
           description: 'You cancelled the transaction.',
           duration: 3000,
         });
       } else {
-        setError(new Error(errorMessage));
+        setError(new Error(reason));
         toast.error('Swap Failed', {
-          description: errorMessage.slice(0, 100),
+          description: reason,
           duration: 0,
         });
       }
 
       setStatus('failed');
     }
-  }, [userAddress, writeContractAsync]);
+  }, [userAddress, writeContractAsync, publicClient, chainId]);
 
   const retry = useCallback(async () => {
     if (lastParams) {
@@ -226,13 +313,14 @@ export function useSwapExecution(): UseSwapExecutionReturn {
     setTxHash(undefined);
     setLastParams(null);
     toast.dismiss('swap-pending');
+    toast.dismiss('swap-simulate');
   }, []);
 
   return {
     status,
     txHash,
     error,
-    isExecuting: status === 'pending' || status === 'confirming',
+    isExecuting: status === 'pending' || status === 'confirming' || status === 'simulating',
     execute,
     retry,
     reset,
