@@ -1,0 +1,291 @@
+Good. These screenshots are extremely useful.
+
+You’re not dealing with one bug — you’re dealing with **three separate classes of failure**.
+
+I’m going to break them down clearly so you understand exactly what’s happening under the hood.
+
+---
+
+# 1️⃣ “Pool may not be initialized or parameters are invalid”
+
+This is from **Add Liquidity**.
+
+### What this means technically
+
+In Uniswap v4, a pool must:
+
+1. Be created (via PoolManager)
+2. Be initialized with a starting price
+3. Have correct pool key parameters:
+
+   * currency0
+   * currency1
+   * fee
+   * tickSpacing
+   * hooks address
+
+If any of those are wrong OR the pool was never initialized with `initialize()`, liquidity mint will revert.
+
+### Most likely causes in your case
+
+* Pool exists in UI but not actually created onchain.
+* Token ordering mismatch (currency0/currency1 reversed from what PoolManager expects).
+* Wrong tickSpacing for that fee tier.
+* Using a fee tier that does not match the pool you think exists.
+* Trying to add liquidity before initialize() was ever called.
+
+This is not a UI bug — it’s a **pool lifecycle issue**.
+
+---
+
+# 2️⃣ WalletConnect HTTP RPC failure
+
+> HTTP request failed… rpc.walletconnect.org…
+
+This is not a contract error.
+
+This is:
+
+* WalletConnect RPC relay hiccup
+* Wrong chainId passed to wallet
+* Wrong RPC URL for that chain
+* Or chain not supported in current wallet session
+
+This is infra-level.
+
+---
+
+# 3️⃣ Swap Simulation Failed
+
+> Unable to decode signature 0x486aa307
+
+This is the big one.
+
+This means:
+
+You are calling a function that does NOT match the ABI of the contract you think you’re calling.
+
+That 4-byte signature:
+
+```
+0x486aa307
+```
+
+does not exist in the ABI you provided to viem.
+
+That happens when:
+
+* You are calling PoolManager.swap with wrong ABI
+* You are using Router ABI against PoolManager address
+* You are encoding swap params incorrectly
+* The contract at that address is not the contract you think it is
+
+This is a **wrong contract interface or wrong address issue.**
+
+Not gas.
+Not slippage.
+Not liquidity.
+
+ABI mismatch.
+
+---
+
+# Why This Is Happening
+
+Right now your system likely has:
+
+* Mock pools in UI
+* Incorrect pool keys
+* No guaranteed initialize step
+* Possibly inconsistent addresses across Base + Unichain
+* Swap using raw PoolManager.swap instead of correct routing path
+* Gas estimation disabled or overridden
+* No preflight simulation guardrail
+
+So when you try to:
+
+* Add liquidity → pool not initialized
+* Swap → ABI mismatch
+* Send tx → gas estimation explodes
+
+It’s expected behavior given the current state.
+
+---
+
+# The Real Fix (Strategic)
+
+Before you seed pools…
+Before you fix tokens…
+Before you add guardrails…
+
+You must fix architecture.
+
+You need:
+
+1️⃣ A canonical Pool Key builder
+2️⃣ A deterministic create → initialize → add liquidity sequence
+3️⃣ Swap simulation before write
+4️⃣ ABI + address verification
+5️⃣ Per-chain config separation (Base vs Unichain)
+
+---
+
+# Updated Replit Prompt (Focused on Root Causes)
+
+Use this version instead of the previous one.
+
+---
+
+## Replit Prompt: Fix Pool Lifecycle + ABI Mismatch + Swap Simulation + Seed 4 Default Pools
+
+### Critical: Fix Before Seeding
+
+We are experiencing:
+
+* Add Liquidity revert (“pool not initialized”)
+* Swap simulation failure (unknown function signature)
+* Gas limit overflow
+* WalletConnect RPC errors
+
+These must be resolved structurally.
+
+---
+
+## 1) Contract + ABI Sanity
+
+Verify:
+
+* The address used for swap is the correct contract for the ABI provided.
+* If calling PoolManager, ABI must include exact swap signature.
+* If using a Router, use Router ABI.
+* Confirm chain-specific addresses:
+
+  * Base Sepolia config
+  * Unichain Sepolia config
+
+Add a startup assertion:
+
+If contract bytecode at address does not match expected interface → throw clear dev error.
+
+---
+
+## 2) Pool Lifecycle Enforcement
+
+For every pool (default or user-created):
+
+Before allowing Add Liquidity or Swap:
+
+* Check if pool exists
+* If not → create pool
+* After create → call initialize() with correct sqrtPrice
+* Confirm pool state
+* Only then allow liquidity mint or swap
+
+Block UI interaction if:
+
+* Pool not initialized
+* Liquidity = 0 (for swap)
+
+---
+
+## 3) Canonical Pool Key Builder
+
+Create one shared utility:
+
+buildPoolKey(tokenA, tokenB, fee, tickSpacing, hook)
+
+Responsibilities:
+
+* Deterministic currency0 / currency1 ordering
+* Correct tickSpacing for fee
+* Proper hook address
+* HookData default to 0x
+
+All swap + liquidity must use this builder.
+
+No manual param construction anywhere else.
+
+---
+
+## 4) Swap Simulation Enforcement
+
+Before writeContract:
+
+* simulateContract
+* estimateContractGas
+* if simulation fails → show readable revert reason
+* do NOT send tx
+
+Remove any hardcoded gasLimit.
+Remove any gas multiplier > 20%.
+
+---
+
+## 5) Seed Default 4 Pools (After Fix)
+
+Once lifecycle + ABI issues are solved:
+
+Seed on both chains:
+
+* mUSDC/mUSDT
+* mUSDC/mUSDE
+* ETH/mUSDC
+* mUSDC/mUSDS
+
+Ensure:
+
+* create → initialize → add liquidity
+* Confirm via explorer links
+
+---
+
+## 6) Swap Verification
+
+On Base Sepolia and Unichain Sepolia:
+
+* Execute swap in each of 4 pools
+* Confirm tx hash
+* Confirm explorer link
+
+No simulation failure.
+No ABI decode errors.
+No gas overflow.
+
+---
+
+# Important
+
+Do not attempt to patch around errors.
+
+Fix:
+
+* ABI mismatch
+* Pool initialization flow
+* Simulation discipline
+
+---
+
+# What This Means For You
+
+Right now, the issue is not “swap logic.”
+
+It’s that your contract interactions are not structurally consistent.
+
+Once you lock:
+
+* correct addresses
+* correct ABI
+* deterministic pool creation
+* mandatory simulation
+
+Your entire system stabilizes.
+
+---
+
+If you want, next I can:
+
+* Diagnose whether you're incorrectly calling PoolManager directly
+* Or whether you should be using a swap router pattern instead
+* Or walk through exactly what the 0x486aa307 signature corresponds to
+
+Tell me which direction you want to go.

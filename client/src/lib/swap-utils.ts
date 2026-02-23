@@ -7,79 +7,23 @@
 
 import { encodePacked, keccak256, type Address } from 'viem';
 import { NATIVE_ETH } from '../config/tokens';
+import { getV4Address } from '../config/contracts';
 
-/**
- * PoolSwapTest contract addresses by chain
- *
- * Official Uniswap v4 deployments on supported testnets.
- * Source: https://docs.uniswap.org/contracts/v4/deployments
- */
-export const POOL_SWAP_TEST_ADDRESSES: Record<number, Address> = {
-  84532: '0x8b5bcc363dde2614281ad875bad385e0a785d3b9' as Address,  // Base Sepolia
-  1301: '0x9140a78c1a137c7ff1c151ec8231272af78a99a4' as Address,   // Unichain Sepolia
-};
-
-/**
- * Get PoolSwapTest address for current chain
- * Throws error if chain not supported or address is undefined
- */
 export function getPoolSwapTestAddress(chainId: number): Address {
-  const address = POOL_SWAP_TEST_ADDRESSES[chainId];
-
-  if (!address) {
-    throw new Error(
-      `PoolSwapTest contract not deployed on chain ${chainId}. Supported chains: ${Object.keys(POOL_SWAP_TEST_ADDRESSES).join(', ')}`
-    );
-  }
-
-  if (address === '0x0000000000000000000000000000000000000000') {
-    throw new Error(
-      `Invalid contract address (0x0) for chain ${chainId}. This would burn your tokens!`
-    );
-  }
-
-  return address;
+  return getV4Address(chainId, 'poolSwapTest');
 }
 
-/**
- * @deprecated Use getPoolSwapTestAddress(chainId) instead
- * Legacy constant for backward compatibility - defaults to Base Sepolia
- */
-export const POOL_SWAP_TEST_ADDRESS = POOL_SWAP_TEST_ADDRESSES[84532];
-
-/**
- * PoolModifyLiquidityTest contract addresses by chain
- *
- * Official Uniswap v4 deployments on supported testnets.
- * Source: https://docs.uniswap.org/contracts/v4/deployments
- * TODO: Replace placeholder addresses with actual deployed addresses.
- */
-export const POOL_MODIFY_LIQUIDITY_TEST_ADDRESSES: Record<number, Address> = {
-  84532: '0x4b69e8d500d7c48285c8b4abbe41dfa5303a8982' as Address,  // Base Sepolia — MinimalLiquidityHelper
-  1301: '0x5fa728c0a5cfd51bee4b060773f50554c0c8a7ab' as Address,   // Unichain Sepolia — PoolModifyLiquidityTest
-};
-
-/**
- * Get PoolModifyLiquidityTest address for current chain
- * Throws error if chain not supported or address is zero (placeholder)
- */
 export function getPoolModifyLiquidityTestAddress(chainId: number): Address {
-  const address = POOL_MODIFY_LIQUIDITY_TEST_ADDRESSES[chainId];
-  if (!address) {
-    throw new Error(
-      `PoolModifyLiquidityTest not deployed on chain ${chainId}. Supported: ${Object.keys(POOL_MODIFY_LIQUIDITY_TEST_ADDRESSES).join(', ')}`
-    );
-  }
-  if (address === '0x0000000000000000000000000000000000000000') {
-    throw new Error(
-      `PoolModifyLiquidityTest address not configured for chain ${chainId}. Update POOL_MODIFY_LIQUIDITY_TEST_ADDRESSES in swap-utils.ts.`
-    );
-  }
-  return address;
+  return getV4Address(chainId, 'poolModifyLiquidityTest');
 }
 
-/** Development mode indicator - true when using placeholder addresses */
-export const IS_DEV_MODE = false;
+export function getPoolManagerAddress(chainId: number): Address {
+  return getV4Address(chainId, 'poolManager');
+}
+
+export function getStateViewAddress(chainId: number): Address {
+  return getV4Address(chainId, 'stateView');
+}
 
 /**
  * Hook contract addresses by hook type

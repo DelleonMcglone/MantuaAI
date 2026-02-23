@@ -3,17 +3,22 @@ import { useAccount, useWriteContract, useWaitForTransactionReceipt, useChainId,
 import { toast } from 'sonner';
 import type { Address } from 'viem';
 import { trackEvent } from '../lib/trackEvent';
+import { decodeV4Error, isPoolNotInitializedError } from '../lib/v4Errors';
+import { getExplorerTxUrl } from '../config/contracts';
 import {
   POOL_SWAP_TEST_ABI,
   getPoolSwapTestAddress,
+  getStateViewAddress,
   createPoolKey,
   createSwapParams,
   encodeHookData,
+  getPoolId,
   isNativeEth,
   getZeroAddress,
   type PoolKey,
   type SwapParams,
 } from '../lib/swap-utils';
+import StateViewABI from '../abis/StateView.json';
 
 export type SwapStatus = 'idle' | 'pending' | 'simulating' | 'confirming' | 'confirmed' | 'failed';
 
@@ -36,18 +41,8 @@ export interface UseSwapExecutionReturn {
   reset: () => void;
 }
 
-const EXPLORERS: Record<number, string> = {
-  84532: 'https://sepolia.basescan.org',
-  1301: 'https://sepolia.uniscan.xyz',
-};
-
 const MAX_GAS_LIMIT = BigInt(15_000_000);
 const GAS_BUFFER_PERCENT = 20;
-
-export function getExplorerLink(txHash: string, chainId: number): string {
-  const explorer = EXPLORERS[chainId] || EXPLORERS[84532];
-  return `${explorer}/tx/${txHash}`;
-}
 
 function extractRevertReason(error: unknown): string {
   const msg = error instanceof Error ? error.message : String(error);
@@ -55,6 +50,9 @@ function extractRevertReason(error: unknown): string {
   if (msg.includes('User rejected') || msg.includes('user rejected')) {
     return 'Transaction cancelled by user';
   }
+
+  const v4Decoded = decodeV4Error(msg);
+  if (v4Decoded) return v4Decoded;
 
   const revertMatch = msg.match(/reverted with reason string '([^']+)'/);
   if (revertMatch) return revertMatch[1];
@@ -109,7 +107,7 @@ export function useSwapExecution(): UseSwapExecutionReturn {
         description: 'Your swap has been executed successfully.',
         action: txHash ? {
           label: 'View',
-          onClick: () => window.open(getExplorerLink(txHash, chainId), '_blank'),
+          onClick: () => window.open(getExplorerTxUrl(txHash, chainId), '_blank'),
         } : undefined,
         duration: 5000,
       });
@@ -166,6 +164,57 @@ export function useSwapExecution(): UseSwapExecutionReturn {
         hookAddress || getZeroAddress()
       );
 
+      const poolId = getPoolId(poolKey);
+
+      if (publicClient) {
+        try {
+          const stateViewAddress = getStateViewAddress(chainId);
+          const slot0 = await publicClient.readContract({
+            address: stateViewAddress,
+            abi: StateViewABI,
+            functionName: 'getSlot0',
+            args: [poolId],
+          }) as [bigint, number, number, number];
+
+          const sqrtPriceX96 = slot0[0];
+          if (sqrtPriceX96 === BigInt(0)) {
+            const reason = 'This pool has not been initialized yet. It needs to be created before you can swap.';
+            setError(new Error(reason));
+            setStatus('failed');
+            toast.error('Pool Not Initialized', {
+              description: reason,
+              duration: 0,
+            });
+            return;
+          }
+
+          const liquidity = await publicClient.readContract({
+            address: stateViewAddress,
+            abi: StateViewABI,
+            functionName: 'getLiquidity',
+            args: [poolId],
+          }) as bigint;
+
+          if (liquidity === BigInt(0)) {
+            const reason = 'This pool has no liquidity. Add liquidity before swapping.';
+            setError(new Error(reason));
+            setStatus('failed');
+            toast.error('No Liquidity', {
+              description: reason,
+              duration: 0,
+            });
+            return;
+          }
+
+          console.log('[SwapExecution] Pool state verified:', {
+            sqrtPriceX96: sqrtPriceX96.toString(),
+            liquidity: liquidity.toString(),
+          });
+        } catch (stateErr) {
+          console.warn('[SwapExecution] Pool state check failed, proceeding with simulation:', stateErr);
+        }
+      }
+
       const swapParams = createSwapParams(tokenIn, tokenOut, amountIn, true);
       const hookData = encodeHookData(hookId || 'none');
 
@@ -189,6 +238,7 @@ export function useSwapExecution(): UseSwapExecutionReturn {
       console.log('[SwapExecution] Preflight simulation starting...', {
         chain: chainId,
         poolKey,
+        poolId,
         swapParams: {
           zeroForOne: swapParams.zeroForOne,
           amountSpecified: swapParams.amountSpecified.toString(),
@@ -211,10 +261,19 @@ export function useSwapExecution(): UseSwapExecutionReturn {
           console.error('[SwapExecution] Simulation failed:', reason, simErr);
           setError(new Error(reason));
           setStatus('failed');
-          toast.error('Swap Simulation Failed', {
-            description: reason,
-            duration: 0,
-          });
+
+          const simErrMsg = simErr instanceof Error ? simErr.message : String(simErr);
+          if (isPoolNotInitializedError(simErrMsg)) {
+            toast.error('Pool Not Initialized', {
+              description: 'This pool needs to be initialized before you can swap. Try adding liquidity first.',
+              duration: 0,
+            });
+          } else {
+            toast.error('Swap Simulation Failed', {
+              description: reason,
+              duration: 0,
+            });
+          }
           return;
         }
 
@@ -269,7 +328,7 @@ export function useSwapExecution(): UseSwapExecutionReturn {
         description: 'Waiting for confirmation...',
         action: {
           label: 'View',
-          onClick: () => window.open(getExplorerLink(hash, chainId), '_blank'),
+          onClick: () => window.open(getExplorerTxUrl(hash, chainId), '_blank'),
         },
         duration: 10000,
       });
@@ -326,3 +385,5 @@ export function useSwapExecution(): UseSwapExecutionReturn {
     reset,
   };
 }
+
+export { getExplorerTxUrl as getExplorerLink };

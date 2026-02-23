@@ -20,8 +20,17 @@ Mantua.AI is a chat-native DeFi platform that combines natural language interact
 4. mUSDC / mUSDS (Stable)
 - Users can create additional pools from any pair of the 5 tokens.
 
+### Pool Lifecycle Management
+- **Pool State Hook** (`usePoolState.ts`): Reads `StateView.getSlot0` and `getLiquidity` to check if a pool is initialized and has liquidity before any operation.
+- **Auto-Initialize**: `useAddLiquidity` auto-initializes pools via `PoolManager.initialize()` when adding liquidity to an uninitialized pool. Uses `getSqrtPriceForPair` to compute correct initial sqrtPriceX96 based on token decimal differences.
+- **Swap Pre-checks**: `useSwapExecution` checks pool initialization and liquidity via StateView before running simulation, blocking swaps on uninitialized/empty pools with clear error messages.
+- **V4 Error Decoder** (`v4Errors.ts`): Maps Uniswap v4 custom error selectors (e.g., 0x486aa307 = PoolNotInitialized) to human-readable messages.
+- **Contract Registry** (`config/contracts.ts`): Centralized per-chain addresses for PoolManager, StateView, PoolSwapTest, PoolModifyLiquidityTest, and Quoter.
+- **UI Status**: AddLiquidityForm shows pool initialization status (not initialized, initialized but empty, ready) with contextual messaging.
+
 ### Swap Safety
 - Preflight `simulateContract` is called before every swap to catch reverts early.
+- Pool state pre-check via StateView before simulation to catch uninitialized pools early.
 - Gas estimation with 20% buffer and 15M gas cap guardrail.
 - No hardcoded gas limits — uses wallet defaults with simulation result.
 - Clear error messages for simulation failures, gas cap exceedance, and on-chain reverts.

@@ -1,8 +1,4 @@
-/**
- * errorMessages.ts
- * Maps technical errors to user-readable messages.
- * Import and use parseError() before showing any error to the user.
- */
+import { decodeV4Error } from './v4Errors';
 
 export function parseError(err: unknown): string {
   if (!err) return 'An unknown error occurred.';
@@ -16,6 +12,9 @@ export function parseError(err: unknown): string {
 
   if (msg.includes('User rejected') || msg.includes('user rejected'))
     return 'Transaction cancelled.';
+
+  const v4Decoded = decodeV4Error(msg);
+  if (v4Decoded) return v4Decoded;
 
   if (msg.includes('insufficient funds') || msg.includes('exceeds balance'))
     return 'Insufficient funds for this transaction.';
@@ -47,7 +46,6 @@ export function parseError(err: unknown): string {
   if (msg.includes('subgraph') || msg.includes('graphql') || msg.includes('GraphQL'))
     return 'Data fetch failed. The subgraph may be indexing.';
 
-  // Short messages that are likely already readable
   if (msg.length < 80 && !msg.includes('0x') && !msg.includes('TypeError'))
     return msg;
 

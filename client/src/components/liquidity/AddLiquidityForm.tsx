@@ -7,6 +7,7 @@ import { ArrowLeftRightIcon } from '../icons';
 import { parseError } from '../../lib/errorMessages';
 import { useAddLiquidity } from '../../hooks/useAddLiquidity';
 import { useTokenApproval } from '../../hooks/useTokenApproval';
+import { usePoolState } from '../../hooks/usePoolState';
 import { createPoolKey, getHookAddress, getPoolModifyLiquidityTestAddress } from '../../lib/swap-utils';
 import { LiquidityTokenInput } from './LiquidityTokenInput';
 
@@ -59,7 +60,9 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
   const [approvalStep, setApprovalStep] = useState<'idle' | 'approving0' | 'approving1' | 'ready'>('idle');
   const { isConnected } = useAccount();
   const chainId = useChainId();
-  const { addLiquidity, isPending, isConfirming, isSuccess, error, hash } = useAddLiquidity();
+  const { addLiquidity, isPending, isConfirming, isInitializing, isSuccess, error, hash } = useAddLiquidity();
+  const hookAddr = getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none');
+  const poolState = usePoolState(tokenA?.address, tokenB?.address, 3000, hookAddr);
 
   const priceA = tokenA ? getPriceBySymbol(tokenA.symbol) : 0;
   const priceB = tokenB ? getPriceBySymbol(tokenB.symbol) : 0;
@@ -136,7 +139,10 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
     const { tickLower, tickUpper } = RANGE_TICKS[range];
     const poolKey = createPoolKey(tokenA.address, tokenB.address, 3000, getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none'));
     const liqDelta = computeLiquidityDelta(parsedAmount0, tokenA.decimals);
-    addLiquidity({ poolKey, tickLower, tickUpper, liquidityDelta: liqDelta, hookData: '0x' });
+    const isCurrency0A = poolKey.currency0.toLowerCase() === tokenA.address.toLowerCase();
+    const c0Dec = isCurrency0A ? tokenA.decimals : tokenB.decimals;
+    const c1Dec = isCurrency0A ? tokenB.decimals : tokenA.decimals;
+    addLiquidity({ poolKey, tickLower, tickUpper, liquidityDelta: liqDelta, hookData: '0x' }, true, c0Dec, c1Dec);
   };
 
   const handleSubmitOnly = () => {
@@ -144,15 +150,20 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
     const { tickLower, tickUpper } = RANGE_TICKS[range];
     const poolKey = createPoolKey(tokenA.address, tokenB.address, 3000, getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none'));
     const liqDelta = computeLiquidityDelta(parsedAmount0, tokenA.decimals);
-    addLiquidity({ poolKey, tickLower, tickUpper, liquidityDelta: liqDelta, hookData: '0x' });
+    const isCurrency0A = poolKey.currency0.toLowerCase() === tokenA.address.toLowerCase();
+    const c0Dec = isCurrency0A ? tokenA.decimals : tokenB.decimals;
+    const c1Dec = isCurrency0A ? tokenB.decimals : tokenA.decimals;
+    addLiquidity({ poolKey, tickLower, tickUpper, liquidityDelta: liqDelta, hookData: '0x' }, true, c0Dec, c1Dec);
   };
 
   const getButtonText = () => {
     if (!isConnected) return 'Connect Wallet';
     if (approvalStep === 'approving0') return `Approving ${tokenA?.symbol}…`;
     if (approvalStep === 'approving1') return `Approving ${tokenB?.symbol}…`;
+    if (isInitializing) return 'Initializing pool…';
     if (isPending) return 'Confirm in wallet…';
     if (isConfirming) return 'Adding Liquidity…';
+    if (!poolState.isInitialized && !poolState.isLoading && tokenA && tokenB) return 'Initialize Pool & Add Liquidity';
     if (!bothApproved && canSubmit) return `Approve & Add Liquidity`;
     return `Add Liquidity with ${hookObj.name}`;
   };
@@ -211,6 +222,18 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
           </div>
         </div>
       </div>
+
+      {tokenA && tokenB && !poolState.isLoading && !poolState.isInitialized && (
+        <div style={{ marginBottom: '12px', padding: '10px 12px', borderRadius: '10px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.15)', fontSize: '12px', color: '#f59e0b' }}>
+          This pool hasn't been created on-chain yet. It will be automatically initialized when you add liquidity.
+        </div>
+      )}
+
+      {tokenA && tokenB && poolState.isInitialized && !poolState.hasLiquidity && (
+        <div style={{ marginBottom: '12px', padding: '10px 12px', borderRadius: '10px', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)', fontSize: '12px', color: '#3b82f6' }}>
+          Pool is initialized but has no liquidity yet. Be the first to provide!
+        </div>
+      )}
 
       {canSubmit && !bothApproved && (
         <div style={{ marginBottom: '12px', padding: '10px 12px', borderRadius: '10px', background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.15)', fontSize: '12px', color: theme.textSecondary }}>
