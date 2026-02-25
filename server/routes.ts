@@ -20,6 +20,7 @@ import authRouter          from "./routes/auth";
 import analyticsRouter     from "./routes/analytics";
 import analyticsQueryRouter from "./routes/analyticsQuery";
 import poolsRouter         from "./routes/pools";
+import portfolioRouter     from "./routes/portfolio";
 
 // ============ VOICE TRANSCRIPTION SETUP ============
 
@@ -84,6 +85,7 @@ export async function registerRoutes(
   app.use('/api/analytics', analyticsRouter);
   app.use('/api/analytics', analyticsQueryRouter);
   app.use('/api/pools',     poolsRouter);
+  app.use('/api/portfolio', portfolioRouter);
 
   // Register new userId-based chat routes first (they fall through for legacy requests)
   registerChatRoutes(app);

@@ -61,7 +61,8 @@
       "Bash(sort:*)",
       "Bash(xargs:*)",
       "Bash(/home/runner/workspace/client/src/utils/queryClassifier.ts:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(/home/runner/workspace/server/db/migrations/003_pools_portfolio.sql:*)"
     ]
   }
 }

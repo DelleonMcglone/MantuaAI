@@ -1,116 +1,85 @@
+/**
+ * Supported tokens on Base Sepolia — ETH, USDC, cbBTC only.
+ */
 export interface Token {
   address: `0x${string}`;
   symbol: string;
   name: string;
   decimals: number;
   logoURI: string;
-  category: 'native' | 'stablecoin';
-  isMock?: boolean;
-  faucetAmount?: string;
+  coingeckoId: string;
+  isNative: boolean;
+  chainId: 84532;
 }
 
-export const MOCK_TOKEN_ADDRESSES = {
-  mUSDC:  "0x3365571b822a54c01816bC75b586317F4c1B3E47" as `0x${string}`,
-  mUSDT:  "0xB85e6FDaB14EAf2fEB9c59BceB97830b98572a2e" as `0x${string}`,
-  mUSDS:  "0x5aDd6F9167E90A5d211C03Ee8f224108e3b8DC73" as `0x${string}`,
-  mUSDE:  "0x36048415ecb7Ce82F5523adDCe0e56a37FE963b4" as `0x${string}`,
-};
-
-export const MOCK_TOKEN_FACTORY = "0xaa0D98c815C3003d35E571fD51C65d7F92391883" as `0x${string}`;
-
-export const NATIVE_ETH: Token = {
-  address: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
-  symbol: "ETH",
-  name: "Ethereum",
-  decimals: 18,
-  logoURI: "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
-  category: 'native',
-  isMock: false,
-};
-
-export const STABLECOINS: Token[] = [
+export const SUPPORTED_TOKENS = [
   {
-    address: MOCK_TOKEN_ADDRESSES.mUSDC,
-    symbol: "mUSDC",
-    name: "Mantua USDC",
-    decimals: 6,
-    logoURI: "https://assets.coingecko.com/coins/images/6319/small/usdc.png",
-    category: 'stablecoin',
-    isMock: true,
-    faucetAmount: "1,000",
-  },
-  {
-    address: MOCK_TOKEN_ADDRESSES.mUSDT,
-    symbol: "mUSDT",
-    name: "Mantua USDT",
-    decimals: 6,
-    logoURI: "https://assets.coingecko.com/coins/images/325/small/Tether.png",
-    category: 'stablecoin',
-    isMock: true,
-    faucetAmount: "1,000",
-  },
-  {
-    address: MOCK_TOKEN_ADDRESSES.mUSDE,
-    symbol: "mUSDE",
-    name: "Mantua USDe",
+    symbol: 'ETH',
+    name: 'Ethereum',
+    address: '0x0000000000000000000000000000000000000000' as `0x${string}`,
     decimals: 18,
-    logoURI: "https://assets.coingecko.com/coins/images/33613/small/usde.png",
-    category: 'stablecoin',
-    isMock: true,
-    faucetAmount: "1,000",
+    chainId: 84532 as const,
+    logoURI: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png',
+    coingeckoId: 'ethereum',
+    isNative: true,
   },
   {
-    address: MOCK_TOKEN_ADDRESSES.mUSDS,
-    symbol: "mUSDS",
-    name: "Mantua USDS",
-    decimals: 18,
-    logoURI: "https://assets.coingecko.com/coins/images/39926/small/usds.png",
-    category: 'stablecoin',
-    isMock: true,
-    faucetAmount: "1,000",
+    symbol: 'USDC',
+    name: 'USD Coin',
+    address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e' as `0x${string}`,
+    decimals: 6,
+    chainId: 84532 as const,
+    logoURI: 'https://assets.coingecko.com/coins/images/6319/small/usdc.png',
+    coingeckoId: 'usd-coin',
+    isNative: false,
   },
-];
+  {
+    symbol: 'cbBTC',
+    name: 'Coinbase Wrapped BTC',
+    address: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf' as `0x${string}`,
+    decimals: 8,
+    chainId: 84532 as const,
+    logoURI: 'https://assets.coingecko.com/coins/images/40143/small/cbbtc.webp',
+    coingeckoId: 'coinbase-wrapped-btc',
+    isNative: false,
+  },
+] satisfies Token[];
 
-export const MOCK_TOKENS: Token[] = [...STABLECOINS];
+export type TokenSymbol = 'ETH' | 'USDC' | 'cbBTC';
 
-export const ALL_TOKENS: Token[] = [NATIVE_ETH, ...MOCK_TOKENS];
+export const NATIVE_ETH = SUPPORTED_TOKENS[0];
 
-export const POPULAR_TOKENS: Token[] = [
-  NATIVE_ETH,
-  STABLECOINS[0],
-  STABLECOINS[1],
-  STABLECOINS[2],
-  STABLECOINS[3],
-];
+/** Map symbol → token for O(1) lookup */
+export const TOKEN_BY_SYMBOL: Record<string, Token> = Object.fromEntries(
+  SUPPORTED_TOKENS.map(t => [t.symbol, t])
+);
+
+/** Map address (lowercase) → token for O(1) lookup */
+export const TOKEN_BY_ADDRESS: Record<string, Token> = Object.fromEntries(
+  SUPPORTED_TOKENS.map(t => [t.address.toLowerCase(), t])
+);
 
 export function getTokenBySymbol(symbol: string): Token | undefined {
-  return ALL_TOKENS.find((token) => token.symbol.toLowerCase() === symbol.toLowerCase());
-}
-
-export function getTokenByAddress(address: `0x${string}`): Token | undefined {
-  return ALL_TOKENS.find(
-    (token) => token.address.toLowerCase() === address.toLowerCase()
+  return TOKEN_BY_SYMBOL[symbol] ?? SUPPORTED_TOKENS.find(
+    t => t.symbol.toLowerCase() === symbol.toLowerCase()
   );
 }
 
+export function getTokenByAddress(address: `0x${string}`): Token | undefined {
+  return TOKEN_BY_ADDRESS[address.toLowerCase()];
+}
+
 export function isNativeToken(address: `0x${string}`): boolean {
-  return address.toLowerCase() === NATIVE_ETH.address.toLowerCase();
+  return address === '0x0000000000000000000000000000000000000000' ||
+    address.toLowerCase() === '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
 }
 
-export function getMockTokens(): Token[] {
-  return MOCK_TOKENS;
-}
+/** All tokens — for selectors */
+export const ALL_TOKENS: Token[] = SUPPORTED_TOKENS;
 
-export function getTokensByCategory(category: Token['category']): Token[] {
-  if (category === 'native') return [NATIVE_ETH];
-  if (category === 'stablecoin') return STABLECOINS;
-  return [];
-}
-
-export function getCategoryDisplayName(category: Token['category']): string {
-  const names = {
-    native: 'Native',
-    stablecoin: 'Stablecoins',
-  };
-  return names[category];
-}
+/** CoinGecko IDs for price lookups */
+export const COINGECKO_IDS: Record<TokenSymbol, string> = {
+  ETH: 'ethereum',
+  USDC: 'usd-coin',
+  cbBTC: 'coinbase-wrapped-btc',
+};

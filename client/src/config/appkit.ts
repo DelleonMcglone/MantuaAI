@@ -13,7 +13,6 @@ import { createAppKit } from '@reown/appkit/react';
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
 import { baseSepolia } from '@reown/appkit/networks';
 import type { AppKitNetwork } from '@reown/appkit/networks';
-import { defineChain } from 'viem';
 
 // Get project ID - REQUIRED for WalletConnect QR code
 const projectId = import.meta.env.VITE_REOWN_PROJECT_ID || 'ad3378514000476f8321eef10f16882e';
@@ -34,28 +33,9 @@ const metadata = {
   icons: ['https://mantua.ai/favicon.png'],
 };
 
-// Unichain Sepolia custom chain definition
-const unichainSepolia = defineChain({
-  id: 1301,
-  name: 'Unichain Sepolia',
-  nativeCurrency: {
-    name: 'Ether',
-    symbol: 'ETH',
-    decimals: 18,
-  },
-  rpcUrls: {
-    default: { http: ['https://sepolia.unichain.org'] },
-  },
-  blockExplorers: {
-    default: { name: 'Uniscan', url: 'https://sepolia.uniscan.xyz' },
-  },
-  testnet: true,
-});
-
-// Supported networks - Base Sepolia and Unichain Sepolia
+// Supported networks — Base Sepolia only
 const networks: [AppKitNetwork, ...AppKitNetwork[]] = [
   baseSepolia,
-  unichainSepolia as AppKitNetwork,
 ];
 
 // Initialize Wagmi adapter
