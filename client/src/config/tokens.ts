@@ -1,6 +1,3 @@
-/**
- * Supported tokens on Base Sepolia — ETH, USDC, cbBTC only.
- */
 export interface Token {
   address: `0x${string}`;
   symbol: string;
@@ -12,49 +9,76 @@ export interface Token {
   chainId: 84532;
 }
 
-export const SUPPORTED_TOKENS = [
+export const NATIVE_ETH: Token = {
+  symbol: 'ETH',
+  name: 'Ethereum',
+  address: '0x0000000000000000000000000000000000000000',
+  decimals: 18,
+  chainId: 84532,
+  logoURI: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png',
+  coingeckoId: 'ethereum',
+  isNative: true,
+};
+
+export const STABLECOINS: Token[] = [
   {
-    symbol: 'ETH',
-    name: 'Ethereum',
-    address: '0x0000000000000000000000000000000000000000' as `0x${string}`,
-    decimals: 18,
-    chainId: 84532 as const,
-    logoURI: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png',
-    coingeckoId: 'ethereum',
-    isNative: true,
-  },
-  {
-    symbol: 'USDC',
-    name: 'USD Coin',
-    address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e' as `0x${string}`,
+    symbol: 'mUSDC',
+    name: 'Mock USD Coin',
+    address: '0x3365571b822a54c01816bC75b586317F4c1B3E47',
     decimals: 6,
-    chainId: 84532 as const,
+    chainId: 84532,
     logoURI: 'https://assets.coingecko.com/coins/images/6319/small/usdc.png',
     coingeckoId: 'usd-coin',
     isNative: false,
   },
   {
-    symbol: 'cbBTC',
-    name: 'Coinbase Wrapped BTC',
-    address: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf' as `0x${string}`,
-    decimals: 8,
-    chainId: 84532 as const,
-    logoURI: 'https://assets.coingecko.com/coins/images/40143/small/cbbtc.webp',
-    coingeckoId: 'coinbase-wrapped-btc',
+    symbol: 'mUSDT',
+    name: 'Mock Tether',
+    address: '0xB85e6FDaB14EAf2fEB9c59BceB97830b98572a2e',
+    decimals: 6,
+    chainId: 84532,
+    logoURI: 'https://assets.coingecko.com/coins/images/325/small/Tether.png',
+    coingeckoId: 'tether',
     isNative: false,
   },
-] satisfies Token[];
+  {
+    symbol: 'mUSDE',
+    name: 'Mock USDe',
+    address: '0x36048415ecb7Ce82F5523adDCe0e56a37FE963b4',
+    decimals: 18,
+    chainId: 84532,
+    logoURI: 'https://assets.coingecko.com/coins/images/33613/small/usde.png',
+    coingeckoId: 'ethena-usde',
+    isNative: false,
+  },
+  {
+    symbol: 'mUSDS',
+    name: 'Mock USDS',
+    address: '0x5aDd6F9167E90A5d211C03Ee8f224108e3b8DC73',
+    decimals: 18,
+    chainId: 84532,
+    logoURI: 'https://assets.coingecko.com/coins/images/39926/small/usds.png',
+    coingeckoId: 'usds',
+    isNative: false,
+  },
+];
 
-export type TokenSymbol = 'ETH' | 'USDC' | 'cbBTC';
+export const SUPPORTED_TOKENS: Token[] = [NATIVE_ETH, ...STABLECOINS];
 
-export const NATIVE_ETH = SUPPORTED_TOKENS[0];
+export const MOCK_TOKENS: Token[] = SUPPORTED_TOKENS;
 
-/** Map symbol → token for O(1) lookup */
+export const ALL_TOKENS: Token[] = SUPPORTED_TOKENS;
+
+export const POPULAR_TOKENS: Token[] = SUPPORTED_TOKENS;
+
+export const MOCK_TOKEN_FACTORY: `0x${string}` = '0x0000000000000000000000000000000000000000';
+
+export type TokenSymbol = 'ETH' | 'mUSDC' | 'mUSDT' | 'mUSDE' | 'mUSDS';
+
 export const TOKEN_BY_SYMBOL: Record<string, Token> = Object.fromEntries(
   SUPPORTED_TOKENS.map(t => [t.symbol, t])
 );
 
-/** Map address (lowercase) → token for O(1) lookup */
 export const TOKEN_BY_ADDRESS: Record<string, Token> = Object.fromEntries(
   SUPPORTED_TOKENS.map(t => [t.address.toLowerCase(), t])
 );
@@ -74,12 +98,26 @@ export function isNativeToken(address: `0x${string}`): boolean {
     address.toLowerCase() === '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
 }
 
-/** All tokens — for selectors */
-export const ALL_TOKENS: Token[] = SUPPORTED_TOKENS;
+export type TokenCategory = 'all' | 'stablecoins' | 'native';
 
-/** CoinGecko IDs for price lookups */
-export const COINGECKO_IDS: Record<TokenSymbol, string> = {
-  ETH: 'ethereum',
-  USDC: 'usd-coin',
-  cbBTC: 'coinbase-wrapped-btc',
-};
+export function getTokensByCategory(category: TokenCategory): Token[] {
+  switch (category) {
+    case 'stablecoins': return STABLECOINS;
+    case 'native': return [NATIVE_ETH];
+    case 'all':
+    default: return SUPPORTED_TOKENS;
+  }
+}
+
+export function getCategoryDisplayName(category: TokenCategory): string {
+  switch (category) {
+    case 'stablecoins': return 'Stablecoins';
+    case 'native': return 'Native';
+    case 'all':
+    default: return 'All Tokens';
+  }
+}
+
+export const COINGECKO_IDS: Record<string, string> = Object.fromEntries(
+  SUPPORTED_TOKENS.map(t => [t.symbol, t.coingeckoId])
+);
