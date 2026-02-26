@@ -113,7 +113,7 @@ function buildPairData(
 
 // ─── USD stablecoins (show toToken price in USD directly) ───────────────────
 
-const USD_STABLES = new Set(['mUSDC', 'mUSDT', 'mUSDE', 'mUSDS', 'USDC', 'USDT', 'USDE', 'USDS']);
+const USD_STABLES = new Set(['USDC']);
 
 // ─── Main component ──────────────────────────────────────────────────────────
 

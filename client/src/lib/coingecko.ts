@@ -66,8 +66,21 @@ export async function getAllPrices(
 
 /** Returns the primary token to chart for a given pool pair */
 export function getPoolChartToken(token1: string, token2: string): string {
-  // Prefer non-stable, non-USDC tokens for price chart
-  if (token1 === 'ETH' || token1 === 'cbBTC') return token1;
-  if (token2 === 'ETH' || token2 === 'cbBTC') return token2;
+  // Prefer volatile assets: ETH > cbBTC > EURC > USDC
+  if (token1 === 'ETH' || token2 === 'ETH') return 'ETH';
+  if (token1 === 'cbBTC' || token2 === 'cbBTC') return 'cbBTC';
+  if (token1 === 'EURC' || token2 === 'EURC') return 'EURC';
   return token1;
+}
+
+const TOKEN_TO_COINGECKO: Record<string, string> = {
+  ETH:   'ethereum',
+  cbBTC: 'coinbase-wrapped-btc',
+  USDC:  'usd-coin',
+  EURC:  'euro-coin',
+};
+
+/** Maps a token symbol to its CoinGecko id */
+export function tokenToCoingeckoId(symbol: string): string {
+  return TOKEN_TO_COINGECKO[symbol] ?? 'ethereum';
 }

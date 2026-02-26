@@ -147,4 +147,70 @@ router.post('/agent-transactions', async (req: Request, res: Response) => {
   }
 });
 
+// ─── LP Positions ─────────────────────────────────────────────────────────────
+
+router.get('/positions', async (req: Request, res: Response) => {
+  try {
+    const { walletAddress, poolId } = req.query;
+    if (!walletAddress) return res.status(400).json({ error: 'walletAddress required' });
+    const params: string[] = [(walletAddress as string).toLowerCase()];
+    let whereClause = `WHERE wallet_address = $1 AND status = 'active'`;
+    if (poolId) {
+      params.push(poolId as string);
+      whereClause += ` AND pool_id = $2`;
+    }
+    const { rows } = await dbPool.query(
+      `SELECT * FROM positions ${whereClause} ORDER BY created_at DESC LIMIT 20`,
+      params
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch positions' });
+  }
+});
+
+router.post('/positions', async (req: Request, res: Response) => {
+  try {
+    const { walletAddress, poolId, positionTokenId, token0, token1, liquidity, amount0, amount1, feeTier } = req.body;
+    if (!walletAddress || !token0 || !token1 || !liquidity) {
+      return res.status(400).json({ error: 'walletAddress, token0, token1, liquidity required' });
+    }
+    const { rows } = await dbPool.query(
+      `INSERT INTO positions
+         (wallet_address, pool_id, position_token_id, token0, token1, liquidity, amount0, amount1,
+          fee_tier, pool_address, tick_lower, tick_upper, status, chain_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'0x0000000000000000000000000000000000000000',0,0,'active',84532)
+       RETURNING *`,
+      [walletAddress.toLowerCase(), poolId || null, positionTokenId || null,
+       token0, token1, liquidity, amount0 || 0, amount1 || 0, feeTier || 3000]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to save position', detail: msg });
+  }
+});
+
+router.patch('/positions/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { status, liquidity } = req.body;
+    if (status) {
+      await dbPool.query(
+        `UPDATE positions SET status = $1, updated_at = NOW() WHERE id = $2`,
+        [status, id]
+      );
+    }
+    if (liquidity !== undefined) {
+      await dbPool.query(
+        `UPDATE positions SET liquidity = $1, updated_at = NOW() WHERE id = $2`,
+        [liquidity, id]
+      );
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update position' });
+  }
+});
+
 export default router;

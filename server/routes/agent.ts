@@ -13,7 +13,7 @@ const createWalletSchema = z.object({
 
 const faucetSchema = z.object({
   address: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
-  tokens: z.array(z.enum(['eth', 'usdc', 'cbbtc'])).min(1),
+  tokens: z.array(z.enum(['eth', 'usdc', 'cbbtc', 'eurc'])).min(1),
 });
 
 const querySchema = z.object({
@@ -24,7 +24,7 @@ const querySchema = z.object({
 const sendSchema = z.object({
   walletId: z.string().min(1),
   to: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
-  token: z.enum(['ETH', 'USDC', 'cbBTC']),
+  token: z.enum(['ETH', 'USDC', 'cbBTC', 'EURC']),
   amount: z.string().min(1),
 });
 
@@ -53,9 +53,11 @@ const COINGECKO_IDS: Record<string, string> = {
   eth:   'ethereum',
   usdc:  'usd-coin',
   cbbtc: 'coinbase-wrapped-btc',
+  eurc:  'euro-coin',
   ETH:   'ethereum',
   USDC:  'usd-coin',
   cbBTC: 'coinbase-wrapped-btc',
+  EURC:  'euro-coin',
 };
 
 // ─── Route Registration ───────────────────────────────────────────────────────
@@ -223,10 +225,11 @@ export function registerAgentRoutes(app: Express): void {
 
       // All prices
       if (q.includes('all') || q.includes('market')) {
-        const [eth, usdc, cbbtc] = await Promise.all([
+        const [eth, usdc, cbbtc, eurc] = await Promise.all([
           fetchCoinGeckoPrice('ethereum'),
           fetchCoinGeckoPrice('usd-coin'),
           fetchCoinGeckoPrice('coinbase-wrapped-btc'),
+          fetchCoinGeckoPrice('euro-coin'),
         ]);
         return res.json({
           type: 'prices',
@@ -234,6 +237,7 @@ export function registerAgentRoutes(app: Express): void {
             ETH: `$${eth.toLocaleString()}`,
             USDC: `$${usdc.toFixed(4)}`,
             cbBTC: `$${cbbtc.toLocaleString()}`,
+            EURC: `$${eurc.toFixed(4)}`,
             source: 'CoinGecko',
           },
         });
@@ -270,11 +274,12 @@ export function registerAgentRoutes(app: Express): void {
         }
       }
 
-      // Fallback: return all three prices
-      const [eth, usdc, cbbtc] = await Promise.all([
+      // Fallback: return all four prices
+      const [eth, usdc, cbbtc, eurc] = await Promise.all([
         fetchCoinGeckoPrice('ethereum'),
         fetchCoinGeckoPrice('usd-coin'),
         fetchCoinGeckoPrice('coinbase-wrapped-btc'),
+        fetchCoinGeckoPrice('euro-coin'),
       ]);
       res.json({
         type: 'market_overview',
@@ -282,6 +287,7 @@ export function registerAgentRoutes(app: Express): void {
           ETH: `$${eth.toLocaleString()}`,
           USDC: `$${usdc.toFixed(4)}`,
           cbBTC: `$${cbbtc.toLocaleString()}`,
+          EURC: `$${eurc.toFixed(4)}`,
           network: 'Base Sepolia',
           source: 'CoinGecko',
         },
@@ -299,10 +305,11 @@ export function registerAgentRoutes(app: Express): void {
   app.post('/api/agent/analytics', async (req: Request, res: Response) => {
     try {
       const { query } = req.body;
-      const [eth, usdc, cbbtc] = await Promise.all([
+      const [eth, usdc, cbbtc, eurc] = await Promise.all([
         fetchCoinGeckoPrice('ethereum'),
         fetchCoinGeckoPrice('usd-coin'),
         fetchCoinGeckoPrice('coinbase-wrapped-btc'),
+        fetchCoinGeckoPrice('euro-coin'),
       ]);
       res.json({
         query,
@@ -310,6 +317,7 @@ export function registerAgentRoutes(app: Express): void {
           ETH: `$${eth.toLocaleString()}`,
           USDC: `$${usdc.toFixed(4)}`,
           cbBTC: `$${cbbtc.toLocaleString()}`,
+          EURC: `$${eurc.toFixed(4)}`,
         },
         network: 'Base Sepolia',
         source: 'CoinGecko',

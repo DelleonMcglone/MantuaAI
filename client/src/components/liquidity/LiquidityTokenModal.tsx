@@ -18,22 +18,20 @@ const CATEGORIES = [
 
 function getGradient(symbol: string): string {
   const colorMap: Record<string, string> = {
-    ETH:    'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)',
-    mUSDC:  'linear-gradient(135deg, #2775CA 0%, #4A9FE8 100%)',
-    mUSDT:  'linear-gradient(135deg, #26A17B 0%, #50C878 100%)',
-    mUSDE:  'linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)',
-    mUSDS:  'linear-gradient(135deg, #F59E0B 0%, #FCD34D 100%)',
+    ETH:   'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)',
+    cbBTC: 'linear-gradient(135deg, #F7931A 0%, #FFB347 100%)',
+    USDC:  'linear-gradient(135deg, #2775CA 0%, #4A9FE8 100%)',
+    EURC:  'linear-gradient(135deg, #0052B4 0%, #2E86AB 100%)',
   };
-  if (colorMap[symbol]) return colorMap[symbol];
-  if (symbol.includes('ETH')) return 'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)';
-  if (symbol.includes('USD')) return 'linear-gradient(135deg, #2775CA 0%, #4A9FE8 100%)';
-  return 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)';
+  return colorMap[symbol] || 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)';
 }
 
 function getGlyph(symbol: string): string {
-  if (symbol.includes('ETH')) return 'Ξ';
-  if (symbol.includes('USD')) return '$';
-  return symbol.replace(/^m/, '').charAt(0);
+  if (symbol === 'ETH') return 'Ξ';
+  if (symbol === 'cbBTC') return '₿';
+  if (symbol === 'USDC') return '$';
+  if (symbol === 'EURC') return '€';
+  return symbol.charAt(0);
 }
 
 function TokenLogo({ token, size = 40 }: { token: Token; size?: number }) {
@@ -81,9 +79,10 @@ export const LiquidityTokenModal: React.FC<LiquidityTokenModalProps> = ({
 
   if (!isOpen) return null;
 
+  const STABLE_SYMBOLS = new Set(['USDC', 'EURC']);
   const filtered = ALL_TOKENS.filter((t) => {
     if (excludeToken && t.address.toLowerCase() === excludeToken.address.toLowerCase()) return false;
-    if (category !== 'all' && t.category !== category) return false;
+    if (category === 'stablecoin' && !STABLE_SYMBOLS.has(t.symbol)) return false;
     if (search) {
       const q = search.toLowerCase();
       return t.symbol.toLowerCase().includes(q) || t.name.toLowerCase().includes(q);

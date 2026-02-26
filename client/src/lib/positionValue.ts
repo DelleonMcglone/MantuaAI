@@ -21,8 +21,7 @@ export interface PositionValue {
 
 async function fetchPythPrice(symbol: string): Promise<number | null> {
   try {
-    // Strip leading 'm' prefix for mock tokens (mUSDC → USDC)
-    const clean = symbol.startsWith('m') && symbol.length > 1 ? symbol.slice(1) : symbol;
+    const clean = symbol; // Use symbol directly — no mock token prefix stripping needed
     const feedRes = await fetch(
       `https://hermes.pyth.network/v2/price_feeds?query=${clean}&asset_type=crypto`
     );

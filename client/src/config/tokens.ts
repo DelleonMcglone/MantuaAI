@@ -20,11 +20,21 @@ export const NATIVE_ETH: Token = {
   isNative: true,
 };
 
-export const STABLECOINS: Token[] = [
+export const ERC20_TOKENS: Token[] = [
   {
-    symbol: 'mUSDC',
-    name: 'Mock USD Coin',
-    address: '0x3365571b822a54c01816bC75b586317F4c1B3E47',
+    symbol: 'cbBTC',
+    name: 'Coinbase Wrapped BTC',
+    address: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf',
+    decimals: 8,
+    chainId: 84532,
+    logoURI: 'https://assets.coingecko.com/coins/images/40143/small/cbbtc.webp',
+    coingeckoId: 'coinbase-wrapped-btc',
+    isNative: false,
+  },
+  {
+    symbol: 'USDC',
+    name: 'USD Coin',
+    address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
     decimals: 6,
     chainId: 84532,
     logoURI: 'https://assets.coingecko.com/coins/images/6319/small/usdc.png',
@@ -32,48 +42,30 @@ export const STABLECOINS: Token[] = [
     isNative: false,
   },
   {
-    symbol: 'mUSDT',
-    name: 'Mock Tether',
-    address: '0xB85e6FDaB14EAf2fEB9c59BceB97830b98572a2e',
+    symbol: 'EURC',
+    name: 'Euro Coin',
+    address: '0x808456652fdb597867f38412077A9182bf77359',
     decimals: 6,
     chainId: 84532,
-    logoURI: 'https://assets.coingecko.com/coins/images/325/small/Tether.png',
-    coingeckoId: 'tether',
-    isNative: false,
-  },
-  {
-    symbol: 'mUSDE',
-    name: 'Mock USDe',
-    address: '0x36048415ecb7Ce82F5523adDCe0e56a37FE963b4',
-    decimals: 18,
-    chainId: 84532,
-    logoURI: 'https://assets.coingecko.com/coins/images/33613/small/usde.png',
-    coingeckoId: 'ethena-usde',
-    isNative: false,
-  },
-  {
-    symbol: 'mUSDS',
-    name: 'Mock USDS',
-    address: '0x5aDd6F9167E90A5d211C03Ee8f224108e3b8DC73',
-    decimals: 18,
-    chainId: 84532,
-    logoURI: 'https://assets.coingecko.com/coins/images/39926/small/usds.png',
-    coingeckoId: 'usds',
+    logoURI: 'https://assets.coingecko.com/coins/images/26045/small/euro-coin.png',
+    coingeckoId: 'euro-coin',
     isNative: false,
   },
 ];
 
-export const SUPPORTED_TOKENS: Token[] = [NATIVE_ETH, ...STABLECOINS];
+export const SUPPORTED_TOKENS: Token[] = [NATIVE_ETH, ...ERC20_TOKENS];
 
+// Legacy aliases — kept for backward compatibility
 export const MOCK_TOKENS: Token[] = SUPPORTED_TOKENS;
-
 export const ALL_TOKENS: Token[] = SUPPORTED_TOKENS;
-
 export const POPULAR_TOKENS: Token[] = SUPPORTED_TOKENS;
+export const STABLECOINS: Token[] = ERC20_TOKENS.filter(
+  t => t.symbol === 'USDC' || t.symbol === 'EURC'
+);
 
 export const MOCK_TOKEN_FACTORY: `0x${string}` = '0x0000000000000000000000000000000000000000';
 
-export type TokenSymbol = 'ETH' | 'mUSDC' | 'mUSDT' | 'mUSDE' | 'mUSDS';
+export type TokenSymbol = 'ETH' | 'cbBTC' | 'USDC' | 'EURC';
 
 export const TOKEN_BY_SYMBOL: Record<string, Token> = Object.fromEntries(
   SUPPORTED_TOKENS.map(t => [t.symbol, t])

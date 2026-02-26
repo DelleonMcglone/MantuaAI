@@ -19,7 +19,7 @@ const RANGE_TICKS: Record<RangeType, { tickLower: number; tickUpper: number }> =
   'Custom':     { tickLower: -887272, tickUpper: 887272 },
 };
 const HOOK_ID_MAP: Record<string, string> = { directional: 'df', jit: 'ym', none: 'none' };
-const EXPLORERS: Record<number, string> = { 84532: 'https://sepolia.basescan.org', 1301: 'https://sepolia.uniscan.xyz' };
+const EXPLORERS: Record<number, string> = { 84532: 'https://sepolia.basescan.org' };
 
 function computeLiquidityDelta(amount: number, decimals: number): bigint {
   const amountStr = amount.toFixed(Math.min(decimals, 8));

@@ -3,22 +3,20 @@ import type { Token } from '../../config/tokens';
 import { ChevronDownIcon } from '../icons';
 
 const TOKEN_GRADIENT_MAP: Record<string, string> = {
-  ETH:    'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)',
-  mUSDC:  'linear-gradient(135deg, #2775CA 0%, #4A9FE8 100%)',
-  mUSDT:  'linear-gradient(135deg, #26A17B 0%, #50C878 100%)',
-  mUSDE:  'linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)',
-  mUSDS:  'linear-gradient(135deg, #F59E0B 0%, #FCD34D 100%)',
+  ETH:   'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)',
+  cbBTC: 'linear-gradient(135deg, #F7931A 0%, #FFB347 100%)',
+  USDC:  'linear-gradient(135deg, #2775CA 0%, #4A9FE8 100%)',
+  EURC:  'linear-gradient(135deg, #0052B4 0%, #2E86AB 100%)',
 };
 function getTokenGradient(symbol: string): string {
-  if (TOKEN_GRADIENT_MAP[symbol]) return TOKEN_GRADIENT_MAP[symbol];
-  if (symbol.includes('ETH')) return 'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)';
-  if (symbol.includes('USD')) return 'linear-gradient(135deg, #2775CA 0%, #4A9FE8 100%)';
-  return 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)';
+  return TOKEN_GRADIENT_MAP[symbol] || 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)';
 }
 
 function getTokenGlyph(symbol: string): string {
-  if (symbol.includes('ETH')) return 'Ξ';
-  if (symbol.includes('USD')) return '$';
+  if (symbol === 'ETH') return 'Ξ';
+  if (symbol === 'cbBTC') return '₿';
+  if (symbol === 'USDC') return '$';
+  if (symbol === 'EURC') return '€';
   return symbol.charAt(0);
 }
 

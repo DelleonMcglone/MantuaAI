@@ -10,11 +10,10 @@ export interface TokenPrice {
 }
 
 const REFERENCE_PRICES: Record<string, number> = {
-  'ETH':    2000,
-  'mUSDC':  1.00,
-  'mUSDT':  1.00,
-  'mUSDE':  1.00,
-  'mUSDS':  1.00,
+  'ETH':   2000,
+  'cbBTC': 90000,
+  'USDC':  1.00,
+  'EURC':  1.10,
 };
 
 export function getPriceBySymbol(symbol: string): number {

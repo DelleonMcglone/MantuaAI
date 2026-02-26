@@ -9,35 +9,26 @@ const POOL_MANAGER = "0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408" as Address;
 const POOL_SWAP_TEST = "0x8b5bcc363dde2614281ad875bad385e0a785d3b9" as Address;
 const ZERO_HOOK = "0x0000000000000000000000000000000000000000" as Address;
 
-const MOCK_TOKENS: Record<string, { address: Address; decimals: number; symbol: string }> = {
-  mUSDC:  { address: "0x3365571b822a54c01816bC75b586317F4c1B3E47", decimals: 6, symbol: "mUSDC" },
-  mUSDT:  { address: "0xB85e6FDaB14EAf2fEB9c59BceB97830b98572a2e", decimals: 6, symbol: "mUSDT" },
-  mUSDS:  { address: "0x5aDd6F9167E90A5d211C03Ee8f224108e3b8DC73", decimals: 18, symbol: "mUSDS" },
-  mUSDE:  { address: "0x36048415ecb7Ce82F5523adDCe0e56a37FE963b4", decimals: 18, symbol: "mUSDE" },
-  mUSDY:  { address: "0xb6639242Ba9A4799317C889De4c13314dAC6748D", decimals: 18, symbol: "mUSDY" },
-  mBUIDL: { address: "0x9f390f689954805A278b104cf5b5F59529cF779D", decimals: 6, symbol: "mBUIDL" },
-  mstETH: { address: "0xdECB63D9195f64aA5434C557b462F9a977E6ad01", decimals: 18, symbol: "mstETH" },
-  mcbETH: { address: "0x7C04d5ED23b229Cb659dc67dd7BF2D75455e339f", decimals: 18, symbol: "mcbETH" },
-  mWBTC:  { address: "0xcA927D36203DC588C66025B8535beFE9C8413237", decimals: 8, symbol: "mWBTC" },
-  mWETH:  { address: "0xFf445C40e5a1c88A703fcAC607A80DEd7A1bC129", decimals: 18, symbol: "mWETH" },
-  mWSOL:  { address: "0x2CD13A38372a65062BceBD980C1FEEA2355ee6e1", decimals: 9, symbol: "mWSOL" },
-  mBTC:   { address: "0xA6abc29Cd7F5D193c3B507152fF842f684E139E4", decimals: 8, symbol: "mBTC" },
+// Supported tokens on Base Sepolia (matching client config/tokens.ts)
+const SUPPORTED_TOKENS: Record<string, { address: Address; decimals: number; symbol: string }> = {
+  ETH:   { address: "0x0000000000000000000000000000000000000000", decimals: 18, symbol: "ETH" },
+  cbBTC: { address: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf", decimals: 8, symbol: "cbBTC" },
+  USDC:  { address: "0x036CbD53842c5426634e7929541eC2318f3dCF7e", decimals: 6, symbol: "USDC" },
+  EURC:  { address: "0x808456652fdb597867f38412077A9182bf77359", decimals: 6, symbol: "EURC" },
 };
+
+// Keep alias for backward compatibility in this file
+const MOCK_TOKENS = SUPPORTED_TOKENS;
 
 const FAUCET_ADDRESS = "0xaa0D98c815C3003d35E571fD51C65d7F92391883" as Address;
 
 const POOL_PAIRS = [
-  { tokenA: "mUSDC", tokenB: "mWETH", fee: 3000, tickSpacing: 60, sqrtPriceX96: "1771595571142957166518320255467520" },
-  { tokenA: "mUSDC", tokenB: "mWBTC", fee: 3000, tickSpacing: 60, sqrtPriceX96: "1771595571142957166518320255467520" },
-  { tokenA: "mUSDC", tokenB: "mUSDT", fee: 500, tickSpacing: 10, sqrtPriceX96: "79228162514264337593543950336" },
-  { tokenA: "mUSDC", tokenB: "mUSDS", fee: 500, tickSpacing: 10, sqrtPriceX96: "79228162514264337593543950336" },
-  { tokenA: "mUSDC", tokenB: "mUSDE", fee: 500, tickSpacing: 10, sqrtPriceX96: "79228162514264337593543950336" },
-  { tokenA: "mWETH", tokenB: "mstETH", fee: 500, tickSpacing: 10, sqrtPriceX96: "79228162514264337593543950336" },
-  { tokenA: "mWETH", tokenB: "mcbETH", fee: 500, tickSpacing: 10, sqrtPriceX96: "79228162514264337593543950336" },
-  { tokenA: "mWBTC", tokenB: "mBTC", fee: 500, tickSpacing: 10, sqrtPriceX96: "79228162514264337593543950336" },
-  { tokenA: "mUSDC", tokenB: "mUSDY", fee: 3000, tickSpacing: 60, sqrtPriceX96: "79228162514264337593543950336" },
-  { tokenA: "mUSDC", tokenB: "mBUIDL", fee: 3000, tickSpacing: 60, sqrtPriceX96: "79228162514264337593543950336" },
-  { tokenA: "mWETH", tokenB: "mWSOL", fee: 3000, tickSpacing: 60, sqrtPriceX96: "79228162514264337593543950336" },
+  { tokenA: "ETH",   tokenB: "USDC",  fee: 3000, tickSpacing: 60, sqrtPriceX96: "1771595571142957166518320255467520" },
+  { tokenA: "ETH",   tokenB: "cbBTC", fee: 3000, tickSpacing: 60, sqrtPriceX96: "1771595571142957166518320255467520" },
+  { tokenA: "ETH",   tokenB: "EURC",  fee: 3000, tickSpacing: 60, sqrtPriceX96: "1771595571142957166518320255467520" },
+  { tokenA: "USDC",  tokenB: "cbBTC", fee: 3000, tickSpacing: 60, sqrtPriceX96: "1771595571142957166518320255467520" },
+  { tokenA: "USDC",  tokenB: "EURC",  fee: 500,  tickSpacing: 10, sqrtPriceX96: "79228162514264337593543950336" },
+  { tokenA: "cbBTC", tokenB: "EURC",  fee: 3000, tickSpacing: 60, sqrtPriceX96: "1771595571142957166518320255467520" },
 ];
 
 function sortTokens(a: Address, b: Address): [Address, Address] {

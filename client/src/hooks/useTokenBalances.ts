@@ -4,6 +4,9 @@ import { formatUnits } from 'viem';
 import { erc20Abi } from 'viem';
 import { MOCK_TOKENS, type Token } from '@/config/tokens';
 
+// Only ERC20 tokens (not native ETH) can be queried via balanceOf
+const ERC20_ONLY_TOKENS = MOCK_TOKENS.filter(t => !t.isNative);
+
 export interface TokenBalance {
   token: Token;
   balance: bigint;
@@ -25,7 +28,7 @@ export interface UseTokenBalancesReturn {
 export function useTokenBalances(): UseTokenBalancesReturn {
   const { address, isConnected } = useAccount();
 
-  const tokens = useMemo(() => MOCK_TOKENS, []);
+  const tokens = useMemo(() => ERC20_ONLY_TOKENS, []);
 
   const contracts = useMemo(() => {
     if (!address) return [];

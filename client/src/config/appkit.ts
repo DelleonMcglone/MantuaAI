@@ -51,8 +51,7 @@ export const appKit = createAppKit({
   projectId,
   metadata,
 
-  // DEFAULT NETWORK CONFIGURATION
-  // Defaults to Base Sepolia but allows switching to Unichain Sepolia
+  // DEFAULT NETWORK CONFIGURATION — Base Sepolia only
   defaultNetwork: baseSepolia,
   allowUnsupportedChain: false,           // Only allow configured testnets
 

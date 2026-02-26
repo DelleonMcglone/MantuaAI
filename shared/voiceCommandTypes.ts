@@ -34,11 +34,10 @@ export interface VaultCommand {
 
 /** Token alias map — normalises user-spoken tokens to canonical symbols. */
 export const TOKEN_ALIASES: Record<string, string> = {
-  ether: 'ETH', ethereum: 'ETH', eth: 'ETH', meth: 'mETH',
-  usdc: 'USDC', musdc: 'mUSDC', usdt: 'USDT', musdt: 'mUSDT',
-  tether: 'USDT', dai: 'DAI', mdai: 'mDAI',
-  bitcoin: 'BTC', btc: 'BTC', wbtc: 'WBTC', weth: 'WETH',
-  link: 'LINK', uni: 'UNI', aave: 'AAVE',
+  ether: 'ETH', ethereum: 'ETH', eth: 'ETH',
+  usdc: 'USDC', 'usd coin': 'USDC',
+  eurc: 'EURC', euro: 'EURC', 'euro coin': 'EURC',
+  cbbtc: 'cbBTC', bitcoin: 'cbBTC', btc: 'cbBTC', 'coinbase btc': 'cbBTC',
 };
 
 export function normalizeToken(raw: string): string {

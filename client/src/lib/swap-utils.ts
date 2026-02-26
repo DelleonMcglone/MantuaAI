@@ -244,8 +244,8 @@ export function formatTokenAmount(amount: bigint, decimals: number, isStablecoin
 }
 
 export function formatDisplayAmount(value: number, symbol: string): string {
-  const stableSymbols = ['mUSDC', 'mUSDT', 'mUSDE', 'mUSDS', 'USDC', 'USDT', 'USDE', 'USDS'];
-  const isStable = stableSymbols.some(s => symbol.toUpperCase().includes(s.replace('m', '').toUpperCase()));
+  const stableSymbols = new Set(['USDC', 'EURC']);
+  const isStable = stableSymbols.has(symbol);
   
   if (isStable) {
     return value.toLocaleString(undefined, {

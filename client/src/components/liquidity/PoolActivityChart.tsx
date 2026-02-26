@@ -17,7 +17,7 @@ interface CacheEntry { data: [number, number][]; fetchedAt: number; }
 const chartCache = new Map<string, CacheEntry>();
 
 const STABLECOINS = new Set([
-  'USDC','USDT','USDE','USDS','mUSDC','mUSDT','mUSDE','mUSDS',
+  'USDC',
 ]);
 
 async function fetchChartData(id: string, days: number): Promise<[number, number][] | null> {
@@ -55,7 +55,7 @@ const PoolActivityChart: React.FC<PoolActivityChartProps> = ({ theme, isDark, to
   const [isMock, setIsMock] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const pairKey = `${tokenA ?? 'ETH'}/${tokenB ?? 'mUSDC'}`;
+  const pairKey = `${tokenA ?? 'ETH'}/${tokenB ?? 'USDC'}`;
 
   // Fallback mock data seeded by pair
   const mockData = useMemo(() => {
@@ -72,7 +72,7 @@ const PoolActivityChart: React.FC<PoolActivityChartProps> = ({ theme, isDark, to
     const days = RANGE_DAYS[range];
 
     const symA = tokenA ?? 'ETH';
-    const symB = tokenB ?? 'mUSDC';
+    const symB = tokenB ?? 'USDC';
     const idA  = STABLECOINS.has(symA) ? null : (COINGECKO_IDS[symA] ?? null);
     const idB  = STABLECOINS.has(symB) ? null : (COINGECKO_IDS[symB] ?? null);
 
@@ -137,12 +137,9 @@ const PoolActivityChart: React.FC<PoolActivityChartProps> = ({ theme, isDark, to
           {pairKey} Price
           {isMock && (
             <span style={{ background: 'rgba(107,114,128,0.2)', color: '#9ca3af', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3 }}>
-              Mock Data
+              Demo Data
             </span>
           )}
-          <span style={{ background: 'rgba(107,114,128,0.2)', color: '#9ca3af', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3 }}>
-            Testnet
-          </span>
         </div>
         <div style={{ display: 'flex', gap: 4 }}>
           {(['1D', '7D', '30D'] as const).map(r => (

@@ -9,16 +9,16 @@ export interface ClassifiedQuery {
   params?: any;
 }
 
+const VALID_TOKENS = new Set(['ETH', 'CBBTC', 'USDC', 'EURC']);
+
 const normalizeTokenSymbol = (sym: string): string => {
   const upper = sym.toUpperCase();
-  const aliases: Record<string, string> = {
-    'USDC':  'mUSDC',
-    'USDT':  'mUSDT',
-    'USDE':  'mUSDE',
-    'USDS':  'mUSDS',
-    'DAI':   'mUSDS',
-  };
-  return aliases[upper] ?? upper;
+  // Normalize common aliases to our supported tokens
+  if (upper === 'CBBTC' || upper === 'BTC' || upper === 'WBTC') return 'cbBTC';
+  if (upper === 'ETH' || upper === 'WETH') return 'ETH';
+  if (upper === 'USDC' || upper === 'USD') return 'USDC';
+  if (upper === 'EURC' || upper === 'EUR') return 'EURC';
+  return upper;
 };
 
 const extractPoolFromMessage = (msg: string) => {
@@ -178,10 +178,9 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
 
   const assetsMap: Record<string, string> = {
     'eth': 'ETH', 'ethereum': 'ETH',
-    'usdc': 'mUSDC', 'musdc': 'mUSDC',
-    'usdt': 'mUSDT', 'musdt': 'mUSDT',
-    'usds': 'mUSDS', 'musds': 'mUSDS',
-    'usde': 'mUSDE', 'musde': 'mUSDE',
+    'usdc': 'USDC',
+    'eurc': 'EURC', 'euro': 'EURC',
+    'cbbtc': 'cbBTC', 'btc': 'cbBTC', 'bitcoin': 'cbBTC',
   };
 
   for (const [key, value] of Object.entries(assetsMap)) {

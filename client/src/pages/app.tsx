@@ -84,24 +84,25 @@ import {
 
 // Token icon component — uses logoURI from token config with character fallback
 const TokenIcon = ({ token, size = 32 }) => {
-  const tokenData = ALL_TOKENS.find(t => t.symbol === token || t.symbol === `m${token}`);
+  const tokenData = ALL_TOKENS.find(t => t.symbol === token);
   const logoURI = tokenData?.logoURI ?? null;
 
   const getTokenColor = (t: string) => {
     const colors: Record<string, string> = {
-      'ETH':    'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)',
-      'mUSDC':  'linear-gradient(135deg, #2775CA 0%, #4A9FE8 100%)',
-      'mUSDT':  'linear-gradient(135deg, #26A17B 0%, #4DB193 100%)',
-      'mUSDS':  'linear-gradient(135deg, #F5AC37 0%, #FFD166 100%)',
-      'mUSDE':  'linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)',
+      'ETH':   'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)',
+      'cbBTC': 'linear-gradient(135deg, #F7931A 0%, #FFB347 100%)',
+      'USDC':  'linear-gradient(135deg, #2775CA 0%, #4A9FE8 100%)',
+      'EURC':  'linear-gradient(135deg, #0052B4 0%, #2E86AB 100%)',
     };
-    return colors[t] || colors[`m${t}`] || 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)';
+    return colors[t] || 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)';
   };
 
   const getTokenSymbol = (t: string) => {
     if (t === 'ETH' || t.endsWith('ETH')) return 'Ξ';
-    if (t.includes('USD')) return '$';
-    return t.replace(/^m/, '').charAt(0);
+    if (t === 'cbBTC') return '₿';
+    if (t === 'USDC') return '$';
+    if (t === 'EURC') return '€';
+    return t.charAt(0);
   };
 
   const fallbackChar = getTokenSymbol(token);
@@ -1003,12 +1004,13 @@ const TokenSelectModal = ({ isOpen, onClose, onSelect, theme, isDark, getTokenBa
     name: token.name,
     address: token.address,
     displayAddress: abbreviateAddress(token.address),
-    category: token.category,
     logoURI: token.logoURI,
     // Single-character fallback if logoURI fails to load
-    icon: token.symbol === 'ETH' || token.symbol.includes('ETH') ? 'Ξ'
-      : token.symbol.includes('USD') ? '$'
-      : '◆',
+    icon: token.symbol === 'ETH' ? 'Ξ'
+      : token.symbol === 'cbBTC' ? '₿'
+      : token.symbol === 'USDC' ? '$'
+      : token.symbol === 'EURC' ? '€'
+      : token.symbol.charAt(0),
   }));
 
   const categories = [
@@ -1017,10 +1019,12 @@ const TokenSelectModal = ({ isOpen, onClose, onSelect, theme, isDark, getTokenBa
   ];
 
   // Filter tokens by category and search
+  const STABLECOIN_SYMBOLS = new Set(['USDC', 'EURC']);
   const filteredTokens = allTokens.filter(token => {
-    const matchesCategory = selectedCategory === 'all' || token.category === selectedCategory;
-    const matchesSearch = !searchQuery || 
-      token.symbol.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    const isStable = STABLECOIN_SYMBOLS.has(token.symbol);
+    const matchesCategory = selectedCategory === 'all' || (selectedCategory === 'stablecoin' && isStable);
+    const matchesSearch = !searchQuery ||
+      token.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
       token.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       token.address.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
@@ -1031,11 +1035,10 @@ const TokenSelectModal = ({ isOpen, onClose, onSelect, theme, isDark, getTokenBa
 
     // Color mapping for canonical token set — used as fallback background
     const colorMap = {
-      ETH:    'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)',
-      mUSDC:  'linear-gradient(135deg, #2775CA 0%, #4A9FE8 100%)',
-      mUSDT:  'linear-gradient(135deg, #26A17B 0%, #50C878 100%)',
-      mUSDE:  'linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)',
-      mUSDS:  'linear-gradient(135deg, #F59E0B 0%, #FCD34D 100%)',
+      ETH:   'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)',
+      cbBTC: 'linear-gradient(135deg, #F7931A 0%, #FFB347 100%)',
+      USDC:  'linear-gradient(135deg, #2775CA 0%, #4A9FE8 100%)',
+      EURC:  'linear-gradient(135deg, #0052B4 0%, #2E86AB 100%)',
     };
 
     const background = colorMap[symbol] || 'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)';
@@ -1719,17 +1722,17 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
   
   // Swap state
   const [fromToken, setFromToken] = useState(swapDetails?.fromToken || "ETH");
-  const [toToken, setToToken] = useState(swapDetails?.toToken || "mUSDC");
+  const [toToken, setToToken] = useState(swapDetails?.toToken || "USDC");
   const [fromAmount, setFromAmount] = useState(swapDetails?.fromAmount || "");
-  const [toAmount, setToAmount] = useState(swapDetails?.toAmount || ""); 
+  const [toAmount, setToAmount] = useState(swapDetails?.toAmount || "");
 
   // Find token data from ALL_TOKENS
   const fromTokenData = useMemo(() => {
-    return ALL_TOKENS.find(t => t.symbol === fromToken || t.symbol === `m${fromToken}`) || NATIVE_ETH;
+    return ALL_TOKENS.find(t => t.symbol === fromToken) || NATIVE_ETH;
   }, [fromToken]);
 
   const toTokenData = useMemo(() => {
-    return ALL_TOKENS.find(t => t.symbol === toToken || t.symbol === `m${toToken}`) || ALL_TOKENS[1];
+    return ALL_TOKENS.find(t => t.symbol === toToken) || ALL_TOKENS[1];
   }, [toToken]);
 
   // Parse amount for hooks
@@ -1814,7 +1817,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
   // Update toAmount when quote changes
   useEffect(() => {
     if (quote && quote.outputAmount > BigInt(0)) {
-      setToAmount(formatTokenAmount(quote.outputAmount, toTokenData.decimals, toTokenData.category === 'stablecoin'));
+      setToAmount(formatTokenAmount(quote.outputAmount, toTokenData.decimals, toTokenData.symbol === 'USDC' || toTokenData.symbol === 'EURC'));
     } else if (!fromAmount) {
       setToAmount('');
     }
@@ -1824,7 +1827,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
   useEffect(() => {
      if (swapDetails) {
         setFromToken(swapDetails.fromToken || "ETH");
-        setToToken(swapDetails.toToken || "mUSDC");
+        setToToken(swapDetails.toToken || "USDC");
         setFromAmount(swapDetails.fromAmount || "");
         setToAmount(swapDetails.toAmount || "");
      }
@@ -2529,7 +2532,7 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
         <div style={{ flex: 1 }}>
           <span style={{ color: theme.textSecondary, fontSize: '14px', lineHeight: '1.5' }}>
             <span style={{ color: theme.accent, fontWeight: '600' }}>{filteredPools.length > 0 ? `${filteredPools.length} pools on Base Sepolia` : 'No pools yet — create your first pool'}</span>
-            {' '}• ETH, USDC, cbBTC on Uniswap v4.
+            {' '}• ETH, cbBTC, USDC, EURC on Uniswap v4.
           </span>
         </div>
       </div>
@@ -2719,7 +2722,7 @@ const AgentTransferPanel = ({ theme, isDark }) => {
   const [txStatus, setTxStatus] = useState(null);
   const [txHash, setTxHash] = useState('');
 
-  const quickTokens = ['ETH', 'USDC', 'cbBTC'];
+  const quickTokens = ['ETH', 'cbBTC', 'USDC', 'EURC'];
 
   const handleTransfer = async () => {
     if (!toAddress || !amount || !address) return;
@@ -2884,8 +2887,9 @@ const AgentFaucetPanel = ({ theme, isDark }) => {
 
   const tokens = [
     { id: 'eth', label: 'ETH', color: '#627EEA' },
-    { id: 'usdc', label: 'USDC', color: '#2775CA' },
     { id: 'cbbtc', label: 'cbBTC', color: '#F7931A' },
+    { id: 'usdc', label: 'USDC', color: '#2775CA' },
+    { id: 'eurc', label: 'EURC', color: '#0052B4' },
   ];
 
   const toggle = (id: string) => {
@@ -3082,7 +3086,7 @@ const AgentBuilderInterface = ({ onClose, theme, isDark, onNavigate }) => {
   const actions = [
     { id: 'wallet',    color: '#3b82f6', emoji: '🔐', title: 'Create & Manage Wallet',  subtitle: 'Create agent wallet via CDP', },
     { id: 'transfer',  color: '#10b981', emoji: '📤', title: 'Send Tokens',              subtitle: 'Transfer tokens to any address', },
-    { id: 'swap',      color: '#f59e0b', emoji: '🔄', title: 'Swap Tokens',              subtitle: 'Exchange between ETH/USDC/cbBTC', },
+    { id: 'swap',      color: '#f59e0b', emoji: '🔄', title: 'Swap Tokens',              subtitle: 'Exchange between ETH/cbBTC/USDC/EURC', },
     { id: 'liquidity', color: '#8b5cf6', emoji: '💧', title: 'Liquidity',                subtitle: 'Add/remove liquidity from a pool', },
     { id: 'query',     color: '#06b6d4', emoji: '🔍', title: 'Query On-Chain Data',      subtitle: 'Fetch any crypto data', },
     { id: 'faucet',    color: '#f97316', emoji: '🚰', title: 'Get Testnet Funds',        subtitle: 'Request tokens from CDP Faucet', },
@@ -3137,7 +3141,7 @@ const AgentBuilderInterface = ({ onClose, theme, isDark, onNavigate }) => {
       case 'swap': return (
         <div style={{ padding: '24px', background: theme.bgCard, borderRadius: '14px', border: `1px solid ${theme.border}` }}>
           <h3 style={{ color: theme.textPrimary, margin: '0 0 12px 0' }}>🔄 Swap Tokens</h3>
-          <p style={{ color: theme.textSecondary, fontSize: '14px', marginBottom: '20px' }}>Execute token swaps via Uniswap v4 on Base Sepolia. Supports ETH ↔ USDC ↔ cbBTC.</p>
+          <p style={{ color: theme.textSecondary, fontSize: '14px', marginBottom: '20px' }}>Execute token swaps via Uniswap v4 on Base Sepolia. Supports ETH, cbBTC, USDC, EURC.</p>
           <button onClick={() => onNavigate('swap')} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', border: 'none', borderRadius: '8px', color: 'white', fontWeight: '600', cursor: 'pointer' }}>
             Open Swap Interface →
           </button>
@@ -3146,7 +3150,7 @@ const AgentBuilderInterface = ({ onClose, theme, isDark, onNavigate }) => {
       case 'liquidity': return (
         <div style={{ padding: '24px', background: theme.bgCard, borderRadius: '14px', border: `1px solid ${theme.border}` }}>
           <h3 style={{ color: theme.textPrimary, margin: '0 0 12px 0' }}>💧 Liquidity Management</h3>
-          <p style={{ color: theme.textSecondary, fontSize: '14px', marginBottom: '20px' }}>Add or remove liquidity from Uniswap v4 pools. Supports ETH/USDC, ETH/cbBTC, USDC/cbBTC pools.</p>
+          <p style={{ color: theme.textSecondary, fontSize: '14px', marginBottom: '20px' }}>Add or remove liquidity from Uniswap v4 pools. Supports ETH, cbBTC, USDC, EURC pairs.</p>
           <button onClick={() => onNavigate('liquidity')} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', border: 'none', borderRadius: '8px', color: 'white', fontWeight: '600', cursor: 'pointer' }}>
             Open Liquidity Interface →
           </button>

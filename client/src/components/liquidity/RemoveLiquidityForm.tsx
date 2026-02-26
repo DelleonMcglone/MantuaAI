@@ -10,7 +10,7 @@ import { parseError } from '../../lib/errorMessages';
 import { createPoolKey, getHookAddress } from '../../lib/swap-utils';
 
 const HOOK_MAP: Record<string, string> = { directional: 'df', jit: 'ym', none: 'none' };
-const EXPLORER: Record<number, string> = { 84532: 'https://sepolia.basescan.org', 1301: 'https://sepolia.uniscan.xyz' };
+const EXPLORER: Record<number, string> = { 84532: 'https://sepolia.basescan.org' };
 
 interface Props {
   theme: any; isDark: boolean; tokenA: Token | null; tokenB: Token | null;
