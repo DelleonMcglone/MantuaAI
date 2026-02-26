@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAccount, useChainId } from 'wagmi';
 import { parseUnits } from 'viem';
 import type { Token } from '../../config/tokens';
@@ -8,7 +8,7 @@ import { parseError } from '../../lib/errorMessages';
 import { useAddLiquidity } from '../../hooks/useAddLiquidity';
 import { useTokenApproval } from '../../hooks/useTokenApproval';
 import { usePoolState } from '../../hooks/usePoolState';
-import { createPoolKey, getHookAddress, getPoolModifyLiquidityTestAddress } from '../../lib/swap-utils';
+import { createPoolKey, getHookAddress, getPoolModifyLiquidityTestAddress, isNativeEth } from '../../lib/swap-utils';
 import { LiquidityTokenInput } from './LiquidityTokenInput';
 
 type RangeType = 'Full Range' | 'Wide' | 'Narrow' | 'Custom';
@@ -58,7 +58,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
   const [amount1, setAmount1] = useState('');
   const [range, setRange] = useState<RangeType>('Full Range');
   const [approvalStep, setApprovalStep] = useState<'idle' | 'approving0' | 'approving1' | 'ready'>('idle');
-  const { isConnected } = useAccount();
+  const { isConnected, address } = useAccount();
   const chainId = useChainId();
   const { addLiquidity, isPending, isConfirming, isInitializing, isSuccess, error, hash } = useAddLiquidity();
   const hookAddr = getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none');
@@ -118,6 +118,58 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
   const canSubmit = isConnected && !!tokenA && !!tokenB && parsedAmount0 > 0 && parsedAmount1 > 0;
   const bothApproved = approval0.isApproved && approval1.isApproved;
 
+  // Compute ETH value to send as msg.value when currency0 is native (ETH)
+  const buildPoolParams = () => {
+    if (!tokenA || !tokenB) return null;
+    const { tickLower, tickUpper } = RANGE_TICKS[range];
+    const poolKey = createPoolKey(tokenA.address, tokenB.address, 3000, getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none'));
+    const liqDelta = computeLiquidityDelta(parsedAmount0, tokenA.decimals);
+    const isCurrency0A = poolKey.currency0.toLowerCase() === tokenA.address.toLowerCase();
+    const c0Dec = isCurrency0A ? tokenA.decimals : tokenB.decimals;
+    const c1Dec = isCurrency0A ? tokenB.decimals : tokenA.decimals;
+    // Send ETH as msg.value if either currency is native ETH
+    const ethValue = isNativeEth(poolKey.currency0)
+      ? (isCurrency0A ? rawAmount0 : rawAmount1)
+      : isNativeEth(poolKey.currency1)
+      ? (isCurrency0A ? rawAmount1 : rawAmount0)
+      : BigInt(0);
+    return { poolKey, tickLower, tickUpper, liqDelta, c0Dec, c1Dec, ethValue };
+  };
+
+  // Save liquidity to DB after successful confirmation
+  useEffect(() => {
+    if (isSuccess && hash && address && tokenA && tokenB) {
+      const params = buildPoolParams();
+      if (!params) return;
+      // Save pool record
+      fetch('/api/portfolio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token0: params.poolKey.currency0 === tokenA.address.toLowerCase() ? tokenA.symbol : tokenB.symbol,
+          token1: params.poolKey.currency0 === tokenA.address.toLowerCase() ? tokenB.symbol : tokenA.symbol,
+          feeTier: 3000,
+          creatorAddress: address,
+          txHash: hash,
+        }),
+      }).catch(() => {});
+      // Save transaction record
+      fetch('/api/portfolio/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress: address,
+          type: 'add_liquidity',
+          txHash: hash,
+          tokenIn: tokenA.symbol,
+          tokenOut: tokenB.symbol,
+          amountIn: amount0,
+          amountOut: amount1,
+        }),
+      }).catch(() => {});
+    }
+  }, [isSuccess, hash]);
+
   const handleApproveAndSubmit = async () => {
     if (!canSubmit || !tokenA || !tokenB) return;
 
@@ -136,24 +188,22 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
       return;
     }
 
-    const { tickLower, tickUpper } = RANGE_TICKS[range];
-    const poolKey = createPoolKey(tokenA.address, tokenB.address, 3000, getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none'));
-    const liqDelta = computeLiquidityDelta(parsedAmount0, tokenA.decimals);
-    const isCurrency0A = poolKey.currency0.toLowerCase() === tokenA.address.toLowerCase();
-    const c0Dec = isCurrency0A ? tokenA.decimals : tokenB.decimals;
-    const c1Dec = isCurrency0A ? tokenB.decimals : tokenA.decimals;
-    addLiquidity({ poolKey, tickLower, tickUpper, liquidityDelta: liqDelta, hookData: '0x' }, true, c0Dec, c1Dec);
+    const params = buildPoolParams();
+    if (!params) return;
+    addLiquidity(
+      { poolKey: params.poolKey, tickLower: params.tickLower, tickUpper: params.tickUpper, liquidityDelta: params.liqDelta, hookData: '0x', ethValue: params.ethValue },
+      true, params.c0Dec, params.c1Dec
+    );
   };
 
   const handleSubmitOnly = () => {
     if (!canSubmit || !tokenA || !tokenB) return;
-    const { tickLower, tickUpper } = RANGE_TICKS[range];
-    const poolKey = createPoolKey(tokenA.address, tokenB.address, 3000, getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none'));
-    const liqDelta = computeLiquidityDelta(parsedAmount0, tokenA.decimals);
-    const isCurrency0A = poolKey.currency0.toLowerCase() === tokenA.address.toLowerCase();
-    const c0Dec = isCurrency0A ? tokenA.decimals : tokenB.decimals;
-    const c1Dec = isCurrency0A ? tokenB.decimals : tokenA.decimals;
-    addLiquidity({ poolKey, tickLower, tickUpper, liquidityDelta: liqDelta, hookData: '0x' }, true, c0Dec, c1Dec);
+    const params = buildPoolParams();
+    if (!params) return;
+    addLiquidity(
+      { poolKey: params.poolKey, tickLower: params.tickLower, tickUpper: params.tickUpper, liquidityDelta: params.liqDelta, hookData: '0x', ethValue: params.ethValue },
+      true, params.c0Dec, params.c1Dec
+    );
   };
 
   const getButtonText = () => {

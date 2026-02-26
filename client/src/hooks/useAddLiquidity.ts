@@ -12,6 +12,8 @@ export interface AddLiquidityParams {
   tickUpper: number;
   liquidityDelta: bigint;
   hookData: `0x${string}`;
+  /** ETH to send as msg.value when currency0 is native ETH */
+  ethValue?: bigint;
 }
 
 const SQRT_PRICE_1_1 = BigInt('79228162514264337593543950336');
@@ -174,6 +176,8 @@ export function useAddLiquidity() {
         },
         params.hookData,
       ],
+      // Send ETH value when currency0 is native ETH (address 0x000...000)
+      value: params.ethValue ?? BigInt(0),
     });
   };
 

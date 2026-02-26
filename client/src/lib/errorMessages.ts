@@ -31,8 +31,12 @@ export function parseError(err: unknown): string {
   if (msg.includes('ERC20InsufficientBalance'))
     return 'Insufficient token balance for this operation.';
 
-  if (msg.includes('execution reverted') || msg.includes('revert'))
-    return 'Transaction reverted. The pool may not be initialized or parameters are invalid.';
+  if (msg.includes('execution reverted') || msg.includes('revert')) {
+    // Try to extract a short reason from the revert message
+    const shortMatch = msg.match(/reason:\s*(.+?)(?:\n|$)/i) || msg.match(/reverted with reason string '([^']+)'/);
+    if (shortMatch) return `Transaction reverted: ${shortMatch[1]}`;
+    return 'Transaction reverted. Check token approvals and pool parameters.';
+  }
 
   if (msg.includes('gas') || msg.includes('Gas'))
     return 'Transaction failed due to gas estimation. Try again.';
@@ -46,8 +50,8 @@ export function parseError(err: unknown): string {
   if (msg.includes('subgraph') || msg.includes('graphql') || msg.includes('GraphQL'))
     return 'Data fetch failed. The subgraph may be indexing.';
 
-  if (msg.length < 80 && !msg.includes('0x') && !msg.includes('TypeError'))
-    return msg;
+  if (msg.length < 200 && !msg.includes('TypeError'))
+    return msg.replace(/^Error:\s*/i, '').slice(0, 150);
 
   return 'Something went wrong. Please try again.';
 }

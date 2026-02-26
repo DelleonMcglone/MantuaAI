@@ -211,20 +211,52 @@ export function registerAgentRoutes(app: Express): void {
       const { query, walletAddress } = querySchema.parse(req.body);
       const q = query.toLowerCase();
 
-      // Price queries
-      if (q.includes('price') || q.includes('worth') || q.includes('cost')) {
-        const tokenMatch = Object.keys(COINGECKO_IDS).find(t => q.includes(t.toLowerCase()));
-        const id = tokenMatch ? COINGECKO_IDS[tokenMatch] : 'ethereum';
-        const price = await fetchCoinGeckoPrice(id);
-        const symbol = tokenMatch ?? 'ETH';
-        return res.json({
-          type: 'price',
-          data: { symbol, price: `$${price.toLocaleString()}`, source: 'CoinGecko' },
-        });
+      // Transaction history — check first (before pool/price checks)
+      if (q.includes('history') || q.includes('transaction')) {
+        if (!walletAddress) {
+          return res.json({ type: 'history', data: [], message: 'Connect wallet to see history' });
+        }
+        try {
+          const { rows } = await dbPool.query(
+            `SELECT type, tx_hash, token_in, token_out, amount_in, amount_out, timestamp, base_scan_url
+             FROM portfolio_transactions WHERE wallet_address = $1
+             ORDER BY timestamp DESC LIMIT 20`,
+            [walletAddress.toLowerCase()]
+          );
+          return res.json({ type: 'history', data: rows });
+        } catch {
+          return res.json({ type: 'history', data: [] });
+        }
       }
 
-      // All prices
-      if (q.includes('all') || q.includes('market')) {
+      // Pool queries — check before "all" to prevent "list all pools" being caught by all-prices
+      if (q.includes('pool')) {
+        try {
+          const { rows } = await dbPool.query(
+            `SELECT token0, token1, fee_tier, creator_address, tx_hash, created_at
+             FROM pools WHERE chain_id = 84532 ORDER BY created_at DESC LIMIT 10`
+          );
+          if (rows.length === 0) {
+            return res.json({ type: 'pools', data: [], message: 'No pools have been created yet.' });
+          }
+          return res.json({
+            type: 'pools',
+            data: rows.map(p => ({
+              pair: `${p.token0}/${p.token1}`,
+              feeTier: `${(p.fee_tier / 10000).toFixed(2)}%`,
+              creator: p.creator_address,
+              createdAt: p.created_at,
+              txHash: p.tx_hash,
+              baseScanUrl: `https://sepolia.basescan.org/tx/${p.tx_hash}`,
+            })),
+          });
+        } catch {
+          return res.json({ type: 'pools', data: [], message: 'No pools found' });
+        }
+      }
+
+      // All prices — "show all token prices", "all prices", "market overview"
+      if ((q.includes('all') && q.includes('price')) || q.includes('market')) {
         const [eth, usdc, cbbtc, eurc] = await Promise.all([
           fetchCoinGeckoPrice('ethereum'),
           fetchCoinGeckoPrice('usd-coin'),
@@ -243,35 +275,16 @@ export function registerAgentRoutes(app: Express): void {
         });
       }
 
-      // Pool queries
-      if (q.includes('pool')) {
-        try {
-          const { rows } = await dbPool.query(
-            `SELECT token0, token1, fee_tier, tx_hash, created_at
-             FROM pools WHERE chain_id = 84532 ORDER BY created_at DESC LIMIT 10`
-          );
-          return res.json({ type: 'pools', data: rows });
-        } catch {
-          return res.json({ type: 'pools', data: [], message: 'No pools found' });
-        }
-      }
-
-      // Transaction history
-      if (q.includes('history') || q.includes('transaction')) {
-        if (!walletAddress) {
-          return res.json({ type: 'history', data: [], message: 'Connect wallet to see history' });
-        }
-        try {
-          const { rows } = await dbPool.query(
-            `SELECT type, tx_hash, token_in, token_out, timestamp, base_scan_url
-             FROM portfolio_transactions WHERE wallet_address = $1
-             ORDER BY timestamp DESC LIMIT 10`,
-            [walletAddress.toLowerCase()]
-          );
-          return res.json({ type: 'history', data: rows });
-        } catch {
-          return res.json({ type: 'history', data: [] });
-        }
+      // Single token price queries — "what's the price of ETH"
+      if (q.includes('price') || q.includes('worth') || q.includes('cost')) {
+        const tokenMatch = Object.keys(COINGECKO_IDS).find(t => q.includes(t.toLowerCase()));
+        const id = tokenMatch ? COINGECKO_IDS[tokenMatch] : 'ethereum';
+        const price = await fetchCoinGeckoPrice(id);
+        const symbol = tokenMatch ?? 'ETH';
+        return res.json({
+          type: 'price',
+          data: { symbol, price: `$${price.toLocaleString()}`, source: 'CoinGecko' },
+        });
       }
 
       // Fallback: return all four prices

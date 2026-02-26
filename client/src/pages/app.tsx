@@ -706,11 +706,11 @@ const ActivityFeed = ({ activities, filter, setFilter, theme }) => {
 
 // ============ PORTFOLIO INTERFACE ============
 const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, currentChain, onRemoveLiquidity }) => {
-  const [activeTab, setActiveTab] = useState<'user'|'agent'>(type === 'Agent' ? 'agent' : 'user');
   const [txns, setTxns] = useState<Array<{type:string;tx_hash:string;token_in?:string;token_out?:string;amount_in?:string;amount_out?:string;timestamp:string;base_scan_url:string}>>([]);
   const [agentWallet, setAgentWallet] = useState<{address:string;wallet_id:string} | null>(null);
   const [agentTxns, setAgentTxns] = useState<Array<{type:string;tx_hash:string;token_in?:string;token_out?:string;base_scan_url:string;timestamp:string}>>([]);
   const [loadingTxns, setLoadingTxns] = useState(false);
+  const isAgentView = type === 'Agent';
 
   const { address } = useAccount();
   const { data: liveEthBalance } = useBalance({ address, query: { enabled: !!address && isConnected } });
@@ -766,20 +766,15 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
       <div style={{ background: theme.bgSecondary, borderRadius: '16px', border: `1px solid ${theme.border}`, padding: '24px', maxHeight: '85vh', overflowY: 'auto' }}>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <div style={{ display: 'flex', gap: '4px', background: theme.bgCard, borderRadius: '10px', padding: '4px', border: `1px solid ${theme.border}` }}>
-            <button onClick={() => setActiveTab('user')} style={{ padding: '8px 16px', borderRadius: '7px', border: 'none', background: activeTab === 'user' ? theme.accent : 'transparent', color: activeTab === 'user' ? 'white' : theme.textSecondary, fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
-              User Portfolio
-            </button>
-            <button onClick={() => setActiveTab('agent')} style={{ padding: '8px 16px', borderRadius: '7px', border: 'none', background: activeTab === 'agent' ? theme.accent : 'transparent', color: activeTab === 'agent' ? 'white' : theme.textSecondary, fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
-              Agent Portfolio
-            </button>
-          </div>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: theme.textPrimary }}>
+            {isAgentView ? 'Agent Portfolio' : 'User Portfolio'}
+          </h2>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '8px', color: theme.textSecondary }}>
             <CloseIcon />
           </button>
         </div>
 
-        {activeTab === 'user' && (
+        {!isAgentView && (
           <div>
             {/* Summary */}
             <div style={{ background: theme.bgCard, borderRadius: '12px', padding: '20px', marginBottom: '20px', border: `1px solid ${theme.border}` }}>
@@ -828,7 +823,7 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
           </div>
         )}
 
-        {activeTab === 'agent' && (
+        {isAgentView && (
           <div>
             {!agentWallet ? (
               <div style={{ padding: '40px', textAlign: 'center', background: theme.bgCard, borderRadius: '12px', border: `1px solid ${theme.border}` }}>
@@ -1833,6 +1828,25 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
      }
   }, [swapDetails]);
 
+  // Save confirmed swap to portfolio_transactions DB
+  useEffect(() => {
+    if (swapStatus === 'confirmed' && txHash && address && fromToken && toToken && fromAmount) {
+      fetch('/api/portfolio/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress: address,
+          type: 'swap',
+          txHash,
+          tokenIn: fromToken,
+          tokenOut: toToken,
+          amountIn: fromAmount,
+          amountOut: toAmount || '',
+        }),
+      }).catch(err => console.warn('[Portfolio] Failed to record swap transaction:', err));
+    }
+  }, [swapStatus, txHash]);
+
   const handleSwap = async () => {
     if (!isConnected || !quote) return;
 
@@ -2700,8 +2714,8 @@ const AgentWalletPanel = ({ theme, isDark, address, balance }) => {
             <div style={{ fontSize: '13px', color: theme.textMuted, marginBottom: '14px', lineHeight: '1.5' }}>
               Create a CDP-managed wallet for autonomous on-chain operations on Base Sepolia.
             </div>
-            <button onClick={handleCreateWallet} disabled={isCreating || !address}
-              style={{ padding: '12px 22px', background: 'linear-gradient(135deg, #3b82f6, #6366f1)', border: 'none', borderRadius: '8px', color: 'white', fontSize: '14px', fontWeight: '600', cursor: (isCreating || !address) ? 'not-allowed' : 'pointer', opacity: (isCreating || !address) ? 0.7 : 1 }}>
+            <button onClick={handleCreateWallet} disabled={isCreating}
+              style={{ padding: '12px 22px', background: 'linear-gradient(135deg, #3b82f6, #6366f1)', border: 'none', borderRadius: '8px', color: 'white', fontSize: '14px', fontWeight: '600', cursor: isCreating ? 'wait' : 'pointer', opacity: isCreating ? 0.7 : 1 }}>
               {isCreating ? 'Creating...' : 'Create Agent Wallet'}
             </button>
             {!address && <div style={{ marginTop: '8px', fontSize: '12px', color: theme.textMuted }}>Connect your wallet to continue.</div>}
@@ -2880,10 +2894,22 @@ const AgentQueryPanel = ({ theme, isDark }) => {
 // ─── Agent v2: Faucet Panel ───────────────────────────────────────────────────
 const AgentFaucetPanel = ({ theme, isDark }) => {
   const { address } = useAccount();
-  const [targetAddr, setTargetAddr] = useState(address ?? '');
+  const [agentAddress, setAgentAddress] = useState<string | null>(null);
+  const [loadingAgent, setLoadingAgent] = useState(true);
   const [selectedTokens, setSelectedTokens] = useState<string[]>(['eth']);
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<Array<{token:string;success:boolean;txHash?:string;baseScanUrl?:string;error?:string}>>([]);
+
+  // Fetch agent wallet address from DB — faucet must target agent wallet, not user wallet
+  useEffect(() => {
+    if (!address) return;
+    setLoadingAgent(true);
+    fetch(`/api/portfolio/agent-wallets?userId=${address}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(wallet => setAgentAddress(wallet?.address ?? null))
+      .catch(() => setAgentAddress(null))
+      .finally(() => setLoadingAgent(false));
+  }, [address]);
 
   const tokens = [
     { id: 'eth', label: 'ETH', color: '#627EEA' },
@@ -2897,14 +2923,14 @@ const AgentFaucetPanel = ({ theme, isDark }) => {
   };
 
   const handleRequest = async () => {
-    if (!targetAddr || !selectedTokens.length) return;
+    if (!agentAddress || !selectedTokens.length) return;
     setIsLoading(true);
     setResults([]);
     try {
       const res = await fetch('/api/agent/faucet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address: targetAddr, tokens: selectedTokens }),
+        body: JSON.stringify({ address: agentAddress, tokens: selectedTokens }),
       });
       const data = await res.json();
       setResults(data.results ?? []);
@@ -2918,44 +2944,58 @@ const AgentFaucetPanel = ({ theme, isDark }) => {
   return (
     <div style={{ padding: '24px', background: theme.bgCard, borderRadius: '14px', border: `1px solid ${theme.border}` }}>
       <h3 style={{ color: theme.textPrimary, fontSize: '16px', fontWeight: '600', margin: '0 0 16px 0' }}>🚰 Get Testnet Funds</h3>
-      <div style={{ marginBottom: '16px' }}>
-        <div style={{ fontSize: '12px', color: theme.textMuted, marginBottom: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Wallet Address</div>
-        <input value={targetAddr} onChange={e => setTargetAddr(e.target.value)}
-          placeholder="0x..."
-          style={{ width: '100%', padding: '12px 16px', background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)', border: `1px solid ${theme.border}`, borderRadius: '8px', color: theme.textPrimary, fontSize: '13px', outline: 'none', boxSizing: 'border-box' }} />
+
+      {/* Agent wallet address (read-only — faucet always targets agent wallet) */}
+      <div style={{ marginBottom: '16px', padding: '12px 14px', borderRadius: '10px', background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)', border: `1px solid ${theme.border}` }}>
+        <div style={{ fontSize: '11px', color: theme.textMuted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '6px' }}>Sending to Agent Wallet</div>
+        {loadingAgent ? (
+          <div style={{ color: theme.textMuted, fontSize: '13px' }}>Loading agent wallet...</div>
+        ) : agentAddress ? (
+          <div style={{ fontFamily: 'monospace', fontSize: '13px', color: theme.textPrimary, wordBreak: 'break-all' }}>{agentAddress}</div>
+        ) : (
+          <div style={{ color: '#ef4444', fontSize: '13px' }}>
+            No agent wallet found. Create one first using the "Create &amp; Manage Wallet" card.
+          </div>
+        )}
       </div>
-      <div style={{ marginBottom: '20px' }}>
-        <div style={{ fontSize: '12px', color: theme.textMuted, marginBottom: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Select Tokens</div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          {tokens.map(t => (
-            <button key={t.id} onClick={() => toggle(t.id)}
-              style={{ padding: '8px 16px', borderRadius: '8px', border: `1.5px solid ${selectedTokens.includes(t.id) ? t.color : theme.border}`, background: selectedTokens.includes(t.id) ? `${t.color}15` : 'transparent', color: selectedTokens.includes(t.id) ? t.color : theme.textSecondary, fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
-      <button onClick={handleRequest} disabled={isLoading || !targetAddr || !selectedTokens.length}
-        style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #3b82f6, #6366f1)', border: 'none', borderRadius: '10px', color: 'white', fontSize: '15px', fontWeight: '600', cursor: (isLoading || !targetAddr || !selectedTokens.length) ? 'not-allowed' : 'pointer', opacity: (isLoading || !targetAddr || !selectedTokens.length) ? 0.6 : 1 }}>
-        {isLoading ? 'Requesting...' : 'Request Testnet Funds'}
-      </button>
-      {results.length > 0 && (
-        <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {results.map((r, i) => (
-            <div key={i} style={{ padding: '12px 16px', borderRadius: '8px', background: r.success ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)', border: `1px solid ${r.success ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}` }}>
-              <div style={{ color: r.success ? '#10b981' : '#ef4444', fontWeight: '600', fontSize: '13px', marginBottom: r.baseScanUrl ? '4px' : 0 }}>
-                {r.success ? `✅ ${r.token.toUpperCase()} requested` : `❌ ${r.token.toUpperCase()}: ${r.error}`}
-              </div>
-              {r.baseScanUrl && (
-                <a href={r.baseScanUrl} target="_blank" rel="noopener noreferrer"
-                  style={{ color: '#10b981', fontSize: '12px', textDecoration: 'underline' }}>
-                  View on BaseScan →
-                </a>
-              )}
+
+      {agentAddress && (
+        <>
+          <div style={{ marginBottom: '20px' }}>
+            <div style={{ fontSize: '12px', color: theme.textMuted, marginBottom: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Select Tokens</div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              {tokens.map(t => (
+                <button key={t.id} onClick={() => toggle(t.id)}
+                  style={{ padding: '8px 16px', borderRadius: '8px', border: `1.5px solid ${selectedTokens.includes(t.id) ? t.color : theme.border}`, background: selectedTokens.includes(t.id) ? `${t.color}15` : 'transparent', color: selectedTokens.includes(t.id) ? t.color : theme.textSecondary, fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                  {t.label}
+                </button>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+          <button onClick={handleRequest} disabled={isLoading || !selectedTokens.length}
+            style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #3b82f6, #6366f1)', border: 'none', borderRadius: '10px', color: 'white', fontSize: '15px', fontWeight: '600', cursor: (isLoading || !selectedTokens.length) ? 'not-allowed' : 'pointer', opacity: (isLoading || !selectedTokens.length) ? 0.6 : 1 }}>
+            {isLoading ? 'Requesting...' : 'Request Testnet Funds'}
+          </button>
+          {results.length > 0 && (
+            <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {results.map((r, i) => (
+                <div key={i} style={{ padding: '12px 16px', borderRadius: '8px', background: r.success ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)', border: `1px solid ${r.success ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}` }}>
+                  <div style={{ color: r.success ? '#10b981' : '#ef4444', fontWeight: '600', fontSize: '13px', marginBottom: r.baseScanUrl ? '4px' : 0 }}>
+                    {r.success ? `✅ ${r.token.toUpperCase()} sent to agent wallet` : `❌ ${r.token.toUpperCase()}: ${r.error}`}
+                  </div>
+                  {r.baseScanUrl && (
+                    <a href={r.baseScanUrl} target="_blank" rel="noopener noreferrer"
+                      style={{ color: '#10b981', fontSize: '12px', textDecoration: 'underline' }}>
+                      View on BaseScan →
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
+
       <div style={{ marginTop: '12px', padding: '10px 14px', borderRadius: '8px', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', fontSize: '12px', color: theme.textSecondary }}>
         💡 Alternatively, visit <a href="https://portal.cdp.coinbase.com/products/faucet" target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6' }}>Coinbase CDP Faucet</a> to claim tokens directly.
       </div>
