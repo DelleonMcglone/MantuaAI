@@ -100,7 +100,7 @@ export function registerAgentRoutes(app: Express): void {
           apiKeyId: process.env.CDP_API_KEY_NAME!,
           apiKeySecret: process.env.CDP_API_KEY_PRIVATE_KEY!,
         });
-        const wallet = await cdp.evm.createWallet({ network: 'base-sepolia' });
+        const wallet = await cdp.evm.createAccount({});
         address = wallet.address;
         walletId = `cdp_${wallet.address.slice(2, 10)}_${Date.now()}`;
       } catch {
@@ -172,20 +172,18 @@ export function registerAgentRoutes(app: Express): void {
             apiKeySecret: process.env.CDP_API_KEY_PRIVATE_KEY!,
           });
 
-          // CDP faucet call — check actual SDK for correct method
-          const faucetResult = await (cdp.evm as Record<string, (args: { address: string; token: string; network: string }) => Promise<{ transactionHash: string }>>)
-            .requestFaucetFunds?.({ address, token, network: 'base-sepolia' });
+          const faucetResult = await cdp.evm.requestFaucet({
+            address,
+            token: token as 'eth' | 'usdc' | 'eurc' | 'cbbtc',
+            network: 'base-sepolia',
+          });
 
-          if (faucetResult?.transactionHash) {
-            results.push({
-              token,
-              success: true,
-              txHash: faucetResult.transactionHash,
-              baseScanUrl: `https://sepolia.basescan.org/tx/${faucetResult.transactionHash}`,
-            });
-          } else {
-            throw new Error('No tx hash returned');
-          }
+          results.push({
+            token,
+            success: true,
+            txHash: faucetResult.transactionHash,
+            baseScanUrl: `https://sepolia.basescan.org/tx/${faucetResult.transactionHash}`,
+          });
         } catch (cdpErr) {
           // CDP unavailable — instruct user to use web faucet
           results.push({

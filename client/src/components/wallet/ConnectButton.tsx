@@ -8,7 +8,7 @@
  *  - Disconnect button
  */
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useAppKit, useAppKitAccount, useDisconnect } from '@reown/appkit/react';
 import { useBalance, useReadContracts } from 'wagmi';
 import { erc20Abi, formatUnits } from 'viem';
@@ -83,12 +83,15 @@ export function ConnectButton({
   });
 
   // ERC20 balances (cbBTC, USDC, EURC) via multicall
-  const erc20Contracts = ERC20_TOKENS.map(token => ({
-    address: token.address as `0x${string}`,
-    abi: erc20Abi,
-    functionName: 'balanceOf' as const,
-    args: [address as `0x${string}`],
-  }));
+  const erc20Contracts = useMemo(() => {
+    if (!address) return [];
+    return ERC20_TOKENS.map(token => ({
+      address: token.address as `0x${string}`,
+      abi: erc20Abi,
+      functionName: 'balanceOf' as const,
+      args: [address as `0x${string}`],
+    }));
+  }, [address]);
   const { data: erc20Data } = useReadContracts({
     contracts: erc20Contracts,
     query: { enabled: isConnected && !!address, refetchInterval: 30_000 },

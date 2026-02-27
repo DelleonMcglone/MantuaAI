@@ -63,7 +63,9 @@
       "Bash(/home/runner/workspace/client/src/utils/queryClassifier.ts:*)",
       "Bash(grep:*)",
       "Bash(/home/runner/workspace/server/db/migrations/003_pools_portfolio.sql:*)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(npx skills add Uniswap/uniswap-ai)",
+      "Bash(npx skills add Uniswap/uniswap-ai --yes)"
     ]
   }
 }
