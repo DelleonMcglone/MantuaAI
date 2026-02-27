@@ -61,7 +61,8 @@ function extractRevertReason(error: unknown): string {
   if (customErrorMatch) return `Contract error: ${customErrorMatch[1]}`;
 
   if (msg.includes('insufficient funds')) return 'Insufficient balance for this swap';
-  if (msg.includes('exceeds max transaction gas')) return 'Transaction too expensive — pool may be uninitialized or have no liquidity';
+  if (msg.includes('exceeds max transaction gas') || msg.includes('exceeds maximum per-transaction'))
+    return 'Transaction too expensive — pool may be uninitialized or have no liquidity. Add liquidity first.';
   if (msg.includes('execution reverted')) return 'Swap reverted — pool may not exist or have insufficient liquidity';
 
   if (msg.length > 150) return msg.slice(0, 150) + '...';

@@ -6,32 +6,22 @@ import { getPriceBySymbol } from '../../services/priceService';
 import { ArrowLeftRightIcon } from '../icons';
 import { parseError } from '../../lib/errorMessages';
 import { useAddLiquidity } from '../../hooks/useAddLiquidity';
-import { useTokenApproval } from '../../hooks/useTokenApproval';
 import { usePoolState } from '../../hooks/usePoolState';
-import { createPoolKey, getHookAddress, getPoolModifyLiquidityTestAddress, isNativeEth } from '../../lib/swap-utils';
+import { createPoolKey, getHookAddress, isNativeEth } from '../../lib/swap-utils';
 import { LiquidityTokenInput } from './LiquidityTokenInput';
 
 type RangeType = 'Full Range' | 'Wide' | 'Narrow' | 'Custom';
+// Ticks must be multiples of tickSpacing (60 for the 0.3% fee tier used here).
+// MAX_TICK = 887272; floor(887272 / 60) * 60 = 887220.
 const RANGE_TICKS: Record<RangeType, { tickLower: number; tickUpper: number }> = {
-  'Full Range': { tickLower: -887272, tickUpper: 887272 },
-  'Wide':       { tickLower: -887272, tickUpper: 887272 },
+  'Full Range': { tickLower: -887220, tickUpper: 887220 },
+  'Wide':       { tickLower: -887220, tickUpper: 887220 },
   'Narrow':     { tickLower: -600,    tickUpper: 600    },
-  'Custom':     { tickLower: -887272, tickUpper: 887272 },
+  'Custom':     { tickLower: -887220, tickUpper: 887220 },
 };
 const HOOK_ID_MAP: Record<string, string> = { directional: 'df', jit: 'ym', none: 'none' };
 const EXPLORERS: Record<number, string> = { 84532: 'https://sepolia.basescan.org' };
 
-function computeLiquidityDelta(amount: number, decimals: number): bigint {
-  const amountStr = amount.toFixed(Math.min(decimals, 8));
-  const amountRaw = parseUnits(amountStr, decimals);
-  if (decimals <= 6) {
-    return amountRaw * BigInt(50);
-  }
-  if (decimals <= 8) {
-    return amountRaw / BigInt(2);
-  }
-  return amountRaw / BigInt(20);
-}
 
 interface AddLiquidityFormProps {
   theme: any;
@@ -57,19 +47,14 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
   const [amount0, setAmount0] = useState('');
   const [amount1, setAmount1] = useState('');
   const [range, setRange] = useState<RangeType>('Full Range');
-  const [approvalStep, setApprovalStep] = useState<'idle' | 'approving0' | 'approving1' | 'ready'>('idle');
   const { isConnected, address } = useAccount();
   const chainId = useChainId();
-  const { addLiquidity, isPending, isConfirming, isInitializing, isSuccess, error, hash } = useAddLiquidity();
+  const { addLiquidity, isPending, isConfirming, isInitializing, approvalStep, isSuccess, error, hash } = useAddLiquidity();
   const hookAddr = getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none');
   const poolState = usePoolState(tokenA?.address, tokenB?.address, 3000, hookAddr);
 
   const priceA = tokenA ? getPriceBySymbol(tokenA.symbol) : 0;
   const priceB = tokenB ? getPriceBySymbol(tokenB.symbol) : 0;
-
-  const spenderAddress = useMemo(() => {
-    try { return getPoolModifyLiquidityTestAddress(chainId); } catch { return undefined; }
-  }, [chainId]);
 
   const parsedAmount0 = parseFloat(amount0) || 0;
   const parsedAmount1 = parseFloat(amount1) || 0;
@@ -88,52 +73,32 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
     } catch { return BigInt(0); }
   }, [parsedAmount1, tokenB]);
 
-  const approval0 = useTokenApproval({
-    tokenAddress: tokenA?.address ?? '0x0000000000000000000000000000000000000000',
-    spenderAddress,
-    amount: rawAmount0,
-    enabled: !!tokenA && parsedAmount0 > 0 && !!spenderAddress,
-  });
-
-  const approval1 = useTokenApproval({
-    tokenAddress: tokenB?.address ?? '0x0000000000000000000000000000000000000000',
-    spenderAddress,
-    amount: rawAmount1,
-    enabled: !!tokenB && parsedAmount1 > 0 && !!spenderAddress,
-  });
-
   const handleAmount0Change = (val: string) => {
     setAmount0(val);
-    setApprovalStep('idle');
     if (priceA && priceB && val && !isNaN(parseFloat(val)))
       setAmount1((parseFloat(val) * priceA / priceB).toFixed(6));
   };
   const handleAmount1Change = (val: string) => {
     setAmount1(val);
-    setApprovalStep('idle');
     if (priceA && priceB && val && !isNaN(parseFloat(val)))
       setAmount0((parseFloat(val) * priceB / priceA).toFixed(6));
   };
 
   const canSubmit = isConnected && !!tokenA && !!tokenB && parsedAmount0 > 0 && parsedAmount1 > 0;
-  const bothApproved = approval0.isApproved && approval1.isApproved;
 
-  // Compute ETH value to send as msg.value when currency0 is native (ETH)
   const buildPoolParams = () => {
     if (!tokenA || !tokenB) return null;
     const { tickLower, tickUpper } = RANGE_TICKS[range];
     const poolKey = createPoolKey(tokenA.address, tokenB.address, 3000, getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none'));
-    const liqDelta = computeLiquidityDelta(parsedAmount0, tokenA.decimals);
     const isCurrency0A = poolKey.currency0.toLowerCase() === tokenA.address.toLowerCase();
     const c0Dec = isCurrency0A ? tokenA.decimals : tokenB.decimals;
     const c1Dec = isCurrency0A ? tokenB.decimals : tokenA.decimals;
-    // Send ETH as msg.value if either currency is native ETH
-    const ethValue = isNativeEth(poolKey.currency0)
-      ? (isCurrency0A ? rawAmount0 : rawAmount1)
-      : isNativeEth(poolKey.currency1)
-      ? (isCurrency0A ? rawAmount1 : rawAmount0)
+    const amount0Desired = isCurrency0A ? rawAmount0 : rawAmount1;
+    const amount1Desired = isCurrency0A ? rawAmount1 : rawAmount0;
+    const ethValue = isNativeEth(poolKey.currency0) ? amount0Desired
+      : isNativeEth(poolKey.currency1) ? amount1Desired
       : BigInt(0);
-    return { poolKey, tickLower, tickUpper, liqDelta, c0Dec, c1Dec, ethValue };
+    return { poolKey, tickLower, tickUpper, c0Dec, c1Dec, amount0Desired, amount1Desired, ethValue };
   };
 
   // Save liquidity to DB after successful confirmation
@@ -170,55 +135,41 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
     }
   }, [isSuccess, hash]);
 
-  const handleApproveAndSubmit = async () => {
-    if (!canSubmit || !tokenA || !tokenB) return;
-
-    try {
-      if (approval0.needsApproval) {
-        setApprovalStep('approving0');
-        await approval0.approve(true);
-      }
-      if (approval1.needsApproval) {
-        setApprovalStep('approving1');
-        await approval1.approve(true);
-      }
-      setApprovalStep('ready');
-    } catch {
-      setApprovalStep('idle');
-      return;
-    }
-
+  const handleSubmit = () => {
+    if (!canSubmit || !tokenA || !tokenB || !address) return;
     const params = buildPoolParams();
     if (!params) return;
     addLiquidity(
-      { poolKey: params.poolKey, tickLower: params.tickLower, tickUpper: params.tickUpper, liquidityDelta: params.liqDelta, hookData: '0x', ethValue: params.ethValue },
-      true, params.c0Dec, params.c1Dec
-    );
-  };
-
-  const handleSubmitOnly = () => {
-    if (!canSubmit || !tokenA || !tokenB) return;
-    const params = buildPoolParams();
-    if (!params) return;
-    addLiquidity(
-      { poolKey: params.poolKey, tickLower: params.tickLower, tickUpper: params.tickUpper, liquidityDelta: params.liqDelta, hookData: '0x', ethValue: params.ethValue },
-      true, params.c0Dec, params.c1Dec
+      {
+        poolKey: params.poolKey,
+        tickLower: params.tickLower,
+        tickUpper: params.tickUpper,
+        liquidityDelta: 0n,
+        hookData: '0x',
+        ethValue: params.ethValue,
+        currency0Decimals: params.c0Dec,
+        currency1Decimals: params.c1Dec,
+        amount0Desired: params.amount0Desired,
+        amount1Desired: params.amount1Desired,
+      },
+      true,
+      params.c0Dec,
+      params.c1Dec,
+      address as `0x${string}`
     );
   };
 
   const getButtonText = () => {
     if (!isConnected) return 'Connect Wallet';
-    if (approvalStep === 'approving0') return `Approving ${tokenA?.symbol}…`;
-    if (approvalStep === 'approving1') return `Approving ${tokenB?.symbol}…`;
+    if (approvalStep) return approvalStep;
     if (isInitializing) return 'Initializing pool…';
     if (isPending) return 'Confirm in wallet…';
     if (isConfirming) return 'Adding Liquidity…';
     if (!poolState.isInitialized && !poolState.isLoading && tokenA && tokenB) return 'Initialize Pool & Add Liquidity';
-    if (!bothApproved && canSubmit) return `Approve & Add Liquidity`;
     return `Add Liquidity with ${hookObj.name}`;
   };
 
-  const isButtonDisabled = !canSubmit || isPending || isConfirming || approvalStep === 'approving0' || approvalStep === 'approving1';
+  const isButtonDisabled = !canSubmit || isPending || isConfirming || !!approvalStep;
 
   const explorerUrl = EXPLORERS[chainId] ?? 'https://sepolia.basescan.org';
   return (
@@ -285,16 +236,10 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
         </div>
       )}
 
-      {canSubmit && !bothApproved && (
-        <div style={{ marginBottom: '12px', padding: '10px 12px', borderRadius: '10px', background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.15)', fontSize: '12px', color: theme.textSecondary }}>
-          Token approvals are required before adding liquidity. You'll be prompted to approve each token.
-        </div>
-      )}
-
       <div style={{ marginTop: '12px' }}>
         <button
           data-testid="button-add-liquidity"
-          onClick={bothApproved ? handleSubmitOnly : handleApproveAndSubmit}
+          onClick={handleSubmit}
           disabled={isButtonDisabled}
           style={{ width: '100%', background: !canSubmit ? (isDark ? '#374151' : '#e5e7eb') : `linear-gradient(135deg, ${hookColor} 0%, #8b5cf6 100%)`, border: 'none', borderRadius: '16px', padding: '16px', color: !canSubmit ? theme.textMuted : 'white', fontSize: '16px', fontWeight: '700', cursor: isButtonDisabled ? 'not-allowed' : 'pointer', boxShadow: canSubmit ? `0 8px 20px ${hookColor}40` : 'none', transition: 'all 0.2s' }}
         >
@@ -305,9 +250,9 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
             Liquidity added!{' '}<a href={`${explorerUrl}/tx/${hash}`} target="_blank" rel="noopener noreferrer" style={{ color: '#10b981', textDecoration: 'underline' }}>View transaction</a>
           </div>
         )}
-        {(error || approval0.error || approval1.error) && (
+        {error && (
           <div data-testid="text-liquidity-error" style={{ marginTop: '8px', padding: '10px 12px', borderRadius: '10px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontSize: '13px' }}>
-            {parseError(error || approval0.error || approval1.error)}
+            {parseError(error)}
           </div>
         )}
       </div>

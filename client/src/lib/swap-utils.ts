@@ -25,6 +25,14 @@ export function getStateViewAddress(chainId: number): Address {
   return getV4Address(chainId, 'stateView');
 }
 
+export function getPositionManagerAddress(chainId: number): Address {
+  return getV4Address(chainId, 'positionManager');
+}
+
+export function getPermit2Address(chainId: number): Address {
+  return getV4Address(chainId, 'permit2');
+}
+
 /**
  * Hook contract addresses by hook type
  * 

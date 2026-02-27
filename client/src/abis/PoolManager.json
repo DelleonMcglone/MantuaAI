@@ -15,8 +15,7 @@
           { "name": "hooks", "type": "address" }
         ]
       },
-      { "name": "sqrtPriceX96", "type": "uint160" },
-      { "name": "hookData", "type": "bytes" }
+      { "name": "sqrtPriceX96", "type": "uint160" }
     ],
     "outputs": [
       { "name": "tick", "type": "int24" }
