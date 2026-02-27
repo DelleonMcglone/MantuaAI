@@ -5,7 +5,7 @@ import type { Token } from '../../config/tokens';
 import { getPriceBySymbol } from '../../services/priceService';
 import { ArrowLeftRightIcon } from '../icons';
 import { parseError } from '../../lib/errorMessages';
-import { useAddLiquidity } from '../../hooks/useAddLiquidity';
+import { useAddLiquidity, computeSqrtPriceX96 } from '../../hooks/useAddLiquidity';
 import { usePoolState } from '../../hooks/usePoolState';
 import { createPoolKey, getHookAddress, isNativeEth } from '../../lib/swap-utils';
 import { LiquidityTokenInput } from './LiquidityTokenInput';
@@ -49,7 +49,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
   const [range, setRange] = useState<RangeType>('Full Range');
   const { isConnected, address } = useAccount();
   const chainId = useChainId();
-  const { addLiquidity, isPending, isConfirming, isInitializing, approvalStep, isSuccess, error, hash } = useAddLiquidity();
+  const { addLiquidity, isPending, isConfirming, step, totalSteps, stepLabel, isSuccess, error, hash, reset } = useAddLiquidity();
   const hookAddr = getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none');
   const poolState = usePoolState(tokenA?.address, tokenB?.address, 3000, hookAddr);
 
@@ -98,7 +98,13 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
     const ethValue = isNativeEth(poolKey.currency0) ? amount0Desired
       : isNativeEth(poolKey.currency1) ? amount1Desired
       : BigInt(0);
-    return { poolKey, tickLower, tickUpper, c0Dec, c1Dec, amount0Desired, amount1Desired, ethValue };
+    // Compute sqrtPriceX96 from live USD prices for pool initialization
+    let sqrtPriceX96: bigint | undefined;
+    if (priceA > 0 && priceB > 0) {
+      const priceToken1PerToken0 = isCurrency0A ? priceA / priceB : priceB / priceA;
+      sqrtPriceX96 = computeSqrtPriceX96(priceToken1PerToken0, c0Dec, c1Dec);
+    }
+    return { poolKey, tickLower, tickUpper, c0Dec, c1Dec, amount0Desired, amount1Desired, ethValue, sqrtPriceX96 };
   };
 
   // Save liquidity to DB after successful confirmation
@@ -139,37 +145,28 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
     if (!canSubmit || !tokenA || !tokenB || !address) return;
     const params = buildPoolParams();
     if (!params) return;
-    addLiquidity(
-      {
-        poolKey: params.poolKey,
-        tickLower: params.tickLower,
-        tickUpper: params.tickUpper,
-        liquidityDelta: 0n,
-        hookData: '0x',
-        ethValue: params.ethValue,
-        currency0Decimals: params.c0Dec,
-        currency1Decimals: params.c1Dec,
-        amount0Desired: params.amount0Desired,
-        amount1Desired: params.amount1Desired,
-      },
-      true,
-      params.c0Dec,
-      params.c1Dec,
-      address as `0x${string}`
-    );
+    reset();
+    addLiquidity({
+      poolKey: params.poolKey,
+      tickLower: params.tickLower,
+      tickUpper: params.tickUpper,
+      amount0Desired: params.amount0Desired,
+      amount1Desired: params.amount1Desired,
+      userAddress: address as `0x${string}`,
+      sqrtPriceX96: params.sqrtPriceX96,
+    });
   };
 
   const getButtonText = () => {
     if (!isConnected) return 'Connect Wallet';
-    if (approvalStep) return approvalStep;
-    if (isInitializing) return 'Initializing pool…';
+    if (step > 0 && stepLabel) return `[${Array.from({length: totalSteps}, (_, i) => i < step ? '●' : '○').join('')}] Step ${step} of ${totalSteps}: ${stepLabel}`;
     if (isPending) return 'Confirm in wallet…';
     if (isConfirming) return 'Adding Liquidity…';
     if (!poolState.isInitialized && !poolState.isLoading && tokenA && tokenB) return 'Initialize Pool & Add Liquidity';
     return `Add Liquidity with ${hookObj.name}`;
   };
 
-  const isButtonDisabled = !canSubmit || isPending || isConfirming || !!approvalStep;
+  const isButtonDisabled = !canSubmit || isPending || isConfirming;
 
   const explorerUrl = EXPLORERS[chainId] ?? 'https://sepolia.basescan.org';
   return (
