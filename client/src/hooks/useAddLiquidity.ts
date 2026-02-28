@@ -297,16 +297,17 @@ export function useAddLiquidity() {
   const [totalSteps, setTotalSteps] = useState(3);
   const [stepLabel,  setStepLabel]  = useState('');
   const [setupError, setSetupError] = useState<Error | null>(null);
+  // Track only the final (modifyLiquidities) tx hash so success fires at the right time
+  const [finalHash, setFinalHash] = useState<`0x${string}` | undefined>();
 
   const {
     writeContractAsync,
-    data:     hash,
     isPending,
     error:    writeError,
     reset:    resetWrite,
   } = useWriteContract();
 
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: finalHash });
 
   const checkPoolInitialized = useCallback(async (poolKey: PoolKey): Promise<boolean> => {
     if (!publicClient) return false;
@@ -465,43 +466,50 @@ export function useAddLiquidity() {
 
       const ethValue = isNative0 ? amount0Max : (isNative1 ? amount1Max : 0n);
 
-      const modifyCalldata = encodeFunctionData({
+      if (!poolInitialized) {
+        // Two separate transactions to stay within block gas limits:
+        // Tx A: initialize the pool
+        setStepLabel('Initializing pool…');
+        try {
+          const initTx = await writeContractAsync({
+            address: positionManagerAddr,
+            abi: PositionManagerABI,
+            functionName: 'initializePool',
+            args: [
+              {
+                currency0:   poolKey.currency0,
+                currency1:   poolKey.currency1,
+                fee:         poolKey.fee,
+                tickSpacing: poolKey.tickSpacing,
+                hooks:       poolKey.hooks,
+              },
+              currentSqrtPrice,
+            ],
+          });
+          await publicClient.waitForTransactionReceipt({ hash: initTx });
+        } catch (initErr) {
+          const initMsg = initErr instanceof Error ? initErr.message : String(initErr);
+          // If pool was already initialized by a concurrent tx, continue anyway
+          if (!isAlreadyInitializedError(initMsg)) {
+            setSetupError(new Error(decodeV4Error(initMsg) || `Pool initialization failed: ${initMsg.slice(0, 150)}`));
+            return;
+          }
+        }
+        setStep(s => s + 1);
+        setTotalSteps(t => t + 1);
+      }
+
+      // Tx B: add liquidity
+      setStepLabel('Adding liquidity…');
+      const modifyTx = await writeContractAsync({
+        address: positionManagerAddr,
         abi: PositionManagerABI,
         functionName: 'modifyLiquidities',
         args: [unlockData, deadline],
+        value: ethValue,
       });
-
-      if (!poolInitialized) {
-        const initCalldata = encodeFunctionData({
-          abi: PositionManagerABI,
-          functionName: 'initializePool',
-          args: [
-            {
-              currency0:   poolKey.currency0,
-              currency1:   poolKey.currency1,
-              fee:         poolKey.fee,
-              tickSpacing: poolKey.tickSpacing,
-              hooks:       poolKey.hooks,
-            },
-            currentSqrtPrice,
-          ],
-        });
-        await writeContractAsync({
-          address: positionManagerAddr,
-          abi: PositionManagerABI,
-          functionName: 'multicall',
-          args: [[initCalldata, modifyCalldata]],
-          value: ethValue,
-        });
-      } else {
-        await writeContractAsync({
-          address: positionManagerAddr,
-          abi: PositionManagerABI,
-          functionName: 'modifyLiquidities',
-          args: [unlockData, deadline],
-          value: ethValue,
-        });
-      }
+      // Set the final hash *before* the finally block so isSuccess fires correctly
+      setFinalHash(modifyTx);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (isAlreadyInitializedError(msg)) {
@@ -520,6 +528,7 @@ export function useAddLiquidity() {
     setSetupError(null);
     setStep(0);
     setStepLabel('');
+    setFinalHash(undefined);
   }, [resetWrite]);
 
   const displayError = setupError ?? writeError ?? null;
@@ -534,7 +543,7 @@ export function useAddLiquidity() {
   return {
     addLiquidity,
     checkPoolInitialized,
-    hash,
+    hash: finalHash,
     step,
     totalSteps,
     stepLabel,

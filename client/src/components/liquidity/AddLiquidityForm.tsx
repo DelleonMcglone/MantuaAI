@@ -11,13 +11,13 @@ import { createPoolKey, getHookAddress, isNativeEth } from '../../lib/swap-utils
 import { LiquidityTokenInput } from './LiquidityTokenInput';
 
 type RangeType = 'Full Range' | 'Wide' | 'Narrow' | 'Custom';
-// Ticks must be multiples of tickSpacing (60 for the 0.3% fee tier used here).
-// MAX_TICK = 887272; floor(887272 / 60) * 60 = 887220.
+// Ticks must be multiples of tickSpacing (10 for the 0.05% fee tier used here).
+// MAX_TICK = 887272; floor(887272 / 10) * 10 = 887270.
 const RANGE_TICKS: Record<RangeType, { tickLower: number; tickUpper: number }> = {
-  'Full Range': { tickLower: -887220, tickUpper: 887220 },
-  'Wide':       { tickLower: -887220, tickUpper: 887220 },
-  'Narrow':     { tickLower: -600,    tickUpper: 600    },
-  'Custom':     { tickLower: -887220, tickUpper: 887220 },
+  'Full Range': { tickLower: -887270, tickUpper: 887270 },
+  'Wide':       { tickLower: -887270, tickUpper: 887270 },
+  'Narrow':     { tickLower: -100,    tickUpper: 100    },
+  'Custom':     { tickLower: -887270, tickUpper: 887270 },
 };
 const HOOK_ID_MAP: Record<string, string> = { directional: 'df', jit: 'ym', none: 'none' };
 const EXPLORERS: Record<number, string> = { 84532: 'https://sepolia.basescan.org' };
@@ -51,7 +51,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
   const chainId = useChainId();
   const { addLiquidity, isPending, isConfirming, step, totalSteps, stepLabel, isSuccess, error, hash, reset } = useAddLiquidity();
   const hookAddr = getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none');
-  const poolState = usePoolState(tokenA?.address, tokenB?.address, 3000, hookAddr);
+  const poolState = usePoolState(tokenA?.address, tokenB?.address, 500, hookAddr);
 
   const priceA = tokenA ? getPriceBySymbol(tokenA.symbol) : 0;
   const priceB = tokenB ? getPriceBySymbol(tokenB.symbol) : 0;
@@ -89,7 +89,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
   const buildPoolParams = () => {
     if (!tokenA || !tokenB) return null;
     const { tickLower, tickUpper } = RANGE_TICKS[range];
-    const poolKey = createPoolKey(tokenA.address, tokenB.address, 3000, getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none'));
+    const poolKey = createPoolKey(tokenA.address, tokenB.address, 500, getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none'));
     const isCurrency0A = poolKey.currency0.toLowerCase() === tokenA.address.toLowerCase();
     const c0Dec = isCurrency0A ? tokenA.decimals : tokenB.decimals;
     const c1Dec = isCurrency0A ? tokenB.decimals : tokenA.decimals;
@@ -119,7 +119,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
         body: JSON.stringify({
           token0: params.poolKey.currency0 === tokenA.address.toLowerCase() ? tokenA.symbol : tokenB.symbol,
           token1: params.poolKey.currency0 === tokenA.address.toLowerCase() ? tokenB.symbol : tokenA.symbol,
-          feeTier: 3000,
+          feeTier: 500,
           creatorAddress: address,
           txHash: hash,
         }),

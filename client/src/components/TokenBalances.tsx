@@ -3,13 +3,13 @@ import { formatUnits } from "viem";
 import { erc20Abi } from "viem";
 import {
   NATIVE_ETH,
-  STABLECOINS,
+  ERC20_TOKENS,
   type Token,
 } from "../config/tokens";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Skeleton } from "./ui/skeleton";
 
-const ALL_MOCK_TOKENS = [...STABLECOINS];
+const ALL_MOCK_TOKENS = [...ERC20_TOKENS];
 
 export function TokenBalances() {
   const { address, isConnected } = useAccount();
@@ -78,7 +78,7 @@ export function TokenBalances() {
     <Card>
       <CardHeader>
         <CardTitle>Token Balances</CardTitle>
-        <CardDescription>Your wallet balances (5 tokens)</CardDescription>
+        <CardDescription>Your wallet balances</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
@@ -120,10 +120,10 @@ export function TokenBalances() {
 
           <div>
             <h3 className="text-sm font-semibold text-muted-foreground mb-3">
-              Stablecoins
+              ERC-20 Tokens
             </h3>
             <div className="space-y-2">
-              {STABLECOINS.map((token) => (
+              {ERC20_TOKENS.map((token) => (
                 <div
                   key={token.symbol}
                   data-testid={`card-balance-${token.symbol}`}
@@ -139,13 +139,8 @@ export function TokenBalances() {
                       }}
                     />
                     <div>
-                      <div className="font-medium flex items-center gap-2">
+                      <div className="font-medium">
                         {token.symbol}
-                        {token.isMock && (
-                          <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded">
-                            Mock
-                          </span>
-                        )}
                       </div>
                       <div className="text-sm text-muted-foreground">{token.name}</div>
                     </div>

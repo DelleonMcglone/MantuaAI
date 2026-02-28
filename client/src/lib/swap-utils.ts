@@ -5,7 +5,7 @@
  * for integration with PoolSwapTest contract on Base Sepolia.
  */
 
-import { encodePacked, keccak256, type Address } from 'viem';
+import { encodePacked, encodeAbiParameters, keccak256, type Address } from 'viem';
 import { NATIVE_ETH } from '../config/tokens';
 import { getV4Address } from '../config/contracts';
 
@@ -141,9 +141,16 @@ export function createPoolKey(
 }
 
 export function getPoolId(poolKey: PoolKey): `0x${string}` {
+  // Uniswap v4 uses keccak256(abi.encode(key)) — 5 fields × 32 bytes = 160 bytes ABI-padded
   return keccak256(
-    encodePacked(
-      ['address', 'address', 'uint24', 'int24', 'address'],
+    encodeAbiParameters(
+      [
+        { type: 'address' },
+        { type: 'address' },
+        { type: 'uint24' },
+        { type: 'int24' },
+        { type: 'address' },
+      ],
       [poolKey.currency0, poolKey.currency1, poolKey.fee, poolKey.tickSpacing, poolKey.hooks]
     )
   );

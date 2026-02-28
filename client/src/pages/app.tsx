@@ -1761,7 +1761,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
     outputDecimals: toTokenData.decimals,
     slippageTolerance,
     hookAddress: getHookAddress(selectedHook),
-    feeTier: 25, // 0.0025% LP fee — gives minimum price impact display
+    feeTier: 500, // 0.05% fee tier — matches the ETH/USDC pool on Base Sepolia
     enabled: parsedAmount > BigInt(0),
   });
 
@@ -1856,6 +1856,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
       amountIn: parsedAmount,
       hookAddress: getHookAddress(selectedHook),
       hookId: selectedHook,
+      feeTier: 500, // must match the fee tier of the active ETH/USDC pool
     };
 
     try {
@@ -2184,7 +2185,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
 
           {/* Swap Details Breakdown */}
           {(() => {
-            const LP_FEE_PCT    = 0.0025; // matches feeTier: 25
+            const LP_FEE_PCT    = 0.0005; // matches feeTier: 500 (0.05%)
             const HOOK_FEE_PCT  = selectedHook !== 'none' ? 0.01 : 0;
             const TOTAL_FEE_PCT = LP_FEE_PCT + HOOK_FEE_PCT;
             const rateInclFees  = livePairRate !== null
