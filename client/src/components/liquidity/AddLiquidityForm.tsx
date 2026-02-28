@@ -212,7 +212,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
         <div style={{ borderTop: `1px solid ${theme.border}`, paddingTop: '10px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '13px' }}>
             <span style={{ color: theme.textSecondary }}>Fee Tier</span>
-            <span style={{ color: theme.textPrimary, fontWeight: '500' }}>0.30%</span>
+            <span style={{ color: theme.textPrimary, fontWeight: '500' }}>0.05%</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
             <span style={{ color: theme.textSecondary }}>Hook Benefit</span>

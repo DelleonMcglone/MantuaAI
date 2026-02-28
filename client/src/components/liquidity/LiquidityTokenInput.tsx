@@ -11,12 +11,11 @@ const TOKEN_GRADIENT_MAP: Record<string, string> = {
 function getTokenGradient(symbol: string): string {
   return TOKEN_GRADIENT_MAP[symbol] || 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)';
 }
-
 function getTokenGlyph(symbol: string): string {
-  if (symbol === 'ETH') return 'Ξ';
+  if (symbol === 'ETH')   return 'Ξ';
   if (symbol === 'cbBTC') return '₿';
-  if (symbol === 'USDC') return '$';
-  if (symbol === 'EURC') return '€';
+  if (symbol === 'USDC')  return '$';
+  if (symbol === 'EURC')  return '€';
   return symbol.charAt(0);
 }
 
@@ -57,12 +56,55 @@ export const LiquidityTokenInput: React.FC<LiquidityTokenInputProps> = ({
         </div>
       </div>
 
-      {/* Token pill button */}
-      <button onClick={onTokenClick} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderRadius: '9999px', border: isDark ? '1px solid #4b5563' : '1px solid #e5e7eb', background: isDark ? '#1f2937' : '#f3f4f6', color: isDark ? '#f3f4f6' : '#1f2937', cursor: 'pointer', fontSize: '15px', fontWeight: '600', flexShrink: 0, transition: 'background 0.2s ease' }}>
-        <div style={{ width: '26px', height: '26px', borderRadius: '50%', background: token ? getTokenGradient(token.symbol) : 'linear-gradient(135deg, #9ca3af 0%, #d1d5db 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '700', color: 'white', flexShrink: 0 }}>
+      {/* Token pill button — always light background to match swap modal in both themes */}
+      <button
+        onClick={onTokenClick}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '8px 16px',
+          borderRadius: '9999px',
+          border: '1px solid #e5e7eb',
+          background: '#f3f4f6',
+          color: '#111827',
+          cursor: 'pointer',
+          fontSize: '16px',
+          fontWeight: '600',
+          flexShrink: 0,
+          transition: 'background 0.2s ease',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+        }}
+      >
+        {/* Logo image — with gradient-circle fallback */}
+        {token?.logoURI ? (
+          <img
+            src={token.logoURI}
+            alt={token.symbol}
+            style={{ width: '28px', height: '28px', borderRadius: '50%', display: 'block', flexShrink: 0 }}
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              const sib = e.currentTarget.nextElementSibling as HTMLElement | null;
+              if (sib) sib.style.display = 'flex';
+            }}
+          />
+        ) : null}
+        <div style={{
+          width: '28px',
+          height: '28px',
+          borderRadius: '50%',
+          background: token ? getTokenGradient(token.symbol) : 'linear-gradient(135deg, #9ca3af 0%, #d1d5db 100%)',
+          display: token?.logoURI ? 'none' : 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '13px',
+          fontWeight: '700',
+          color: 'white',
+          flexShrink: 0,
+        }}>
           {token ? getTokenGlyph(token.symbol) : '?'}
         </div>
-        <span>{token?.symbol ?? 'Select'}</span>
+        <span>{token?.symbol ?? 'Select token'}</span>
         <ChevronDownIcon />
       </button>
     </div>
