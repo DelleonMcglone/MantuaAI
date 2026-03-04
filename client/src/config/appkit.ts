@@ -13,6 +13,7 @@ import { createAppKit } from '@reown/appkit/react';
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
 import { baseSepolia, unichainSepolia } from '@reown/appkit/networks';
 import type { AppKitNetwork } from '@reown/appkit/networks';
+import { http } from 'viem';
 
 // Get project ID - REQUIRED for WalletConnect QR code
 const projectId = import.meta.env.VITE_REOWN_PROJECT_ID || 'ad3378514000476f8321eef10f16882e';
@@ -39,10 +40,16 @@ const networks: [AppKitNetwork, ...AppKitNetwork[]] = [
   unichainSepolia,
 ];
 
-// Initialize Wagmi adapter
+// Initialize Wagmi adapter with explicit HTTP transports.
+// This is critical — without explicit transports, useReadContracts multicall
+// can silently fail for ERC20 balance reads when connected via WalletConnect/Reown.
 const wagmiAdapter = new WagmiAdapter({
   networks,
   projectId,
+  transports: {
+    [baseSepolia.id]:    http('https://sepolia.base.org'),
+    [unichainSepolia.id]: http('https://sepolia.unichain.org'),
+  },
 });
 
 // Create and export the AppKit modal instance

@@ -46,7 +46,8 @@ export const BASE_SEPOLIA_ERC20_TOKENS: Token[] = [
   {
     symbol: 'EURC',
     name: 'Euro Coin',
-    address: '0x808456652fdb597867f38412077A9182bf77359',
+    // Verified: https://base-sepolia.blockscout.com/token/0x808456652fdb597867f38412077A9182bf77359F
+    address: '0x808456652fdb597867f38412077A9182bf77359F',
     decimals: 6,
     chainId: 84532,
     logoURI: 'https://assets.coingecko.com/coins/images/26045/small/euro-coin.png',
@@ -75,7 +76,8 @@ export const UNICHAIN_SEPOLIA_ERC20_TOKENS: Token[] = [
   {
     symbol: 'USDC',
     name: 'USD Coin',
-    // Confirmed: https://developers.circle.com/stablecoins/usdc-contract-addresses
+    // Verified: https://unichain-sepolia.blockscout.com/token/0x31d0220469e10c4E71834a79b1f276d740d3768F
+    // Source: https://developers.circle.com/stablecoins/usdc-contract-addresses
     address: '0x31d0220469e10c4E71834a79b1f276d740d3768F',
     decimals: 6,
     chainId: 1301,
@@ -83,17 +85,9 @@ export const UNICHAIN_SEPOLIA_ERC20_TOKENS: Token[] = [
     coingeckoId: 'usd-coin',
     isNative: false,
   },
-  {
-    symbol: 'EURC',
-    name: 'Euro Coin',
-    // Source: Circle faucet deployment on Unichain Sepolia
-    address: '0x18fB358Bc74054B0c2530C48eF23f8A8D464cb18',
-    decimals: 6,
-    chainId: 1301,
-    logoURI: 'https://assets.coingecko.com/coins/images/26045/small/euro-coin.png',
-    coingeckoId: 'euro-coin',
-    isNative: false,
-  },
+  // Note: EURC on Unichain Sepolia — address unconfirmed via on-chain verification.
+  // If you receive EURC from https://faucet.circle.com on Unichain Sepolia,
+  // check your wallet's token list for the contract address and update here.
 ];
 
 // ─── Chain-aware token helpers ──────────────────────────────────────────────

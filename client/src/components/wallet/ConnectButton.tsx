@@ -3,18 +3,17 @@
  *
  * Displays "Connect Wallet" when disconnected.
  * When connected, shows truncated address and a dropdown with:
- *  - Dynamic network badge (Base Sepolia or Unichain Sepolia)
+ *  - Dynamic network badge + inline network switcher (Base Sepolia ↔ Unichain Sepolia)
  *  - ETH + chain-specific ERC20 balances with USD values
  *  - Copy address and Disconnect buttons
  */
 
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useAppKit, useAppKitAccount, useDisconnect } from '@reown/appkit/react';
-import { useBalance, useReadContracts, useChainId } from 'wagmi';
+import { useBalance, useReadContracts, useChainId, useSwitchChain } from 'wagmi';
 import { erc20Abi, formatUnits } from 'viem';
 import { getPriceBySymbol } from '../../services/priceService';
-import { getERC20Tokens } from '../../config/tokens';
-import { CHAIN_IDS } from '../../config/tokens';
+import { getERC20Tokens, CHAIN_IDS } from '../../config/tokens';
 
 interface ConnectButtonProps {
   className?: string;
@@ -29,7 +28,7 @@ function truncateAddress(address: string): string {
 
 function ExitIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
       <polyline points="16 17 21 12 16 7" />
       <line x1="21" y1="12" x2="9" y2="12" />
@@ -39,26 +38,45 @@ function ExitIcon() {
 
 function CopyIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
     </svg>
   );
 }
 
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+      style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+    >
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
 // Per-chain display config
-const CHAIN_META: Record<number, { name: string; color: string; bgColor: string }> = {
-  [CHAIN_IDS.BASE_SEPOLIA]: {
+const CHAIN_OPTIONS = [
+  {
+    id: CHAIN_IDS.BASE_SEPOLIA,
+    key: 'base-sepolia',
     name: 'Base Sepolia',
+    shortName: 'Base',
     color: '#60a5fa',
-    bgColor: 'rgba(59,130,246,0.15)',
+    bgColor: 'rgba(59,130,246,0.12)',
+    icon: '🔵',
   },
-  [CHAIN_IDS.UNICHAIN_SEPOLIA]: {
+  {
+    id: CHAIN_IDS.UNICHAIN_SEPOLIA,
+    key: 'unichain-sepolia',
     name: 'Unichain Sepolia',
+    shortName: 'Unichain',
     color: '#f472b6',
-    bgColor: 'rgba(244,114,182,0.15)',
+    bgColor: 'rgba(244,114,182,0.12)',
+    icon: '🦄',
   },
-};
+];
 
 export function ConnectButton({
   className = '',
@@ -69,12 +87,15 @@ export function ConnectButton({
   const { address, isConnected } = useAppKitAccount();
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
+  const { switchChain, isPending: isSwitching } = useSwitchChain();
+
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [networkMenuOpen, setNetworkMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const chainMeta = CHAIN_META[chainId] ?? CHAIN_META[CHAIN_IDS.BASE_SEPOLIA];
+  const currentChain = CHAIN_OPTIONS.find(c => c.id === chainId) ?? CHAIN_OPTIONS[0];
 
   // Callback when connection state changes
   useEffect(() => {
@@ -88,6 +109,7 @@ export function ConnectButton({
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setDropdownOpen(false);
+        setNetworkMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -144,15 +166,30 @@ export function ConnectButton({
 
   const handleClick = () => {
     if (isConnected) {
-      setDropdownOpen(!dropdownOpen);
+      setDropdownOpen(prev => !prev);
+      if (dropdownOpen) setNetworkMenuOpen(false);
     } else {
       open({ view: 'Connect' });
     }
   };
 
+  const handleSwitchChain = async (targetChainId: number) => {
+    if (targetChainId === chainId) {
+      setNetworkMenuOpen(false);
+      return;
+    }
+    try {
+      await switchChain({ chainId: targetChainId });
+    } catch (e) {
+      console.error('Chain switch failed:', e);
+    }
+    setNetworkMenuOpen(false);
+  };
+
   const handleDisconnect = async () => {
     await disconnect();
     setDropdownOpen(false);
+    setNetworkMenuOpen(false);
     onDisconnect?.();
   };
 
@@ -213,31 +250,116 @@ export function ConnectButton({
             position: 'absolute',
             right: 0,
             top: 'calc(100% + 6px)',
-            zIndex: 50,
+            zIndex: 9999,
             background: '#1a1b23',
             border: '1px solid rgba(255,255,255,0.08)',
             borderRadius: 14,
             padding: '14px 16px',
-            minWidth: 280,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+            minWidth: 290,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
           }}
         >
-          {/* Header: address + dynamic network badge */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          {/* Header: truncated address */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <span style={{ color: '#e5e7eb', fontSize: 13, fontWeight: 600 }}>
               {truncateAddress(address!)}
             </span>
-            <span style={{
-              background: chainMeta.bgColor,
-              color: chainMeta.color,
-              fontSize: 11,
-              fontWeight: 600,
-              borderRadius: 6,
-              padding: '2px 8px',
-              border: `1px solid ${chainMeta.color}40`,
-            }}>
-              {chainMeta.name}
+            <span style={{ color: '#6b7280', fontSize: 11 }}>
+              ${totalUsd.toFixed(2)}
             </span>
+          </div>
+
+          {/* ── Network Switcher ─────────────────────────────── */}
+          <div style={{ marginBottom: 12, position: 'relative' }}>
+            <button
+              onClick={() => setNetworkMenuOpen(prev => !prev)}
+              disabled={isSwitching}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '8px 12px',
+                background: currentChain.bgColor,
+                border: `1px solid ${currentChain.color}30`,
+                borderRadius: 10,
+                cursor: isSwitching ? 'wait' : 'pointer',
+                transition: 'all 0.15s',
+              }}
+            >
+              {/* Live indicator dot */}
+              <div style={{
+                width: 7, height: 7, borderRadius: '50%',
+                background: currentChain.color,
+                boxShadow: `0 0 6px ${currentChain.color}80`,
+                flexShrink: 0,
+              }} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: currentChain.color, textTransform: 'uppercase', letterSpacing: '0.5px', flex: 1, textAlign: 'left' }}>
+                {isSwitching ? 'Switching…' : currentChain.name}
+              </span>
+              <span style={{ color: '#6b7280' }}>
+                <ChevronIcon open={networkMenuOpen} />
+              </span>
+            </button>
+
+            {networkMenuOpen && (
+              <div style={{
+                position: 'absolute',
+                top: 'calc(100% + 4px)',
+                left: 0,
+                right: 0,
+                background: '#12131a',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 10,
+                overflow: 'hidden',
+                zIndex: 10000,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+              }}>
+                {CHAIN_OPTIONS.map(chain => {
+                  const isActive = chain.id === chainId;
+                  return (
+                    <button
+                      key={chain.id}
+                      onClick={() => handleSwitchChain(chain.id)}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: '10px 12px',
+                        background: isActive ? `${chain.color}10` : 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        transition: 'background 0.15s',
+                        borderBottom: '1px solid rgba(255,255,255,0.04)',
+                      }}
+                      onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)'; }}
+                      onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                    >
+                      <div style={{
+                        width: 28, height: 28, borderRadius: 8,
+                        background: `${chain.color}18`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 14, flexShrink: 0,
+                      }}>
+                        {chain.icon}
+                      </div>
+                      <div style={{ flex: 1, textAlign: 'left' }}>
+                        <div style={{ color: isActive ? chain.color : '#e5e7eb', fontSize: 13, fontWeight: 600 }}>
+                          {chain.name}
+                        </div>
+                        <div style={{ color: '#6b7280', fontSize: 11 }}>Testnet</div>
+                      </div>
+                      {isActive && (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={chain.color} strokeWidth="2.5">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Divider */}
@@ -254,7 +376,7 @@ export function ConnectButton({
                   <span style={{ color: '#e5e7eb', fontSize: 13, fontWeight: 500 }}>
                     {row.balance.toFixed(row.decimals)}
                   </span>
-                  {usdValue > 0 && (
+                  {usdValue > 0.001 && (
                     <span style={{ color: '#6b7280', fontSize: 11, marginLeft: 6 }}>
                       (${usdValue.toFixed(2)})
                     </span>
@@ -264,11 +386,8 @@ export function ConnectButton({
             );
           })}
 
-          {/* Total */}
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8, marginBottom: 12, display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: '#9ca3af', fontSize: 13 }}>Total</span>
-            <span style={{ color: '#e5e7eb', fontSize: 13, fontWeight: 700 }}>${totalUsd.toFixed(2)}</span>
-          </div>
+          {/* Divider */}
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: 4, marginBottom: 10 }} />
 
           {/* Actions */}
           <div style={{ display: 'flex', gap: 8 }}>
