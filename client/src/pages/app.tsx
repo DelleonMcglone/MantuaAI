@@ -2547,7 +2547,7 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
         </div>
         <div style={{ flex: 1 }}>
           <span style={{ color: theme.textSecondary, fontSize: '14px', lineHeight: '1.5' }}>
-            <span style={{ color: theme.accent, fontWeight: '600' }}>{filteredPools.length > 0 ? `${filteredPools.length} pools on ${currentChain?.name ?? 'Base Sepolia'}` : 'No pools yet — create your first pool'}</span>
+            <span style={{ color: theme.accent, fontWeight: '600' }}>{filteredPools.length > 0 ? `${filteredPools.length} pools on Base Sepolia` : 'No pools yet — create your first pool'}</span>
             {' '}• ETH, USDC, EURC on Uniswap v4.
           </span>
         </div>
