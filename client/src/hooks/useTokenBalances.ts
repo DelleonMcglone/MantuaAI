@@ -1,11 +1,8 @@
 import { useMemo } from 'react';
-import { useAccount, useReadContracts } from 'wagmi';
+import { useAccount, useReadContracts, useChainId } from 'wagmi';
 import { formatUnits } from 'viem';
 import { erc20Abi } from 'viem';
-import { MOCK_TOKENS, type Token } from '@/config/tokens';
-
-// Only ERC20 tokens (not native ETH) can be queried via balanceOf
-const ERC20_ONLY_TOKENS = MOCK_TOKENS.filter(t => !t.isNative);
+import { getERC20Tokens, type Token } from '@/config/tokens';
 
 export interface TokenBalance {
   token: Token;
@@ -22,13 +19,16 @@ export interface UseTokenBalancesReturn {
 }
 
 /**
- * Hook to fetch balances for all mock tokens
- * Uses multicall for efficient batch fetching
+ * Hook to fetch balances for all ERC20 tokens on the wallet's current chain.
+ * Uses multicall for efficient batch fetching.
+ * Explicitly passes chainId so Reown AppKit reads from the correct RPC.
  */
 export function useTokenBalances(): UseTokenBalancesReturn {
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
 
-  const tokens = useMemo(() => ERC20_ONLY_TOKENS, []);
+  // Get ERC20 tokens for the current chain
+  const tokens = useMemo(() => getERC20Tokens(chainId), [chainId]);
 
   const contracts = useMemo(() => {
     if (!address) return [];
@@ -38,8 +38,9 @@ export function useTokenBalances(): UseTokenBalancesReturn {
       abi: erc20Abi,
       functionName: 'balanceOf' as const,
       args: [address] as const,
+      chainId,
     }));
-  }, [address, tokens]);
+  }, [address, tokens, chainId]);
 
   const {
     data,

@@ -1,11 +1,18 @@
 /**
- * Verified Uniswap v4 contract addresses for Base Sepolia (Chain ID: 84532)
- * Source: https://docs.uniswap.org/contracts/v4/deployments
- * Last verified: 2026-02-27
+ * Verified Uniswap v4 contract addresses
+ *
+ * Base Sepolia (84532):
+ *   Source: https://docs.uniswap.org/contracts/v4/deployments
+ *   Last verified: 2026-02-27
+ *
+ * Unichain Sepolia (1301):
+ *   Source: https://docs.uniswap.org/contracts/v4/deployments
+ *   Last verified: 2026-03-04
  */
 import type { Address } from 'viem';
 
 export const BASE_SEPOLIA_CHAIN_ID = 84532;
+export const UNICHAIN_SEPOLIA_CHAIN_ID = 1301;
 
 export const UNISWAP_V4_ADDRESSES = {
   // Core
@@ -21,23 +28,50 @@ export const UNISWAP_V4_ADDRESSES = {
   poolModifyLiquidityTest:  '0x37429cd17cb1454c34e7f50b09725202fd533039' as Address,
 };
 
+// Unichain Sepolia V4 addresses
+// Source: https://docs.uniswap.org/contracts/v4/deployments
+export const UNISWAP_V4_ADDRESSES_UNICHAIN_SEPOLIA = {
+  poolManager:              '0x00b036b58a818b1bc34d502d3fe730db729e62ac' as Address,
+  stateView:                '0xc199f1072a74d4e905aba1a84d9a45e2546b6222' as Address,
+  positionManager:          '0xf969aee60879c54baaed9f3ed26147db216fd664' as Address,
+  universalRouter:          '0xf70536b3bcc1bd1a972dc186a2cf84cc6da6be5d' as Address,
+  quoter:                   '0x56dcd40a3f2d466f48e7f48bdbe5cc9b92ae4472' as Address,
+  permit2:                  '0x000000000022d473030f116ddee9f6b43ac78ba3' as Address,
+  // Test helpers (same pattern as Base Sepolia)
+  poolSwapTest:             '0x8b5bcc363dde2614281ad875bad385e0a785d3b9' as Address,
+  poolModifyLiquidityTest:  '0x37429cd17cb1454c34e7f50b09725202fd533039' as Address,
+};
+
+export const UNISWAP_V4_ADDRESSES_BY_CHAIN: Record<number, typeof UNISWAP_V4_ADDRESSES> = {
+  [BASE_SEPOLIA_CHAIN_ID]:    UNISWAP_V4_ADDRESSES,
+  [UNICHAIN_SEPOLIA_CHAIN_ID]: UNISWAP_V4_ADDRESSES_UNICHAIN_SEPOLIA,
+};
+
 export function getV4Address(
-  _chainId: number,
+  chainId: number,
   contract: keyof typeof UNISWAP_V4_ADDRESSES
 ): Address {
-  return UNISWAP_V4_ADDRESSES[contract];
+  const addresses = UNISWAP_V4_ADDRESSES_BY_CHAIN[chainId] ?? UNISWAP_V4_ADDRESSES;
+  return addresses[contract];
 }
 
-export const EXPLORER_BASE = 'https://sepolia.basescan.org';
+// ─── Block Explorers ────────────────────────────────────────────────────────
 
-export function getExplorerTxUrl(txHash: string, _chainId?: number): string {
-  return `${EXPLORER_BASE}/tx/${txHash}`;
+export const EXPLORERS: Record<number, string> = {
+  [BASE_SEPOLIA_CHAIN_ID]:    'https://sepolia.basescan.org',
+  [UNICHAIN_SEPOLIA_CHAIN_ID]: 'https://sepolia.uniscan.xyz',
+};
+
+export const EXPLORER_BASE = EXPLORERS[BASE_SEPOLIA_CHAIN_ID];
+
+export function getExplorerBase(chainId?: number): string {
+  return EXPLORERS[chainId ?? BASE_SEPOLIA_CHAIN_ID] ?? EXPLORER_BASE;
 }
 
-export function getExplorerAddressUrl(address: string): string {
-  return `${EXPLORER_BASE}/address/${address}`;
+export function getExplorerTxUrl(txHash: string, chainId?: number): string {
+  return `${getExplorerBase(chainId)}/tx/${txHash}`;
 }
 
-// Legacy compatibility shims
-export const EXPLORERS: Record<number, string> = { 84532: EXPLORER_BASE };
-export const UNISWAP_V4_ADDRESSES_BY_CHAIN = { [84532]: UNISWAP_V4_ADDRESSES };
+export function getExplorerAddressUrl(address: string, chainId?: number): string {
+  return `${getExplorerBase(chainId)}/address/${address}`;
+}

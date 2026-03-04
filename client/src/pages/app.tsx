@@ -2546,8 +2546,8 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
         </div>
         <div style={{ flex: 1 }}>
           <span style={{ color: theme.textSecondary, fontSize: '14px', lineHeight: '1.5' }}>
-            <span style={{ color: theme.accent, fontWeight: '600' }}>{filteredPools.length > 0 ? `${filteredPools.length} pools on Base Sepolia` : 'No pools yet — create your first pool'}</span>
-            {' '}• ETH, cbBTC, USDC, EURC on Uniswap v4.
+            <span style={{ color: theme.accent, fontWeight: '600' }}>{filteredPools.length > 0 ? `${filteredPools.length} pools on ${currentChain?.name ?? 'Base Sepolia'}` : 'No pools yet — create your first pool'}</span>
+            {' '}• ETH, USDC, EURC on Uniswap v4.
           </span>
         </div>
       </div>
@@ -3429,7 +3429,7 @@ export default function MantuaApp() {
     document.documentElement.classList.toggle('dark', isDark);
   }, [isDark]);
 
-  // Chain configuration — Base Sepolia only
+  // Chain configuration — Base Sepolia + Unichain Sepolia
   const SUPPORTED_CHAINS = {
     'base-sepolia': {
       id: 84532,
@@ -3440,43 +3440,59 @@ export default function MantuaApp() {
       rpcUrl: 'https://sepolia.base.org',
       blockExplorer: 'https://sepolia.basescan.org',
     },
+    'unichain-sepolia': {
+      id: 1301,
+      name: 'Unichain Sepolia',
+      shortName: 'Unichain',
+      icon: '🦄',
+      color: '#f472b6',
+      rpcUrl: 'https://sepolia.unichain.org',
+      blockExplorer: 'https://sepolia.uniscan.xyz',
+    },
   };
 
-  const selectedChain = 'base-sepolia';
-  const currentChain = SUPPORTED_CHAINS[selectedChain];
+  // selectedChain is driven by the wallet's actual chainId so they stay in sync
+  const [selectedChain, setSelectedChain] = useState<string>('base-sepolia');
+  const currentChain = SUPPORTED_CHAINS[selectedChain] ?? SUPPORTED_CHAINS['base-sepolia'];
+
+  // Sync wallet chainId → UI selectedChain (wallet is source of truth)
+  const currentChainId = useChainId();
+  useEffect(() => {
+    const matched = Object.entries(SUPPORTED_CHAINS).find(([, c]) => c.id === currentChainId);
+    if (matched) setSelectedChain(matched[0]);
+  }, [currentChainId]);
 
   // Real wallet connection using AppKit
   const { isConnected, address, truncatedAddress } = useWalletConnection();
 
-  // Token balances (used for balance chat command)
+  // Token balances (used for balance chat command) — auto-scoped to current chain
   const { balances: tokenBalances, balancesBySymbol } = useTokenBalances();
-  const { data: ethBalanceData } = useBalance({ address });
+  const { data: ethBalanceData } = useBalance({ address, chainId: currentChainId });
 
   // Chain switching hook
   const { switchChain } = useSwitchChain();
 
-  // Handler to switch both wallet network AND UI state
+  // Handler: UI chain selector → switch wallet network
+  // The useEffect above will sync the wallet's new chainId back to selectedChain.
   const handleChainSwitch = async (chainKey: string) => {
     const chain = SUPPORTED_CHAINS[chainKey];
     if (!chain) return;
 
-    try {
-      // Update UI state immediately for better UX
-      setSelectedChain(chainKey);
-
-      // If wallet is connected, switch the actual network
-      if (isConnected && switchChain) {
+    if (isConnected && switchChain) {
+      try {
         await switchChain({ chainId: chain.id });
+        // selectedChain will update via the useEffect that watches currentChainId
+      } catch (error) {
+        console.error('Failed to switch chain:', error);
+        // Revert UI to match actual wallet chain
+        const walletChainKey = Object.entries(SUPPORTED_CHAINS).find(
+          ([, c]) => c.id === currentChainId
+        )?.[0];
+        if (walletChainKey) setSelectedChain(walletChainKey);
       }
-    } catch (error) {
-      console.error('Failed to switch chain:', error);
-      // Revert UI state if network switch failed
-      const currentWalletChain = Object.entries(SUPPORTED_CHAINS).find(
-        ([_, c]) => c.id === chain.id
-      )?.[0];
-      if (currentWalletChain) {
-        setSelectedChain(currentWalletChain);
-      }
+    } else {
+      // Wallet not connected — just update UI optimistically
+      setSelectedChain(chainKey);
     }
   };
 
@@ -3498,8 +3514,8 @@ export default function MantuaApp() {
   const [voiceTranscript, setVoiceTranscript] = useState('');
   const [voiceParsedCommand, setVoiceParsedCommand] = useState(null);
   const isVoiceSubmitRef = useRef(false);
-  // Persistent chat state from useChat hook
-  const { messages: chatMessages, sendMessage, isSending, isLoading: chatIsLoading } = useChat();
+  // Persistent chat state from useChat hook — pass chainId for context-aware AI responses
+  const { messages: chatMessages, sendMessage, isSending, isLoading: chatIsLoading } = useChat({ chainId: currentChainId });
   const [analyticsMessages, setAnalyticsMessages] = useState<any[]>([]);
   const allMessages = useMemo(() => {
     const combined = [...chatMessages, ...analyticsMessages];
@@ -3723,9 +3739,10 @@ export default function MantuaApp() {
           .slice(0, 5)
           .map(b => `${b.formatted.slice(0, 8)} ${b.token.symbol}`);
         const lines = [ethBal, ...topTokens].filter(Boolean);
+        const chainName = currentChain?.name ?? 'the current network';
         const balanceSummary = lines.length
-          ? `Your current balances on Base Sepolia:\n${lines.join('\n')}`
-          : 'No token balances found for this wallet on Base Sepolia.';
+          ? `Your current balances on ${chainName}:\n${lines.join('\n')}`
+          : `No token balances found for this wallet on ${chainName}.`;
         // Inject a synthetic assistant message directly (no AI round-trip needed)
         setAnalyticsMessages(prev => [
           ...prev,

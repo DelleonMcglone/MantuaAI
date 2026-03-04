@@ -25,6 +25,7 @@ const createMessageSchema = z.object({
 const aiChatSchema = z.object({
   sessionId: z.string().uuid(),
   message: z.string().min(1).max(10000),
+  chainId: z.number().optional(),
 });
 
 export function registerChatRoutes(app: Express): void {
@@ -150,10 +151,10 @@ export function registerChatRoutes(app: Express): void {
   // POST /api/ai/chat — parse command and generate AI response
   app.post("/api/ai/chat", async (req: Request, res: Response) => {
     try {
-      const { sessionId, message } = aiChatSchema.parse(req.body);
+      const { sessionId, message, chainId } = aiChatSchema.parse(req.body);
       const parsed = parseVoiceCommand(message);
       const metadata = parsed ? { command: parsed } : undefined;
-      const content = await generateResponse(message, parsed);
+      const content = await generateResponse(message, parsed, chainId);
       res.json({ content, metadata, sessionId });
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -165,9 +166,46 @@ export function registerChatRoutes(app: Express): void {
   });
 }
 
+const CHAIN_NAMES: Record<number, string> = {
+  84532: 'Base Sepolia',
+  1301: 'Unichain Sepolia',
+};
+
+function buildSystemPrompt(chainId?: number): string {
+  const chainName = chainId ? (CHAIN_NAMES[chainId] ?? 'an EVM testnet') : 'Base Sepolia';
+  const isUnichain = chainId === 1301;
+
+  let prompt =
+    `You are Mantua, an AI assistant for a DeFi trading platform. ` +
+    `The user is currently connected to ${chainName}. ` +
+    `Help users with swaps, liquidity positions, portfolio management, and on-chain actions. Be concise and specific. `;
+
+  if (isUnichain) {
+    prompt +=
+      `\n\nUnichain-specific context:\n` +
+      `- Unichain Sepolia (Chain ID 1301) is Uniswap Labs' own L2 chain.\n` +
+      `- Use the Uniswap Trading API (https://api-docs.uniswap.org) for swap quotes and routing on Unichain.\n` +
+      `- Supported tokens on Unichain Sepolia: ETH (native), USDC (0x31d0220469e10c4E71834a79b1f276d740d3768F), EURC (0x18fB358Bc74054B0c2530C48eF23f8A8D464cb18).\n` +
+      `- Uniswap v4 PoolManager on Unichain Sepolia: 0x00b036b58a818b1bc34d502d3fe730db729e62ac\n` +
+      `- Block explorer: https://sepolia.uniscan.xyz\n` +
+      `- ETH faucet: https://console.optimism.io/faucet\n` +
+      `- USDC/EURC faucet: https://faucet.circle.com/`;
+  } else {
+    prompt +=
+      `\n\nBase Sepolia context:\n` +
+      `- Supported tokens: ETH, cbBTC (0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf), USDC (0x036CbD53842c5426634e7929541eC2318f3dCF7e), EURC (0x808456652fdb597867f38412077A9182bf77359).\n` +
+      `- Uniswap v4 PoolManager on Base Sepolia: 0x05e73354cfdd6745c338b50bcfdfa3aa6fa03408\n` +
+      `- Block explorer: https://sepolia.basescan.org\n` +
+      `- ETH+token faucet: https://portal.cdp.coinbase.com/products/faucet`;
+  }
+
+  return prompt;
+}
+
 async function generateResponse(
   message: string,
-  parsed: ReturnType<typeof parseVoiceCommand>
+  parsed: ReturnType<typeof parseVoiceCommand>,
+  chainId?: number,
 ): Promise<string> {
   if (process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
     try {
@@ -176,13 +214,11 @@ async function generateResponse(
         messages: [
           {
             role: "system",
-            content:
-              "You are Mantua, an AI assistant for a DeFi trading platform. " +
-              "Help users with swaps, liquidity positions, and on-chain actions. Be concise.",
+            content: buildSystemPrompt(chainId),
           },
           { role: "user", content: message },
         ],
-        max_tokens: 300,
+        max_tokens: 400,
       });
       return completion.choices[0]?.message?.content ?? fallbackResponse(message, parsed);
     } catch {

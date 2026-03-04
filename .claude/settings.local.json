@@ -65,7 +65,10 @@
       "Bash(/home/runner/workspace/server/db/migrations/003_pools_portfolio.sql:*)",
       "Bash(done)",
       "Bash(npx skills add Uniswap/uniswap-ai)",
-      "Bash(npx skills add Uniswap/uniswap-ai --yes)"
+      "Bash(npx skills add Uniswap/uniswap-ai --yes)",
+      "WebFetch(domain:api-docs.uniswap.org)",
+      "WebFetch(domain:developers.circle.com)",
+      "WebFetch(domain:unichain-sepolia.blockscout.com)"
     ]
   }
 }

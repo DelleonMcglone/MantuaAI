@@ -3,17 +3,18 @@
  *
  * Displays "Connect Wallet" when disconnected.
  * When connected, shows truncated address and a dropdown with:
- *  - Network badge (Base Sepolia)
- *  - ETH, cbBTC, USDC, EURC balances with USD values
- *  - Disconnect button
+ *  - Dynamic network badge (Base Sepolia or Unichain Sepolia)
+ *  - ETH + chain-specific ERC20 balances with USD values
+ *  - Copy address and Disconnect buttons
  */
 
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useAppKit, useAppKitAccount, useDisconnect } from '@reown/appkit/react';
-import { useBalance, useReadContracts } from 'wagmi';
+import { useBalance, useReadContracts, useChainId } from 'wagmi';
 import { erc20Abi, formatUnits } from 'viem';
 import { getPriceBySymbol } from '../../services/priceService';
-import { ERC20_TOKENS } from '../../config/tokens';
+import { getERC20Tokens } from '../../config/tokens';
+import { CHAIN_IDS } from '../../config/tokens';
 
 interface ConnectButtonProps {
   className?: string;
@@ -45,6 +46,20 @@ function CopyIcon() {
   );
 }
 
+// Per-chain display config
+const CHAIN_META: Record<number, { name: string; color: string; bgColor: string }> = {
+  [CHAIN_IDS.BASE_SEPOLIA]: {
+    name: 'Base Sepolia',
+    color: '#60a5fa',
+    bgColor: 'rgba(59,130,246,0.15)',
+  },
+  [CHAIN_IDS.UNICHAIN_SEPOLIA]: {
+    name: 'Unichain Sepolia',
+    color: '#f472b6',
+    bgColor: 'rgba(244,114,182,0.15)',
+  },
+};
+
 export function ConnectButton({
   className = '',
   onConnect,
@@ -53,10 +68,13 @@ export function ConnectButton({
   const { open } = useAppKit();
   const { address, isConnected } = useAppKitAccount();
   const { disconnect } = useDisconnect();
+  const chainId = useChainId();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [copied, setCopied] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const chainMeta = CHAIN_META[chainId] ?? CHAIN_META[CHAIN_IDS.BASE_SEPOLIA];
 
   // Callback when connection state changes
   useEffect(() => {
@@ -76,44 +94,49 @@ export function ConnectButton({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Native ETH balance
+  // Native ETH balance — scoped to current chain
   const { data: ethBalance } = useBalance({
     address: address as `0x${string}` | undefined,
+    chainId,
     query: { enabled: isConnected && !!address, refetchInterval: 30_000 },
   });
 
-  // ERC20 balances (cbBTC, USDC, EURC) via multicall
+  // ERC20 tokens for the current chain
+  const erc20Tokens = useMemo(() => getERC20Tokens(chainId), [chainId]);
+
+  // ERC20 balances via multicall — explicitly scoped to current chain
   const erc20Contracts = useMemo(() => {
     if (!address) return [];
-    return ERC20_TOKENS.map(token => ({
+    return erc20Tokens.map(token => ({
       address: token.address as `0x${string}`,
       abi: erc20Abi,
       functionName: 'balanceOf' as const,
       args: [address as `0x${string}`],
+      chainId,
     }));
-  }, [address]);
+  }, [address, erc20Tokens, chainId]);
+
   const { data: erc20Data } = useReadContracts({
     contracts: erc20Contracts,
     query: { enabled: isConnected && !!address, refetchInterval: 30_000 },
   });
 
-  // Build display rows
-  const tokenRows = [
+  // Build display rows: ETH + chain-specific ERC20s
+  const tokenRows = useMemo(() => [
     {
       symbol: 'ETH',
       balance: ethBalance ? parseFloat(formatUnits(ethBalance.value, 18)) : 0,
       decimals: 4,
     },
-    ...ERC20_TOKENS.map((token, i) => ({
+    ...erc20Tokens.map((token, i) => ({
       symbol: token.symbol,
       balance: erc20Data?.[i]?.result
         ? parseFloat(formatUnits(erc20Data[i].result as bigint, token.decimals))
         : 0,
       decimals: token.decimals <= 8 ? 6 : 4,
     })),
-  ];
+  ], [ethBalance, erc20Data, erc20Tokens]);
 
-  const ethPrice = getPriceBySymbol('ETH') || 0;
   const totalUsd = tokenRows.reduce((sum, row) => {
     const price = getPriceBySymbol(row.symbol) || (row.symbol === 'USDC' || row.symbol === 'EURC' ? 1 : 0);
     return sum + row.balance * price;
@@ -195,25 +218,25 @@ export function ConnectButton({
             border: '1px solid rgba(255,255,255,0.08)',
             borderRadius: 14,
             padding: '14px 16px',
-            minWidth: 260,
+            minWidth: 280,
             boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
           }}
         >
-          {/* Header: address + network badge */}
+          {/* Header: address + dynamic network badge */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <span style={{ color: '#e5e7eb', fontSize: 13, fontWeight: 600 }}>
               {truncateAddress(address!)}
             </span>
             <span style={{
-              background: 'rgba(59,130,246,0.15)',
-              color: '#60a5fa',
+              background: chainMeta.bgColor,
+              color: chainMeta.color,
               fontSize: 11,
               fontWeight: 600,
               borderRadius: 6,
               padding: '2px 8px',
-              border: '1px solid rgba(59,130,246,0.25)',
+              border: `1px solid ${chainMeta.color}40`,
             }}>
-              Base Sepolia
+              {chainMeta.name}
             </span>
           </div>
 

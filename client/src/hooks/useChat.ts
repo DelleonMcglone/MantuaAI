@@ -21,6 +21,10 @@ function getOrCreateUserId(): string {
   return id;
 }
 
+export interface UseChatOptions {
+  chainId?: number;
+}
+
 export interface UseChatReturn {
   messages: Message[];
   isLoading: boolean;
@@ -30,7 +34,8 @@ export interface UseChatReturn {
   userId: string;
 }
 
-export function useChat(): UseChatReturn {
+export function useChat(options: UseChatOptions = {}): UseChatReturn {
+  const { chainId } = options;
   const [userId] = useState<string>(getOrCreateUserId);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -91,7 +96,8 @@ export function useChat(): UseChatReturn {
   }, [userId]);
 
   const sendMessage = useCallback(
-    async (text: string): Promise<void> => {
+    async (text: string, overrideChainId?: number): Promise<void> => {
+      const effectiveChainId = overrideChainId ?? chainId;
       if (!text.trim()) return;
 
       // Ensure session exists before sending
@@ -140,7 +146,7 @@ export function useChat(): UseChatReturn {
         const aiRes = await fetch(AI_ENDPOINT, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionId: sid, message: text }),
+          body: JSON.stringify({ sessionId: sid, message: text, chainId: effectiveChainId }),
         });
         if (!aiRes.ok) throw new Error("AI response failed");
         const aiData: AiChatResponse = await aiRes.json();
@@ -170,7 +176,7 @@ export function useChat(): UseChatReturn {
         setIsSending(false);
       }
     },
-    [userId]
+    [userId, chainId]
   );
 
   return { messages, isLoading, isSending, sendMessage, sessionId, userId };

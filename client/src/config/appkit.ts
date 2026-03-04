@@ -4,14 +4,14 @@
  * Initializes the AppKit instance with multi-chain support
  * and WALLET-ONLY authentication (no email/social login).
  *
- * Default network: Base Sepolia (chainId: 84532)
+ * Supported networks: Base Sepolia (default), Unichain Sepolia
  *
  * IMPORTANT: Call this OUTSIDE React components to prevent re-renders.
  */
 
 import { createAppKit } from '@reown/appkit/react';
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
-import { baseSepolia } from '@reown/appkit/networks';
+import { baseSepolia, unichainSepolia } from '@reown/appkit/networks';
 import type { AppKitNetwork } from '@reown/appkit/networks';
 
 // Get project ID - REQUIRED for WalletConnect QR code
@@ -33,9 +33,10 @@ const metadata = {
   icons: ['https://mantua.ai/favicon.png'],
 };
 
-// Supported networks — Base Sepolia only
+// Supported networks — Base Sepolia (default) + Unichain Sepolia
 const networks: [AppKitNetwork, ...AppKitNetwork[]] = [
   baseSepolia,
+  unichainSepolia,
 ];
 
 // Initialize Wagmi adapter
@@ -51,17 +52,14 @@ export const appKit = createAppKit({
   projectId,
   metadata,
 
-  // DEFAULT NETWORK CONFIGURATION — Base Sepolia only
+  // DEFAULT NETWORK — Base Sepolia
   defaultNetwork: baseSepolia,
   allowUnsupportedChain: false,           // Only allow configured testnets
 
   // Theme configuration - follows system preference by default
-  // DO NOT hardcode 'dark' or 'light' - let it be dynamic
-  // themeMode will be controlled programmatically via useAppKit().setThemeMode()
   themeMode: undefined, // undefined = follows system preference automatically
 
   themeVariables: {
-    // These variables work for both light and dark modes
     '--w3m-color-mix': '#00BB7F',        // Accent color (teal/green)
     '--w3m-color-mix-strength': 20,
     '--w3m-accent': '#3B82F6',            // Blue accent for buttons
@@ -69,7 +67,6 @@ export const appKit = createAppKit({
   },
 
   // WALLET-ONLY CONFIGURATION
-  // Email and social login are DISABLED
   features: {
     analytics: true,
     email: false,                         // DISABLED - wallet only
@@ -88,14 +85,10 @@ export const appKit = createAppKit({
     '4622a2b2d6af1c9844944291e5e7351a6aa24cd7b23099efac1b2fd875da31a0', // Trust
     'a797aa35c0fadbfc1a53e7f675162ed5226968b44a19ee3d24385c64d1d3c393', // Phantom
   ],
-
-  // DO NOT use includeWalletIds or excludeWalletIds - they break search
-  // includeWalletIds: undefined,
-  // excludeWalletIds: undefined,
 });
 
 // Export wagmi config for WagmiProvider
 export const wagmiConfig = wagmiAdapter.wagmiConfig;
 
 // Export networks for use in components
-export { networks };
+export { networks, baseSepolia, unichainSepolia };
