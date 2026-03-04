@@ -12,6 +12,7 @@ import { useAccount, useBalance, useSwitchChain, useChainId } from 'wagmi';
 import logoWhite from '@assets/Mantua_logo_white_1768946648374.png';
 import logoBlack from '@assets/Mantua_logo_black_1768946648374.png';
 import { ChatMessageList } from '../components/chat/ChatMessageList';
+import { DuneResultTable } from '../components/DuneResultTable';
 import { ChatInput } from '../components/chat/ChatInput';
 import { useChat } from '../hooks/useChat';
 import AddLiquidityModal from '../components/liquidity/AddLiquidityModal';
@@ -2818,15 +2819,24 @@ const AgentTransferPanel = ({ theme, isDark }) => {
   );
 };
 
-// Sub-panel: Onchain Analytics Query
-// ─── Agent v2: Query Panel (real CoinGecko data) ─────────────────────────────
+// Sub-panel: Onchain Analytics Query — powered by Dune Analytics + CoinGecko
+// ─── Agent v2: Query Panel ────────────────────────────────────────────────────
 const AgentQueryPanel = ({ theme, isDark }) => {
   const { address } = useAccount();
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState(null);
+  const [duneResult, setDuneResult] = useState<any>(null);
+  const [localResult, setLocalResult] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'dune' | 'local'>('dune');
 
-  const examples = [
+  const duneExamples = [
+    'NFT marketplace rankings',
+    'DEX volume overview',
+    'Uniswap v4 activity on Base',
+    'ETH gas analytics',
+  ];
+
+  const localExamples = [
     "What's the price of ETH?",
     "Show all token prices",
     "List all pools",
@@ -2838,55 +2848,128 @@ const AgentQueryPanel = ({ theme, isDark }) => {
     if (!text.trim()) return;
     if (q) setQuery(q);
     setIsLoading(true);
-    setResult(null);
-    try {
-      const res = await fetch('/api/agent/query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: text, walletAddress: address }),
-      });
-      const data = await res.json();
-      setResult(data);
-    } catch {
-      setResult({ error: 'Failed to fetch data. Please try again.' });
-    } finally {
-      setIsLoading(false);
+    setDuneResult(null);
+    setLocalResult(null);
+
+    if (activeTab === 'dune') {
+      try {
+        const res = await fetch('/api/dune/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text }),
+        });
+        const data = await res.json();
+        setDuneResult(data);
+      } catch {
+        setDuneResult({ success: false, message: 'Failed to reach Dune API. Please try again.' });
+      }
+    } else {
+      try {
+        const res = await fetch('/api/agent/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: text, walletAddress: address }),
+        });
+        const data = await res.json();
+        setLocalResult(data);
+      } catch {
+        setLocalResult({ error: 'Failed to fetch data. Please try again.' });
+      }
     }
+    setIsLoading(false);
   };
 
   return (
     <div style={{ padding: '24px', background: theme.bgCard, borderRadius: '14px', border: `1px solid ${theme.border}` }}>
-      <h3 style={{ color: theme.textPrimary, fontSize: '16px', fontWeight: '600', margin: '0 0 16px 0' }}>🔍 Query On-Chain Data</h3>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <h3 style={{ color: theme.textPrimary, fontSize: '16px', fontWeight: '600', margin: 0 }}>🔍 Query On-Chain Data</h3>
+        <div style={{ display: 'flex', borderRadius: '8px', border: `1px solid ${theme.border}`, overflow: 'hidden' }}>
+          {(['dune', 'local'] as const).map(tab => (
+            <button key={tab} onClick={() => { setActiveTab(tab); setDuneResult(null); setLocalResult(null); }}
+              style={{ padding: '5px 14px', border: 'none', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+                background: activeTab === tab ? (tab === 'dune' ? '#f59e0b' : '#3b82f6') : 'transparent',
+                color: activeTab === tab ? 'white' : theme.textSecondary, transition: 'all 0.15s' }}>
+              {tab === 'dune' ? '🟡 Dune' : '⚡ Local'}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
-        <input
-          type="text"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
+        <input type="text" value={query} onChange={e => setQuery(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleQuery()}
-          placeholder="What's the price of ETH? / Show my balance / List pools..."
-          style={{ flex: 1, padding: '12px 16px', background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)', border: `1px solid ${theme.border}`, borderRadius: '8px', color: theme.textPrimary, fontSize: '14px', outline: 'none' }}
-        />
+          placeholder={activeTab === 'dune' ? 'NFT marketplace rankings / DEX volume / Uniswap v4 on Base...' : "What's the price of ETH? / List pools..."}
+          style={{ flex: 1, padding: '12px 16px', background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)',
+            border: `1px solid ${activeTab === 'dune' ? 'rgba(245,158,11,0.35)' : theme.border}`,
+            borderRadius: '8px', color: theme.textPrimary, fontSize: '14px', outline: 'none' }} />
         <button onClick={() => handleQuery()} disabled={!query.trim() || isLoading}
-          style={{ padding: '12px 20px', background: 'linear-gradient(135deg, #06b6d4, #0891b2)', border: 'none', borderRadius: '8px', color: 'white', fontSize: '14px', fontWeight: '600', cursor: (!query.trim() || isLoading) ? 'not-allowed' : 'pointer', opacity: (!query.trim() || isLoading) ? 0.7 : 1 }}>
+          style={{ padding: '12px 20px', background: activeTab === 'dune' ? 'linear-gradient(135deg,#f59e0b,#d97706)' : 'linear-gradient(135deg,#06b6d4,#0891b2)',
+            border: 'none', borderRadius: '8px', color: 'white', fontSize: '14px', fontWeight: '600',
+            cursor: (!query.trim() || isLoading) ? 'not-allowed' : 'pointer', opacity: (!query.trim() || isLoading) ? 0.7 : 1 }}>
           {isLoading ? '...' : 'Ask'}
         </button>
       </div>
+
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
-        {examples.map(q => (
+        {(activeTab === 'dune' ? duneExamples : localExamples).map(q => (
           <button key={q} onClick={() => handleQuery(q)}
-            style={{ padding: '4px 12px', borderRadius: '14px', border: `1px solid ${theme.border}`, background: 'transparent', color: theme.textSecondary, fontSize: '12px', cursor: 'pointer' }}>
+            style={{ padding: '4px 12px', borderRadius: '14px',
+              border: `1px solid ${activeTab === 'dune' ? 'rgba(245,158,11,0.3)' : theme.border}`,
+              background: 'transparent', color: activeTab === 'dune' ? '#f59e0b' : theme.textSecondary,
+              fontSize: '12px', cursor: 'pointer' }}>
             {q}
           </button>
         ))}
       </div>
-      {isLoading && <div style={{ padding: '16px', textAlign: 'center', color: theme.textMuted }}>Fetching live data...</div>}
-      {result && !result.error && (
-        <div style={{ padding: '16px', borderRadius: '10px', background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)', border: `1px solid ${theme.border}`, maxHeight: '300px', overflowY: 'auto' }}>
-          <pre style={{ color: theme.textPrimary, fontSize: '13px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', margin: 0 }}>{JSON.stringify(result.data ?? result, null, 2)}</pre>
+
+      {isLoading && (
+        <div style={{ padding: '16px', textAlign: 'center', color: theme.textMuted }}>
+          {activeTab === 'dune' ? '🟡 Querying Dune Analytics...' : '⚡ Fetching data...'}
         </div>
       )}
-      {result?.error && (
-        <div style={{ padding: '12px 16px', borderRadius: '8px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontSize: '13px' }}>{result.error}</div>
+
+      {/* Dune results — formatted table */}
+      {duneResult && !isLoading && (
+        duneResult.success && duneResult.data ? (
+          <DuneResultTable data={duneResult.data} isDark={isDark} />
+        ) : (
+          <div>
+            <div style={{ padding: '12px 14px', borderRadius: '8px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#f59e0b', fontSize: '13px', marginBottom: '8px' }}>
+              {duneResult.message ?? duneResult.error ?? 'No results found.'}
+            </div>
+            {duneResult.suggestions?.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {duneResult.suggestions.map((s: any) => (
+                  <button key={s.id} onClick={() => { setQuery(s.name); handleQuery(s.name); }}
+                    style={{ padding: '8px 12px', borderRadius: '8px', border: `1px solid rgba(245,158,11,0.25)`, background: 'rgba(245,158,11,0.06)', color: '#f59e0b', fontSize: '12px', textAlign: 'left', cursor: 'pointer' }}>
+                    <strong>{s.name}</strong> — {s.description}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      )}
+
+      {/* Local results */}
+      {localResult && !isLoading && (
+        <div style={{ padding: '16px', borderRadius: '10px', background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)', border: `1px solid ${theme.border}`, maxHeight: '300px', overflowY: 'auto' }}>
+          {localResult.error ? (
+            <div style={{ color: '#ef4444', fontSize: '13px' }}>{localResult.error}</div>
+          ) : (
+            <pre style={{ color: theme.textPrimary, fontSize: '13px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', margin: 0 }}>
+              {JSON.stringify(localResult.data ?? localResult, null, 2)}
+            </pre>
+          )}
+        </div>
+      )}
+
+      {!duneResult && !localResult && !isLoading && (
+        <div style={{ fontSize: '11px', color: theme.textMuted }}>
+          🟡 <strong>Dune tab</strong> — live on-chain analytics powered by{' '}
+          <a href="https://dune.com" target="_blank" rel="noopener noreferrer" style={{ color: '#f59e0b' }}>Dune Analytics</a>
+          &nbsp;·&nbsp; ⚡ <strong>Local tab</strong> — token prices, pools, transaction history
+        </div>
       )}
     </div>
   );
@@ -3011,13 +3094,24 @@ const AgentAutonomousPanel = ({ theme, isDark, onNavigate }) => {
   const [isExecuting, setIsExecuting] = useState(false);
   const [messages, setMessages] = useState<Array<{role:'agent'|'user';text:string;txHash?:string}>>([]);
 
+  const [duneTableData, setDuneTableData] = useState<any>(null);
+
   const suggestions = [
     'Swap 0.001 ETH for USDC',
     'What is the current ETH price?',
     'Get me testnet ETH',
-    'Create a wallet for me',
-    'Add 0.01 ETH to the ETH/USDC pool',
+    'NFT marketplace rankings',
+    'Show DEX volume overview',
   ];
+
+  const isOnChainQuery = (text: string) => {
+    const lower = text.toLowerCase();
+    return lower.includes('dune') || lower.includes('on-chain') || lower.includes('tvl') ||
+      lower.includes('nft') || lower.includes('volume') || lower.includes('analytics') ||
+      lower.includes('uniswap v4') || lower.includes('defi') || lower.includes('gas fee') ||
+      lower.includes('gas trend') || lower.includes('marketplace') || lower.includes('protocol') ||
+      lower.includes('dex') || lower.includes('opensea') || lower.includes('blur');
+  };
 
   const execute = async (cmd?: string) => {
     const text = cmd ?? instruction;
@@ -3026,20 +3120,31 @@ const AgentAutonomousPanel = ({ theme, isDark, onNavigate }) => {
     setMessages(prev => [...prev, userMsg]);
     setInstruction('');
     setIsExecuting(true);
+    setDuneTableData(null);
 
     const lower = text.toLowerCase();
     try {
-      // Route to appropriate action
-      if (lower.includes('price') || lower.includes('worth')) {
+      if (isOnChainQuery(text)) {
+        // Route on-chain analytics queries to /api/dune/query
+        setMessages(prev => [...prev, { role: 'agent', text: '🟡 Querying Dune Analytics for on-chain data...' }]);
+        const res = await fetch('/api/dune/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text }) });
+        const json = await res.json();
+        if (json.success && json.data?.rows?.length > 0) {
+          setDuneTableData(json.data);
+          setMessages(prev => [...prev, { role: 'agent', text: `📊 Retrieved ${json.data.rowCount} rows for: ${json.data.label}` }]);
+        } else {
+          const msg = json.message || 'No matching Dune query found. Try: "NFT marketplace rankings", "DEX volume", or "ETH gas analytics".';
+          setMessages(prev => [...prev, { role: 'agent', text: `🟡 ${msg}` }]);
+        }
+      } else if (lower.includes('price') || lower.includes('worth')) {
         const res = await fetch('/api/agent/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: text, walletAddress: address }) });
         const data = await res.json();
-        const prices = data.data ?? data;
-        setMessages(prev => [...prev, { role: 'agent', text: `📊 ${JSON.stringify(prices, null, 2)}` }]);
+        setMessages(prev => [...prev, { role: 'agent', text: `📊 ${JSON.stringify(data.data ?? data, null, 2)}` }]);
       } else if (lower.includes('create wallet') || lower.includes('make wallet')) {
         if (!address) { setMessages(prev => [...prev, { role: 'agent', text: '⚠️ Connect your wallet first to create an agent wallet.' }]); return; }
         const res = await fetch('/api/agent/wallet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: address }) });
         const data = await res.json();
-        setMessages(prev => [...prev, { role: 'agent', text: `✅ Agent wallet created!\nAddress: ${data.address}\n\n${data.baseScanUrl ? `[View on BaseScan](${data.baseScanUrl})` : ''}` }]);
+        setMessages(prev => [...prev, { role: 'agent', text: `✅ Agent wallet created!\nAddress: ${data.address}\n\n${data.baseScanUrl ? `View on BaseScan: ${data.baseScanUrl}` : ''}` }]);
       } else if (lower.includes('faucet') || lower.includes('testnet eth') || lower.includes('get me eth')) {
         setMessages(prev => [...prev, { role: 'agent', text: '🚰 Opening faucet panel... Use the "Get Testnet Funds" action card below.' }]);
       } else if (lower.includes('swap')) {
@@ -3049,7 +3154,7 @@ const AgentAutonomousPanel = ({ theme, isDark, onNavigate }) => {
         setMessages(prev => [...prev, { role: 'agent', text: '💧 Opening liquidity interface...' }]);
         setTimeout(() => onNavigate('liquidity'), 1000);
       } else {
-        // Generic query
+        // Generic query — try local first
         const res = await fetch('/api/agent/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: text, walletAddress: address }) });
         const data = await res.json();
         setMessages(prev => [...prev, { role: 'agent', text: `📋 ${JSON.stringify(data.data ?? data, null, 2)}` }]);
@@ -3067,7 +3172,7 @@ const AgentAutonomousPanel = ({ theme, isDark, onNavigate }) => {
         <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🤖</div>
         <div>
           <div style={{ color: theme.textPrimary, fontWeight: '700', fontSize: '16px' }}>Autonomous Mode</div>
-          <div style={{ color: theme.textMuted, fontSize: '12px' }}>Tell the agent what to do</div>
+          <div style={{ color: theme.textMuted, fontSize: '12px' }}>Tell the agent what to do · Dune on-chain data enabled</div>
         </div>
       </div>
 
@@ -3088,6 +3193,13 @@ const AgentAutonomousPanel = ({ theme, isDark, onNavigate }) => {
               <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#8b5cf6', animation: 'pulse 1s 0.4s infinite' }} />
             </div>
           )}
+        </div>
+      )}
+
+      {/* Dune Analytics result table */}
+      {duneTableData && !isExecuting && (
+        <div style={{ marginBottom: '16px' }}>
+          <DuneResultTable data={duneTableData} isDark={isDark} />
         </div>
       )}
 
@@ -3608,6 +3720,51 @@ export default function MantuaApp() {
     isVoiceSubmitRef.current = false;
 
     setHasInteracted(true);
+
+    // ── Dune Analytics detection ─────────────────────────────────────────────
+    const duneKeywords = ['volume', 'tvl', 'liquidity pool', 'on-chain', 'onchain', 'dune',
+      'analytics', 'nft marketplace', 'opensea', 'blur', 'dex volume', 'uniswap v4',
+      'holders', 'gas fee', 'gas trend', 'defi protocol'];
+    const isDuneMessage = duneKeywords.some(kw => inputValue.toLowerCase().includes(kw));
+
+    if (isDuneMessage) {
+      const placeholderId = 'dune-' + Date.now();
+      const userMsgId = 'user-dune-' + Date.now();
+      // Add user message + loading placeholder
+      setAnalyticsMessages(prev => [...prev,
+        { id: userMsgId, sessionId: '', role: 'user' as const, content: inputValue, createdAt: new Date().toISOString() },
+        { id: placeholderId, sessionId: '', role: 'assistant' as const, content: '', dune: { rows: [], columns: [], rowCount: 0, label: 'Querying Dune...', isLoading: true }, createdAt: new Date().toISOString() },
+      ]);
+      try {
+        const res = await fetch('/api/dune/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: inputValue }),
+        });
+        const json = await res.json();
+        if (json.success && json.data) {
+          setAnalyticsMessages(prev => prev.map(m => m.id === placeholderId ? {
+            ...m,
+            content: '',
+            dune: { ...json.data, isLoading: false },
+          } : m));
+        } else {
+          const msg = json.message || 'No matching Dune query found.';
+          setAnalyticsMessages(prev => prev.map(m => m.id === placeholderId ? {
+            ...m,
+            content: msg,
+            dune: null,
+          } : m));
+        }
+      } catch {
+        setAnalyticsMessages(prev => prev.map(m => m.id === placeholderId ? {
+          ...m,
+          content: 'Failed to query on-chain data. Please try again.',
+          dune: null,
+        } : m));
+      }
+      return;
+    }
 
     if (isAnalyticsQuery(inputValue)) {
       const placeholderId = 'chart-' + Date.now();

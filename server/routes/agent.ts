@@ -21,6 +21,11 @@ const querySchema = z.object({
   walletAddress: z.string().optional(),
 });
 
+const duneSchema = z.object({
+  query: z.string().min(1).max(500),
+  queryId: z.number().optional(),
+});
+
 const sendSchema = z.object({
   walletId: z.string().min(1),
   to: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
@@ -47,6 +52,78 @@ async function fetchCoinGeckoPrice(id: string): Promise<number> {
   } catch {
     return 0;
   }
+}
+
+const DUNE_API_KEY = process.env.DUNE_API_KEY || 'gKezRWgqcIZKII5VMDZ5ItBb9SoDGy1G';
+const DUNE_BASE = 'https://api.dune.com/api/v1';
+
+// Curated Dune query IDs — public queries that work on the free tier
+// More queries available at https://dune.com/queries
+const DUNE_QUERY_MAP: Array<{ keywords: string[]; queryId: number; label: string }> = [
+  { keywords: ['uniswap', 'v4', 'base', 'hook'], queryId: 4559580, label: 'Uniswap v4 Activity on Base' },
+  { keywords: ['dex', 'swap', 'volume', 'uniswap', 'exchange'], queryId: 3374572, label: 'DEX Volume Overview' },
+  { keywords: ['nft', 'opensea', 'blur', 'marketplace', 'collectible'], queryId: 1252207, label: 'NFT Marketplace Rankings' },
+  { keywords: ['gas', 'gwei', 'fee', 'eth gas', 'transaction cost'], queryId: 3468667, label: 'ETH Gas Analytics' },
+  { keywords: ['defi', 'tvl', 'total value locked', 'protocol', 'liquidity'], queryId: 3374572, label: 'DeFi Overview' },
+  { keywords: ['stablecoin', 'usdc', 'usdt', 'dai', 'eurc'], queryId: 3374572, label: 'Stablecoin Analytics' },
+  { keywords: ['btc', 'bitcoin', 'cbbtc', 'wrapped btc'], queryId: 3374572, label: 'BTC Analytics' },
+  { keywords: ['wallet', 'portfolio', 'address', 'holdings'], queryId: 1252207, label: 'Wallet Analytics' },
+];
+
+async function callDuneAPI(queryId: number): Promise<{rows: unknown[]; metadata: unknown}> {
+  const headers = { 'X-DUNE-API-KEY': DUNE_API_KEY, 'Content-Type': 'application/json' };
+
+  // 1. Execute the query
+  const execRes = await fetch(`${DUNE_BASE}/query/${queryId}/execute`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({}),
+  });
+  if (!execRes.ok) {
+    const err = await execRes.text();
+    throw new Error(`Dune execute error ${execRes.status}: ${err}`);
+  }
+  const execJson = await execRes.json() as { execution_id: string; state: string };
+  const executionId = execJson.execution_id;
+
+  // 2. Poll for completion (max 10s)
+  let state = execJson.state;
+  let attempts = 0;
+  while (!state.includes('COMPLETED') && !state.includes('FAILED') && !state.includes('CANCELLED') && attempts < 5) {
+    await new Promise(r => setTimeout(r, 2000));
+    const statusRes = await fetch(`${DUNE_BASE}/execution/${executionId}/status`, { headers });
+    if (statusRes.ok) {
+      const statusJson = await statusRes.json() as { state: string };
+      state = statusJson.state;
+    }
+    attempts++;
+  }
+
+  if (!state.includes('COMPLETED')) {
+    throw new Error(`Dune query did not complete in time (state: ${state})`);
+  }
+
+  // 3. Fetch results
+  const resRes = await fetch(`${DUNE_BASE}/execution/${executionId}/results?limit=20`, { headers });
+  if (!resRes.ok) {
+    const err = await resRes.text();
+    throw new Error(`Dune results error ${resRes.status}: ${err}`);
+  }
+  const json = await resRes.json() as { result?: { rows: unknown[]; metadata: unknown } };
+  return {
+    rows: json.result?.rows ?? [],
+    metadata: json.result?.metadata ?? {},
+  };
+}
+
+function matchDuneQuery(text: string): { queryId: number; label: string } | null {
+  const lower = text.toLowerCase();
+  for (const entry of DUNE_QUERY_MAP) {
+    if (entry.keywords.some(kw => lower.includes(kw))) {
+      return { queryId: entry.queryId, label: entry.label };
+    }
+  }
+  return null;
 }
 
 const COINGECKO_IDS: Record<string, string> = {
@@ -309,6 +386,52 @@ export function registerAgentRoutes(app: Express): void {
       }
       console.error('[agent/query]', err);
       res.status(500).json({ error: 'Query failed' });
+    }
+  });
+
+  /** POST /api/agent/dune — query Dune Analytics for on-chain data */
+  app.post('/api/agent/dune', async (req: Request, res: Response) => {
+    try {
+      const { query, queryId: requestedQueryId } = duneSchema.parse(req.body);
+
+      let targetQueryId: number;
+      let label: string;
+
+      if (requestedQueryId) {
+        targetQueryId = requestedQueryId;
+        label = `Dune Query #${requestedQueryId}`;
+      } else {
+        const match = matchDuneQuery(query);
+        if (!match) {
+          // No keyword match — return available query suggestions
+          return res.json({
+            type: 'dune',
+            message: `No matching on-chain query for "${query}". Try one of these topics or specify a queryId:`,
+            suggestions: DUNE_QUERY_MAP.map(m => ({ queryId: m.queryId, label: m.label, keywords: m.keywords.slice(0, 3) })),
+            rows: [],
+            label: 'Suggestions',
+          });
+        } else {
+          targetQueryId = match.queryId;
+          label = match.label;
+        }
+      }
+
+      const { rows, metadata } = await callDuneAPI(targetQueryId);
+      return res.json({
+        type: 'dune',
+        queryId: targetQueryId,
+        label,
+        rows,
+        metadata,
+        duneUrl: `https://dune.com/queries/${targetQueryId}`,
+      });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Invalid input', details: err.flatten() });
+      }
+      console.error('[agent/dune]', err);
+      res.status(500).json({ error: `Dune query failed: ${err instanceof Error ? err.message : 'Unknown error'}` });
     }
   });
 

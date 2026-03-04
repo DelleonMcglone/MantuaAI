@@ -10,6 +10,58 @@ const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
+const DUNE_API_KEY = process.env.DUNE_API_KEY || 'gKezRWgqcIZKII5VMDZ5ItBb9SoDGy1G';
+const DUNE_BASE_URL = 'https://api.dune.com/api/v1';
+
+async function fetchDuneResults(queryId: number): Promise<string> {
+  try {
+    const headers = { 'X-DUNE-API-KEY': DUNE_API_KEY, 'Content-Type': 'application/json' };
+
+    // Execute
+    const execRes = await fetch(`${DUNE_BASE_URL}/query/${queryId}/execute`, {
+      method: 'POST', headers, body: JSON.stringify({}),
+    });
+    if (!execRes.ok) return `Dune execute error: ${execRes.status}`;
+    const { execution_id } = await execRes.json() as { execution_id: string };
+
+    // Poll
+    let state = 'PENDING';
+    for (let i = 0; i < 5 && !state.includes('COMPLETED') && !state.includes('FAILED'); i++) {
+      await new Promise(r => setTimeout(r, 2000));
+      const s = await fetch(`${DUNE_BASE_URL}/execution/${execution_id}/status`, { headers });
+      if (s.ok) { state = ((await s.json()) as { state: string }).state; }
+    }
+    if (!state.includes('COMPLETED')) return `Dune query timed out (state: ${state})`;
+
+    // Results
+    const resRes = await fetch(`${DUNE_BASE_URL}/execution/${execution_id}/results?limit=10`, { headers });
+    if (!resRes.ok) return `Dune results error: ${resRes.status}`;
+    const json = await resRes.json() as { result?: { rows: unknown[] } };
+    const rows = json.result?.rows ?? [];
+    if (rows.length === 0) return 'No data returned from Dune query.';
+    return `Dune query ${queryId} returned ${rows.length} rows:\n${JSON.stringify(rows.slice(0, 5), null, 2)}`;
+  } catch (err) {
+    return `Failed to fetch Dune data: ${err instanceof Error ? err.message : 'Unknown error'}`;
+  }
+}
+
+// Curated DeFi query IDs for Dune search fallback (public queries that work on free tier)
+const DUNE_CURATED: Array<{ id: number; name: string; keywords: string[] }> = [
+  { id: 1252207, name: 'NFT Marketplace Rankings', keywords: ['nft', 'opensea', 'blur', 'marketplace'] },
+  { id: 3374572, name: 'DEX Volume Overview', keywords: ['dex', 'volume', 'swap', 'uniswap', 'defi'] },
+  { id: 4559580, name: 'Uniswap v4 Base Activity', keywords: ['uniswap', 'v4', 'base', 'pool', 'hook'] },
+  { id: 3468667, name: 'ETH Gas Analytics', keywords: ['gas', 'gwei', 'fee', 'eth gas'] },
+];
+
+async function searchDune(query: string): Promise<string> {
+  const lower = query.toLowerCase();
+  const matches = DUNE_CURATED.filter(q => q.keywords.some(kw => lower.includes(kw)));
+  if (matches.length > 0) {
+    return matches.map(m => `- [${m.id}] ${m.name} → use query_id: ${m.id}`).join('\n');
+  }
+  return `No pre-configured Dune queries match "${query}". Available topics: NFT marketplaces (1252207), DEX volume (3374572), Uniswap v4 Base (4559580), ETH gas (3468667).`;
+}
+
 const createSessionSchema = z.object({
   userId: z.string().min(1).max(64),
   title: z.string().max(255).optional(),
@@ -202,30 +254,109 @@ function buildSystemPrompt(chainId?: number): string {
   return prompt;
 }
 
+const DUNE_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
+  {
+    type: 'function',
+    function: {
+      name: 'dune_get_query_results',
+      description: 'Fetch on-chain analytics data from a Dune Analytics query. Use when the user asks about blockchain data, DeFi metrics, TVL, volume, wallet activity, protocol analytics, gas fees, token transfers, or any on-chain statistics.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query_id: {
+            type: 'number',
+            description: 'The Dune query ID to fetch results from. Use well-known DeFi query IDs.',
+          },
+        },
+        required: ['query_id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'dune_search_queries',
+      description: 'Search Dune Analytics for queries related to a topic. Use to discover relevant on-chain data queries when you don\'t know a specific query ID.',
+      parameters: {
+        type: 'object',
+        properties: {
+          search_term: {
+            type: 'string',
+            description: 'The search term to find relevant Dune queries (e.g. "Uniswap v4 Base", "ETH gas", "USDC transfers")',
+          },
+        },
+        required: ['search_term'],
+      },
+    },
+  },
+];
+
 async function generateResponse(
   message: string,
   parsed: ReturnType<typeof parseVoiceCommand>,
   chainId?: number,
 ): Promise<string> {
-  if (process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
-    try {
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: buildSystemPrompt(chainId),
-          },
-          { role: "user", content: message },
-        ],
-        max_tokens: 400,
-      });
-      return completion.choices[0]?.message?.content ?? fallbackResponse(message, parsed);
-    } catch {
-      return fallbackResponse(message, parsed);
-    }
+  if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
+    return fallbackResponse(message, parsed);
   }
-  return fallbackResponse(message, parsed);
+
+  try {
+    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+      { role: 'system', content: buildSystemPrompt(chainId) },
+      { role: 'user', content: message },
+    ];
+
+    // First call — allow AI to use Dune tools if relevant
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages,
+      tools: DUNE_TOOLS,
+      tool_choice: 'auto',
+      max_tokens: 600,
+    });
+
+    const choice = completion.choices[0];
+    if (!choice) return fallbackResponse(message, parsed);
+
+    // Handle tool calls (Dune lookups)
+    if (choice.finish_reason === 'tool_calls' && choice.message.tool_calls?.length) {
+      const toolMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+        ...messages,
+        choice.message,
+      ];
+
+      for (const toolCall of choice.message.tool_calls) {
+        let toolResult: string;
+        const args = JSON.parse(toolCall.function.arguments) as Record<string, unknown>;
+
+        if (toolCall.function.name === 'dune_get_query_results') {
+          toolResult = await fetchDuneResults(args.query_id as number);
+        } else if (toolCall.function.name === 'dune_search_queries') {
+          toolResult = await searchDune(args.search_term as string);
+        } else {
+          toolResult = 'Unknown tool';
+        }
+
+        toolMessages.push({
+          role: 'tool',
+          tool_call_id: toolCall.id,
+          content: toolResult,
+        });
+      }
+
+      // Second call — let AI summarise the Dune data
+      const finalCompletion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: toolMessages,
+        max_tokens: 600,
+      });
+      return finalCompletion.choices[0]?.message?.content ?? fallbackResponse(message, parsed);
+    }
+
+    return choice.message?.content ?? fallbackResponse(message, parsed);
+  } catch {
+    return fallbackResponse(message, parsed);
+  }
 }
 
 function fallbackResponse(

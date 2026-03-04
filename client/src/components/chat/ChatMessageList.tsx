@@ -4,6 +4,7 @@ import { formatDistanceToNow, isAfter, subHours } from "date-fns";
 import type { Message } from "../../types/chat";
 import CommandInterpretationCard from "./CommandInterpretationCard";
 import { ChartMessage } from "../analytics/ChartMessage";
+import { DuneResultTable } from "../DuneResultTable";
 
 interface ChatMessageListProps {
   messages: Message[];
@@ -159,6 +160,19 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                 theme={theme}
                 isDark={isDark}
               />
+            )}
+            {msg.dune && (
+              msg.dune.isLoading ? (
+                <div style={{ padding: '12px 16px', borderRadius: 10, background: isDark ? 'rgba(245,158,11,0.08)' : 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)', color: '#f59e0b', fontSize: 13 }}>
+                  🟡 Querying Dune Analytics...
+                </div>
+              ) : msg.dune.error ? (
+                <div style={{ padding: '12px 16px', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontSize: 13 }}>
+                  {msg.dune.error}
+                </div>
+              ) : (
+                <DuneResultTable data={msg.dune} isDark={isDark} />
+              )
             )}
             {msg.metadata?.command && (
               <CommandInterpretationCard command={msg.metadata.command} isDark={isDark} />

@@ -68,7 +68,10 @@
       "Bash(npx skills add Uniswap/uniswap-ai --yes)",
       "WebFetch(domain:api-docs.uniswap.org)",
       "WebFetch(domain:developers.circle.com)",
-      "WebFetch(domain:unichain-sepolia.blockscout.com)"
+      "WebFetch(domain:unichain-sepolia.blockscout.com)",
+      "Bash(claude mcp add --scope user --transport http dune https://api.dune.com/mcp/v1 --header \"x-dune-api-key: gKezRWgqcIZKII5VMDZ5ItBb9SoDGy1G\")",
+      "Bash(claude mcp list)",
+      "WebFetch(domain:docs.dune.com)"
     ]
   }
 }

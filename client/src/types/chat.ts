@@ -18,6 +18,17 @@ export interface ChartMetadata {
   error?: string | null;
 }
 
+/** Dune Analytics query result attached to an assistant message */
+export interface DuneMetadata {
+  rows: Record<string, unknown>[];
+  columns: string[];
+  rowCount: number;
+  label: string;
+  duneUrl?: string;
+  isLoading?: boolean;
+  error?: string | null;
+}
+
 export interface Message {
   id: string;
   sessionId: string;
@@ -27,6 +38,8 @@ export interface Message {
   metadata?: CommandMetadata | null;
   /** Present on assistant messages containing analytics chart data */
   chart?: ChartMetadata | null;
+  /** Present on assistant messages containing Dune Analytics table data */
+  dune?: DuneMetadata | null;
   createdAt: string; // ISO-8601
 }
 

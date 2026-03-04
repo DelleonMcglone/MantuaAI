@@ -21,6 +21,7 @@ import analyticsRouter     from "./routes/analytics";
 import analyticsQueryRouter from "./routes/analyticsQuery";
 import poolsRouter         from "./routes/pools";
 import portfolioRouter     from "./routes/portfolio";
+import duneRouter          from "./routes/dune";
 
 // ============ VOICE TRANSCRIPTION SETUP ============
 
@@ -86,6 +87,7 @@ export async function registerRoutes(
   app.use('/api/analytics', analyticsQueryRouter);
   app.use('/api/pools',     poolsRouter);
   app.use('/api/portfolio', portfolioRouter);
+  app.use('/api/dune',      duneRouter);
 
   // Register new userId-based chat routes first (they fall through for legacy requests)
   registerChatRoutes(app);
