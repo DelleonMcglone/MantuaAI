@@ -200,6 +200,22 @@ export function registerChatRoutes(app: Express): void {
     }
   );
 
+  // PATCH /api/chat/sessions/:id — update session title
+  app.patch("/api/chat/sessions/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { title } = req.body;
+      if (!title || typeof title !== 'string' || title.length > 255) {
+        res.status(400).json({ error: "title must be a non-empty string under 255 chars" });
+        return;
+      }
+      await storage.updateChatSessionTitle(id, title.slice(0, 255));
+      res.json({ success: true });
+    } catch {
+      res.status(500).json({ error: "Failed to update session title" });
+    }
+  });
+
   // POST /api/ai/chat — parse command and generate AI response
   app.post("/api/ai/chat", async (req: Request, res: Response) => {
     try {

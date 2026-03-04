@@ -49,6 +49,7 @@ export interface IStorage {
   getRecentChatSessions(limit?: number, walletAddress?: string): Promise<ChatSession[]>;
   deleteChatSession(id: string): Promise<void>;
   updateChatSessionTimestamp(id: string): Promise<void>;
+  updateChatSessionTitle(id: string, title: string): Promise<void>;
   
   // Chat Messages
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
@@ -133,6 +134,10 @@ export class DbStorage implements IStorage {
 
   async updateChatSessionTimestamp(id: string): Promise<void> {
     await db.update(chatSessions).set({ updatedAt: new Date() }).where(eq(chatSessions.id, id));
+  }
+
+  async updateChatSessionTitle(id: string, title: string): Promise<void> {
+    await db.update(chatSessions).set({ title, updatedAt: new Date() }).where(eq(chatSessions.id, id));
   }
 
   // ============ CHAT MESSAGES ============

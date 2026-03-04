@@ -705,37 +705,62 @@ const ActivityFeed = ({ activities, filter, setFilter, theme }) => {
   );
 };
 
-// ============ PORTFOLIO INTERFACE ============
+// ============ PORTFOLIO INTERFACE (Hyperliquid-inspired) ============
+const TESTNET_PRICES: Record<string, number> = { ETH: 2000, USDC: 1, EURC: 1.06, cbBTC: 50000 };
+
+const ZoneBadge = ({ zone }) => {
+  const cfg = {
+    HEALTHY: { color: '#10b981', bg: 'rgba(16,185,129,0.12)', label: 'HEALTHY' },
+    MINOR: { color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', label: 'MINOR' },
+    MODERATE: { color: '#f97316', bg: 'rgba(249,115,22,0.12)', label: 'MODERATE' },
+    SEVERE: { color: '#ef4444', bg: 'rgba(239,68,68,0.12)', label: 'SEVERE' },
+    CRITICAL: { color: '#7c3aed', bg: 'rgba(124,58,237,0.12)', label: 'CRITICAL' },
+  }[zone] || { color: '#10b981', bg: 'rgba(16,185,129,0.12)', label: 'HEALTHY' };
+  return (
+    <span style={{ padding: '2px 8px', borderRadius: '4px', background: cfg.bg, color: cfg.color, fontSize: '11px', fontWeight: '700', letterSpacing: '0.04em' }}>
+      {cfg.label}
+    </span>
+  );
+};
+
 const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, currentChain, onRemoveLiquidity }) => {
+  const [activeTab, setActiveTab] = useState('balances');
   const [txns, setTxns] = useState<Array<{type:string;tx_hash:string;token_in?:string;token_out?:string;amount_in?:string;amount_out?:string;timestamp:string;base_scan_url:string}>>([]);
-  const [agentWallet, setAgentWallet] = useState<{address:string;wallet_id:string} | null>(null);
+  const [agentWallet, setAgentWallet] = useState<{address:string;wallet_id:string;id?:string} | null>(null);
   const [agentTxns, setAgentTxns] = useState<Array<{type:string;tx_hash:string;token_in?:string;token_out?:string;base_scan_url:string;timestamp:string}>>([]);
-  const [loadingTxns, setLoadingTxns] = useState(false);
+  const [positions, setPositions] = useState<Array<{id:string;token0:string;token1:string;liquidity:string;amount0:string;amount1:string;fee_tier:number;status:string}>>([]);
+  const [hideSmall, setHideSmall] = useState(false);
   const isAgentView = type === 'Agent';
 
   const { address } = useAccount();
-  const { data: liveEthBalance } = useBalance({ address, query: { enabled: !!address && isConnected } });
+  const chainId = useChainId();
+  const { data: liveEthBalance } = useBalance({ address, chainId, query: { enabled: !!address && isConnected, refetchInterval: 30_000 } });
   const { balancesBySymbol } = useTokenBalances();
   const { price: ethPriceUSD } = useLivePriceUSD('ETH');
 
-  const ethBalanceNum = liveEthBalance ? parseFloat(liveEthBalance.formatted) : 0;
-  const ethPrice = ethPriceUSD ?? 0;
+  const ethBalanceNum = liveEthBalance ? (parseFloat(liveEthBalance.formatted) || 0) : 0;
+  const ethPrice = (ethPriceUSD != null && !isNaN(ethPriceUSD)) ? ethPriceUSD : TESTNET_PRICES.ETH;
   const ethValueUSD = ethBalanceNum * ethPrice;
-  const usdcBalance = parseFloat(balancesBySymbol['USDC']?.formatted ?? '0');
-  const totalValue = ethValueUSD + usdcBalance;
+  const usdcBalance = parseFloat(balancesBySymbol['USDC']?.formatted ?? '0') || 0;
+  const eurcBalance = parseFloat(balancesBySymbol['EURC']?.formatted ?? '0') || 0;
+  const cbbtcBalance = parseFloat(balancesBySymbol['cbBTC']?.formatted ?? '0') || 0;
+  const eurcPrice = TESTNET_PRICES.EURC;
+  const cbbtcPrice = TESTNET_PRICES.cbBTC;
+  const totalValue = (isNaN(ethValueUSD) ? 0 : ethValueUSD) + usdcBalance + (eurcBalance * eurcPrice) + (cbbtcBalance * cbbtcPrice);
+  const safeTotal = isNaN(totalValue) ? 0 : totalValue;
 
-  // Fetch user transactions from DB
+  // Explorer URL based on chain
+  const explorerBase = chainId === 1301 ? 'https://sepolia.uniscan.xyz' : 'https://sepolia.basescan.org';
+  const explorerLabel = chainId === 1301 ? 'Uniscan' : 'BaseScan';
+
   useEffect(() => {
     if (!address || !isConnected) return;
-    setLoadingTxns(true);
     fetch(`/api/portfolio/transactions?walletAddress=${address}`)
       .then(r => r.ok ? r.json() : [])
       .then(rows => setTxns(rows ?? []))
-      .catch(() => {})
-      .finally(() => setLoadingTxns(false));
+      .catch(() => {});
   }, [address, isConnected]);
 
-  // Fetch agent wallet and transactions
   useEffect(() => {
     if (!address) return;
     fetch(`/api/portfolio/agent-wallets?userId=${address}`)
@@ -751,119 +776,351 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
       .catch(() => {});
   }, [address]);
 
-  const assets: { name: string; symbol: string; balance: number; usdValue: number; percentage: number }[] = [];
-  if (isConnected && address) {
-    if (ethBalanceNum > 0) assets.push({ name: 'Ethereum', symbol: 'ETH', balance: ethBalanceNum, usdValue: ethValueUSD, percentage: totalValue > 0 ? (ethValueUSD / totalValue) * 100 : 0 });
-    if (usdcBalance > 0) assets.push({ name: 'USD Coin', symbol: 'USDC', balance: usdcBalance, usdValue: usdcBalance, percentage: totalValue > 0 ? (usdcBalance / totalValue) * 100 : 0 });
-  }
+  useEffect(() => {
+    if (!address) return;
+    fetch(`/api/portfolio/positions?walletAddress=${address}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(rows => setPositions(rows ?? []))
+      .catch(() => {});
+  }, [address]);
 
-  const txTypeBadge = (t: string) => {
-    const map: Record<string, string> = { swap: '🔄 SWAP', add_liquidity: '+ ADD LP', remove_liquidity: '- REMOVE LP', send: '📤 SEND' };
-    return map[t] ?? t.toUpperCase();
+  const tokenRows = [
+    { symbol: 'ETH', name: 'Ethereum', balance: ethBalanceNum, usdValue: isNaN(ethValueUSD) ? 0 : ethValueUSD, price: ethPrice },
+    { symbol: 'USDC', name: 'USD Coin', balance: usdcBalance, usdValue: usdcBalance, price: 1 },
+    ...(chainId === 84532 ? [
+      { symbol: 'EURC', name: 'Euro Coin', balance: eurcBalance, usdValue: eurcBalance * eurcPrice, price: eurcPrice },
+      { symbol: 'cbBTC', name: 'Coinbase BTC', balance: cbbtcBalance, usdValue: cbbtcBalance * cbbtcPrice, price: cbbtcPrice },
+    ] : []),
+  ].filter(t => !hideSmall || t.usdValue >= 1);
+
+  const fmtUSD = (v: number) => `$${(isNaN(v) ? 0 : v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const fmtBal = (v: number, sym: string) => {
+    const dec = sym === 'ETH' ? 6 : sym === 'cbBTC' ? 6 : 2;
+    return (isNaN(v) ? 0 : v).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: dec });
   };
+  const fmtTime = (ts: string) => { try { return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch { return ts; } };
+
+  const tabStyle = (tab: string) => ({
+    padding: '10px 16px', borderRadius: '8px 8px 0 0', cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+    background: activeTab === tab ? theme.bgCard : 'transparent',
+    color: activeTab === tab ? theme.textPrimary : theme.textSecondary,
+    border: `1px solid ${activeTab === tab ? theme.border : 'transparent'}`,
+    borderBottom: activeTab === tab ? `1px solid ${theme.bgCard}` : `1px solid ${theme.border}`,
+    whiteSpace: 'nowrap' as const,
+  });
+
+  // Simulated flat chart data for the value line
+  const chartPoints = Array.from({ length: 20 }, (_, i) => safeTotal * (0.98 + 0.02 * (i / 19)));
+  const chartMax = Math.max(...chartPoints);
+  const chartMin = Math.min(...chartPoints) * 0.99;
+  const chartRange = chartMax - chartMin || 1;
+  const chartW = 300; const chartH = 80;
+  const svgPoints = chartPoints.map((v, i) => {
+    const x = (i / (chartPoints.length - 1)) * chartW;
+    const y = chartH - ((v - chartMin) / chartRange) * chartH;
+    return `${x},${y}`;
+  }).join(' ');
+
+  const cardStyle = {
+    background: theme.bgCard,
+    borderRadius: '12px',
+    border: `1px solid ${theme.border}`,
+    padding: '20px',
+  };
+
+  if (isAgentView) {
+    return (
+      <div style={{ width: '100%', fontFamily: '"DM Sans", sans-serif' }}>
+        <div style={{ background: theme.bgSecondary, borderRadius: '16px', border: `1px solid ${theme.border}`, padding: '24px', maxHeight: '85vh', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: theme.textPrimary }}>Agent Portfolio</h2>
+            <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '8px', color: theme.textSecondary }}><CloseIcon /></button>
+          </div>
+          {!agentWallet ? (
+            <div style={{ padding: '40px', textAlign: 'center', ...cardStyle }}>
+              <div style={{ fontSize: '32px', marginBottom: '12px' }}>🤖</div>
+              <div style={{ color: theme.textPrimary, fontWeight: '600', marginBottom: '8px' }}>No Agent Wallet</div>
+              <div style={{ color: theme.textMuted, fontSize: '13px' }}>Create an agent wallet first → Go to Agent → Chat Mode → Create & Manage Wallet</div>
+            </div>
+          ) : (
+            <div>
+              <div style={{ ...cardStyle, marginBottom: '16px' }}>
+                <div style={{ fontSize: '11px', color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Agent Wallet Address</div>
+                <div style={{ fontFamily: 'monospace', fontSize: '13px', color: theme.textPrimary, wordBreak: 'break-all', marginBottom: '8px' }}>{agentWallet.address}</div>
+                <a href={`${explorerBase}/address/${agentWallet.address}`} target="_blank" rel="noopener noreferrer" style={{ color: '#14b8a6', fontSize: '12px', textDecoration: 'none' }}>View on {explorerLabel} →</a>
+              </div>
+              <div style={{ fontSize: '14px', fontWeight: '700', color: theme.textPrimary, marginBottom: '12px' }}>Agent Transactions</div>
+              {agentTxns.length === 0 ? (
+                <div style={{ padding: '24px', textAlign: 'center', color: theme.textMuted, ...cardStyle }}>No agent transactions yet.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {agentTxns.map((t, i) => (
+                    <div key={i} style={{ ...cardStyle, padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontWeight: '700', fontSize: '13px', color: theme.textPrimary, marginBottom: '4px' }}>{t.type?.toUpperCase()}</div>
+                        {t.token_in && t.token_out && <div style={{ fontSize: '12px', color: theme.textSecondary }}>{t.token_in} → {t.token_out}</div>}
+                        <div style={{ fontSize: '11px', color: theme.textMuted }}>{fmtTime(t.timestamp)}</div>
+                      </div>
+                      <a href={t.base_scan_url} target="_blank" rel="noopener noreferrer" style={{ padding: '6px 12px', borderRadius: '6px', background: 'rgba(20,184,166,0.08)', border: '1px solid rgba(20,184,166,0.2)', color: '#14b8a6', fontSize: '12px', textDecoration: 'none' }}>View Tx →</a>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ width: '100%', fontFamily: '"DM Sans", sans-serif' }}>
-      <div style={{ background: theme.bgSecondary, borderRadius: '16px', border: `1px solid ${theme.border}`, padding: '24px', maxHeight: '85vh', overflowY: 'auto' }}>
+      <div style={{ background: theme.bgSecondary, borderRadius: '16px', border: `1px solid ${theme.border}`, padding: '24px', maxHeight: '90vh', overflowY: 'auto' }}>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: theme.textPrimary }}>
-            {isAgentView ? 'Agent Portfolio' : 'User Portfolio'}
-          </h2>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '8px', color: theme.textSecondary }}>
-            <CloseIcon />
-          </button>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: theme.textPrimary }}>Portfolio</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button style={{ padding: '8px 16px', borderRadius: '8px', background: 'rgba(20,184,166,0.12)', border: '1px solid rgba(20,184,166,0.25)', color: '#14b8a6', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>Deposit</button>
+            <button style={{ padding: '8px 16px', borderRadius: '8px', background: theme.bgCard, border: `1px solid ${theme.border}`, color: theme.textSecondary, fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>Send</button>
+            <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '8px', color: theme.textSecondary }}><CloseIcon /></button>
+          </div>
         </div>
 
-        {!isAgentView && (
-          <div>
-            {/* Summary */}
-            <div style={{ background: theme.bgCard, borderRadius: '12px', padding: '20px', marginBottom: '20px', border: `1px solid ${theme.border}` }}>
-              <div style={{ fontSize: '12px', color: theme.textMuted, marginBottom: '6px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Portfolio Value</div>
-              <div style={{ fontSize: '32px', fontWeight: '700', color: theme.textPrimary, fontFamily: 'SF Mono, monospace' }}>
-                ${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-              <div style={{ marginTop: '16px', display: 'flex', gap: '16px' }}>
-                {assets.map(a => (
-                  <div key={a.symbol} style={{ flex: 1, padding: '12px', borderRadius: '8px', background: theme.bgSecondary, border: `1px solid ${theme.border}` }}>
-                    <div style={{ fontSize: '11px', color: theme.textMuted, marginBottom: '4px' }}>{a.symbol}</div>
-                    <div style={{ fontWeight: '600', color: theme.textPrimary }}>{a.balance.toFixed(4)}</div>
-                    <div style={{ fontSize: '12px', color: theme.textSecondary }}>${a.usdValue.toFixed(2)}</div>
-                  </div>
-                ))}
+        {/* Top 3 Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+
+          {/* Card 1: Total Portfolio Value */}
+          <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ fontSize: '12px', color: theme.textMuted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Value</div>
+            <div style={{ fontSize: '32px', fontWeight: '800', color: theme.textPrimary, fontFamily: 'SF Mono, Monaco, monospace', letterSpacing: '-0.02em' }}>
+              {fmtUSD(safeTotal)}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
+              {tokenRows.map(t => t.balance > 0 && (
+                <div key={t.symbol} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <TokenIcon token={t.symbol} size={18} />
+                  <span style={{ flex: 1, fontSize: '12px', color: theme.textSecondary }}>{fmtBal(t.balance, t.symbol)} {t.symbol}</span>
+                  <span style={{ fontSize: '12px', color: theme.textMuted, fontFamily: 'monospace' }}>{fmtUSD(t.usdValue)}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: `1px solid ${theme.border}` }}>
+              <div style={{ fontSize: '11px', color: theme.textMuted }}>Fees (Swap)</div>
+              <div style={{ fontSize: '12px', color: theme.textSecondary, marginTop: '2px' }}>
+                Taker 0.05% / 0.30% · <span style={{ color: '#14b8a6', cursor: 'pointer' }}>Dynamic (Hook pools)</span>
               </div>
             </div>
+          </div>
 
-            {/* Transactions */}
+          {/* Card 2: Account Breakdown */}
+          <div style={{ ...cardStyle }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: theme.textPrimary }}>Spot + LP</div>
+              <div style={{ fontSize: '11px', color: theme.textMuted, background: theme.bgSecondary, padding: '3px 8px', borderRadius: '6px', border: `1px solid ${theme.border}` }}>30D</div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {[
+                { label: 'PNL', value: fmtUSD(0), color: theme.textSecondary },
+                { label: 'Volume', value: fmtUSD(0), color: theme.textSecondary },
+                { label: 'Total Equity', value: fmtUSD(safeTotal), color: theme.textPrimary },
+                { label: 'LP Equity', value: fmtUSD(positions.reduce((s, p) => s + (parseFloat(p.amount0 || '0') + parseFloat(p.amount1 || '0')), 0)), color: theme.textSecondary },
+                { label: 'Spot Equity', value: fmtUSD(safeTotal), color: theme.textSecondary },
+              ].map(row => (
+                <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '13px', color: theme.textSecondary }}>{row.label}</span>
+                  <span style={{ fontSize: '13px', fontWeight: '600', color: row.color, fontFamily: 'SF Mono, monospace' }}>{row.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Card 3: Account Value Chart */}
+          <div style={{ ...cardStyle }}>
+            <div style={{ fontSize: '13px', fontWeight: '600', color: theme.textPrimary, marginBottom: '4px' }}>Account Value</div>
+            <div style={{ fontSize: '11px', color: theme.textMuted, marginBottom: '16px' }}>PNL: <span style={{ color: theme.textSecondary }}>$0.00</span></div>
+            <div style={{ position: 'relative', height: `${chartH}px`, overflow: 'hidden' }}>
+              <svg width="100%" height={chartH} viewBox={`0 0 ${chartW} ${chartH}`} preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="portfolioGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="#14b8a6" stopOpacity="0.3"/>
+                    <stop offset="100%" stopColor="#14b8a6" stopOpacity="0"/>
+                  </linearGradient>
+                </defs>
+                <polygon points={`0,${chartH} ${svgPoints} ${chartW},${chartH}`} fill="url(#portfolioGrad)"/>
+                <polyline points={svgPoints} fill="none" stroke="#14b8a6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
+              <span style={{ fontSize: '11px', color: theme.textMuted }}>30 days ago</span>
+              <span style={{ fontSize: '11px', color: theme.textMuted }}>Now</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: '2px', marginBottom: '-1px', overflowX: 'auto' }}>
+          {['balances', 'lp', 'swaps', 'pools', 'deposits'].map(tab => (
+            <button key={tab} onClick={() => setActiveTab(tab)} style={tabStyle(tab)}>
+              {{ balances: 'Balances', lp: 'LP Positions', swaps: 'Swap History', pools: 'Pool History', deposits: 'Deposits' }[tab]}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab Content */}
+        <div style={{ ...cardStyle, borderRadius: '0 12px 12px 12px', minHeight: '200px' }}>
+
+          {/* Balances Tab */}
+          {activeTab === 'balances' && (
             <div>
-              <div style={{ fontSize: '14px', fontWeight: '700', color: theme.textPrimary, marginBottom: '12px' }}>Transaction History</div>
-              {loadingTxns && <div style={{ padding: '20px', textAlign: 'center', color: theme.textMuted }}>Loading...</div>}
-              {!loadingTxns && txns.length === 0 && (
-                <div style={{ padding: '32px', textAlign: 'center', color: theme.textMuted, background: theme.bgCard, borderRadius: '12px', border: `1px solid ${theme.border}` }}>
-                  No transactions yet. Start swapping or adding liquidity!
-                </div>
-              )}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {txns.map((t, i) => (
-                  <div key={i} style={{ padding: '14px 16px', background: theme.bgCard, borderRadius: '10px', border: `1px solid ${theme.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontWeight: '700', fontSize: '13px', color: theme.textPrimary, marginBottom: '4px' }}>{txTypeBadge(t.type)}</div>
-                      {t.token_in && t.token_out && (
-                        <div style={{ fontSize: '12px', color: theme.textSecondary }}>{t.token_in} → {t.token_out}{t.amount_in ? ` (${parseFloat(t.amount_in).toFixed(6)})` : ''}</div>
-                      )}
-                      <div style={{ fontSize: '11px', color: theme.textMuted, marginTop: '2px' }}>{new Date(t.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-                    </div>
-                    <a href={t.base_scan_url} target="_blank" rel="noopener noreferrer"
-                      style={{ padding: '6px 12px', borderRadius: '6px', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', color: '#3b82f6', fontSize: '12px', textDecoration: 'none', whiteSpace: 'nowrap' }}>
-                      View on BaseScan →
-                    </a>
-                  </div>
-                ))}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: theme.textSecondary, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={hideSmall} onChange={e => setHideSmall(e.target.checked)} style={{ accentColor: '#14b8a6' }} />
+                  Hide Small Balances (&lt;$1)
+                </label>
               </div>
-            </div>
-          </div>
-        )}
-
-        {isAgentView && (
-          <div>
-            {!agentWallet ? (
-              <div style={{ padding: '40px', textAlign: 'center', background: theme.bgCard, borderRadius: '12px', border: `1px solid ${theme.border}` }}>
-                <div style={{ fontSize: '32px', marginBottom: '12px' }}>🤖</div>
-                <div style={{ color: theme.textPrimary, fontWeight: '600', marginBottom: '8px' }}>No Agent Wallet</div>
-                <div style={{ color: theme.textMuted, fontSize: '13px' }}>Create an agent wallet first → Go to Agent → Chat Mode → Create & Manage Wallet</div>
-              </div>
-            ) : (
-              <div>
-                <div style={{ background: theme.bgCard, borderRadius: '12px', padding: '16px', marginBottom: '16px', border: `1px solid ${theme.border}` }}>
-                  <div style={{ fontSize: '11px', color: theme.textMuted, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Agent Wallet Address</div>
-                  <div style={{ fontFamily: 'monospace', fontSize: '13px', color: theme.textPrimary, wordBreak: 'break-all', marginBottom: '8px' }}>{agentWallet.address}</div>
-                  <a href={`https://sepolia.basescan.org/address/${agentWallet.address}`} target="_blank" rel="noopener noreferrer"
-                    style={{ color: '#3b82f6', fontSize: '12px', textDecoration: 'none' }}>View on BaseScan →</a>
-                </div>
-                <div style={{ fontSize: '14px', fontWeight: '700', color: theme.textPrimary, marginBottom: '12px' }}>Agent Transactions</div>
-                {agentTxns.length === 0 ? (
-                  <div style={{ padding: '24px', textAlign: 'center', color: theme.textMuted, background: theme.bgCard, borderRadius: '12px', border: `1px solid ${theme.border}` }}>No agent transactions yet.</div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {agentTxns.map((t, i) => (
-                      <div key={i} style={{ padding: '14px 16px', background: theme.bgCard, borderRadius: '10px', border: `1px solid ${theme.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <div style={{ fontWeight: '700', fontSize: '13px', color: theme.textPrimary, marginBottom: '4px' }}>{txTypeBadge(t.type)}</div>
-                          {t.token_in && t.token_out && <div style={{ fontSize: '12px', color: theme.textSecondary }}>{t.token_in} → {t.token_out}</div>}
-                          <div style={{ fontSize: '11px', color: theme.textMuted }}>{new Date(t.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-                        </div>
-                        <a href={t.base_scan_url} target="_blank" rel="noopener noreferrer"
-                          style={{ padding: '6px 12px', borderRadius: '6px', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', color: '#3b82f6', fontSize: '12px', textDecoration: 'none' }}>
-                          View on BaseScan →
-                        </a>
-                      </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    {['Coin', 'Total Balance', 'Available', 'USD Value', 'Pool Share', 'Action'].map(h => (
+                      <th key={h} style={{ padding: '8px 12px', textAlign: h === 'Coin' ? 'left' : 'right', fontSize: '11px', fontWeight: '600', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${theme.border}` }}>{h}</th>
                     ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {tokenRows.length === 0 ? (
+                    <tr><td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: theme.textMuted, fontSize: '13px' }}>No balances yet</td></tr>
+                  ) : tokenRows.map(t => (
+                    <tr key={t.symbol} style={{ borderBottom: `1px solid ${theme.border}` }}>
+                      <td style={{ padding: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <TokenIcon token={t.symbol} size={28} />
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: '600', color: theme.textPrimary }}>{t.symbol}</div>
+                          <div style={{ fontSize: '11px', color: theme.textMuted }}>{t.name}</div>
+                        </div>
+                      </td>
+                      <td style={{ padding: '12px', textAlign: 'right', fontSize: '13px', color: theme.textPrimary, fontFamily: 'monospace' }}>{fmtBal(t.balance, t.symbol)}</td>
+                      <td style={{ padding: '12px', textAlign: 'right', fontSize: '13px', color: theme.textSecondary, fontFamily: 'monospace' }}>{fmtBal(t.balance, t.symbol)}</td>
+                      <td style={{ padding: '12px', textAlign: 'right', fontSize: '13px', color: theme.textPrimary, fontFamily: 'monospace' }}>{fmtUSD(t.usdValue)}</td>
+                      <td style={{ padding: '12px', textAlign: 'right', fontSize: '13px', color: theme.textMuted }}>—</td>
+                      <td style={{ padding: '12px', textAlign: 'right' }}>
+                        <button style={{ padding: '4px 12px', borderRadius: '6px', background: 'rgba(20,184,166,0.1)', border: '1px solid rgba(20,184,166,0.25)', color: '#14b8a6', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Swap</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* LP Positions Tab */}
+          {activeTab === 'lp' && (
+            <div>
+              {positions.length === 0 ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: theme.textMuted, fontSize: '13px' }}>No LP positions yet. Add liquidity to get started.</div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      {['Pool', 'Hook', 'Liquidity', 'Fee Tier', 'Action'].map(h => (
+                        <th key={h} style={{ padding: '8px 12px', textAlign: h === 'Pool' ? 'left' : 'right', fontSize: '11px', fontWeight: '600', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${theme.border}` }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {positions.map(p => (
+                      <tr key={p.id} style={{ borderBottom: `1px solid ${theme.border}` }}>
+                        <td style={{ padding: '12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <TokenPairIcon token1={p.token0} token2={p.token1} size={22} />
+                            <span style={{ fontSize: '13px', fontWeight: '600', color: theme.textPrimary }}>{p.token0}/{p.token1}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'right', fontSize: '12px', color: theme.textMuted }}>None</td>
+                        <td style={{ padding: '12px', textAlign: 'right', fontSize: '13px', color: theme.textPrimary, fontFamily: 'monospace' }}>{fmtUSD(parseFloat(p.amount0 || '0') + parseFloat(p.amount1 || '0'))}</td>
+                        <td style={{ padding: '12px', textAlign: 'right', fontSize: '12px', color: theme.textMuted }}>{(p.fee_tier / 10000).toFixed(2)}%</td>
+                        <td style={{ padding: '12px', textAlign: 'right' }}>
+                          <button onClick={() => onRemoveLiquidity?.({ token1: p.token0, token2: p.token1 })} style={{ padding: '4px 10px', borderRadius: '6px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Remove</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+
+          {/* Swap History Tab */}
+          {activeTab === 'swaps' && (
+            <div>
+              {txns.filter(t => t.type === 'swap').length === 0 ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: theme.textMuted, fontSize: '13px' }}>No swap history yet.</div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      {['Time', 'Pair', 'Amount In', 'Amount Out', 'Tx'].map(h => (
+                        <th key={h} style={{ padding: '8px 12px', textAlign: h === 'Time' || h === 'Pair' ? 'left' : 'right', fontSize: '11px', fontWeight: '600', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${theme.border}` }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {txns.filter(t => t.type === 'swap').map((t, i) => (
+                      <tr key={i} style={{ borderBottom: `1px solid ${theme.border}` }}>
+                        <td style={{ padding: '12px', fontSize: '12px', color: theme.textMuted }}>{fmtTime(t.timestamp)}</td>
+                        <td style={{ padding: '12px', fontSize: '13px', color: theme.textPrimary }}>{t.token_in} → {t.token_out}</td>
+                        <td style={{ padding: '12px', textAlign: 'right', fontSize: '13px', color: theme.textSecondary, fontFamily: 'monospace' }}>{t.amount_in ? parseFloat(t.amount_in).toFixed(6) : '—'}</td>
+                        <td style={{ padding: '12px', textAlign: 'right', fontSize: '13px', color: theme.textSecondary, fontFamily: 'monospace' }}>{t.amount_out ? parseFloat(t.amount_out).toFixed(6) : '—'}</td>
+                        <td style={{ padding: '12px', textAlign: 'right' }}>
+                          <a href={t.base_scan_url} target="_blank" rel="noopener noreferrer" style={{ color: '#14b8a6', fontSize: '12px', textDecoration: 'none' }}>Tx →</a>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+
+          {/* Pool History Tab */}
+          {activeTab === 'pools' && (
+            <div>
+              {txns.filter(t => t.type === 'add_liquidity' || t.type === 'remove_liquidity').length === 0 ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: theme.textMuted, fontSize: '13px' }}>No pool history yet.</div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      {['Time', 'Action', 'Pool', 'Amount', 'Tx'].map(h => (
+                        <th key={h} style={{ padding: '8px 12px', textAlign: h === 'Time' || h === 'Action' ? 'left' : 'right', fontSize: '11px', fontWeight: '600', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${theme.border}` }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {txns.filter(t => t.type === 'add_liquidity' || t.type === 'remove_liquidity').map((t, i) => (
+                      <tr key={i} style={{ borderBottom: `1px solid ${theme.border}` }}>
+                        <td style={{ padding: '12px', fontSize: '12px', color: theme.textMuted }}>{fmtTime(t.timestamp)}</td>
+                        <td style={{ padding: '12px', fontSize: '13px', color: t.type === 'add_liquidity' ? '#10b981' : '#ef4444' }}>{t.type === 'add_liquidity' ? 'Added' : 'Removed'}</td>
+                        <td style={{ padding: '12px', textAlign: 'right', fontSize: '13px', color: theme.textPrimary }}>{t.token_in}/{t.token_out}</td>
+                        <td style={{ padding: '12px', textAlign: 'right', fontSize: '13px', color: theme.textSecondary, fontFamily: 'monospace' }}>{t.amount_in || '—'}</td>
+                        <td style={{ padding: '12px', textAlign: 'right' }}>
+                          <a href={t.base_scan_url} target="_blank" rel="noopener noreferrer" style={{ color: '#14b8a6', fontSize: '12px', textDecoration: 'none' }}>Tx →</a>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+
+          {/* Deposits Tab */}
+          {activeTab === 'deposits' && (
+            <div style={{ padding: '40px', textAlign: 'center', color: theme.textMuted, fontSize: '13px' }}>
+              Deposit & withdrawal history will appear here once transactions are recorded.
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1695,7 +1952,7 @@ const HookSelectorModal = ({ isOpen, onClose, hooks, selectedHook, onSelect, the
 };
 
 // ============ SWAP INTERFACE ============
-const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
+const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete = null }) => {
   const { isConnected, address } = useAccount();
   const currentChainId = useChainId();
   const { openModal } = useWalletConnection();
@@ -1829,7 +2086,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
      }
   }, [swapDetails]);
 
-  // Save confirmed swap to portfolio_transactions DB
+  // Save confirmed swap to portfolio_transactions DB and update chat title
   useEffect(() => {
     if (swapStatus === 'confirmed' && txHash && address && fromToken && toToken && fromAmount) {
       fetch('/api/portfolio/transactions', {
@@ -1843,8 +2100,12 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark }) => {
           tokenOut: toToken,
           amountIn: fromAmount,
           amountOut: toAmount || '',
+          chainId: currentChainId,
         }),
       }).catch(err => console.warn('[Portfolio] Failed to record swap transaction:', err));
+      if (onActionComplete) {
+        onActionComplete(`Swap ${fromAmount} ${fromToken} → ${toToken}`);
+      }
     }
   }, [swapStatus, txHash]);
 
@@ -2412,17 +2673,22 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
   const [selectedHookFilter, setSelectedHookFilter] = useState('All');
   const [selectedTypeFilter, setSelectedTypeFilter] = useState('All');
   const [sort, setSort] = useState({ key: 'liquidity', direction: 'desc' });
-  
+  const currentChainId = useChainId();
+
   const [dbPools, setDbPools] = React.useState([]);
   React.useEffect(() => {
-    fetch('/api/portfolio').then(r => r.ok ? r.json() : []).then(rows => setDbPools(rows ?? [])).catch(() => {});
-  }, []);
+    fetch(`/api/portfolio?chainId=${currentChainId}`).then(r => r.ok ? r.json() : []).then(rows => setDbPools(rows ?? [])).catch(() => {});
+  }, [currentChainId]);
 
   // Merge DB pools with display-friendly format
   const pools = dbPools.length > 0 ? dbPools.map(p => ({
-    token1: p.token0, token2: p.token1, type: 'Standard', hook: 'None',
+    token1: p.token0, token2: p.token1,
+    type: p.hook_address && p.hook_address !== '0x0000000000000000000000000000000000000000' ? 'Stable' : 'Standard',
+    hook: p.hook_address && p.hook_address !== '0x0000000000000000000000000000000000000000' ? 'Stable Protection' : 'None',
+    hookAddress: p.hook_address,
     volume: 0, fees: 0, liquidity: 0, yield: '0.00',
     txHash: p.tx_hash, feeTier: p.fee_tier,
+    chainId: p.chain_id,
   })) : [];
 
   const hookOptions = ['All', 'None'];
@@ -2547,7 +2813,7 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
         </div>
         <div style={{ flex: 1 }}>
           <span style={{ color: theme.textSecondary, fontSize: '14px', lineHeight: '1.5' }}>
-            <span style={{ color: theme.accent, fontWeight: '600' }}>{filteredPools.length > 0 ? `${filteredPools.length} pools on Base Sepolia` : 'No pools yet — create your first pool'}</span>
+            <span style={{ color: theme.accent, fontWeight: '600' }}>{filteredPools.length > 0 ? `${filteredPools.length} pools on ${currentChainId === 1301 ? 'Unichain Sepolia' : 'Base Sepolia'}` : 'No pools yet — create your first pool'}</span>
             {' '}• ETH, USDC, EURC on Uniswap v4.
           </span>
         </div>
@@ -2640,7 +2906,7 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
                   <td style={{ padding: '12px' }}><YieldBadge value={pool.yield} /></td>
                   <td style={{ padding: '12px', textAlign: 'right', display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
                      <button onClick={() => onAddLiquidity(pool)} style={{ padding: '8px 12px', borderRadius: '8px', border: `1px solid ${theme.accent}40`, background: `${theme.accent}10`, color: theme.accent, fontSize: '12px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}>+ Add</button>
-                     {pool.txHash && <a href={`https://sepolia.basescan.org/tx/${pool.txHash}`} target="_blank" rel="noopener noreferrer" style={{ padding: '8px 10px', borderRadius: '8px', border: `1px solid ${theme.border}`, background: 'transparent', color: theme.textSecondary, fontSize: '12px', textDecoration: 'none', display: 'flex', alignItems: 'center' }}>↗</a>}
+                     {pool.txHash && <a href={`${currentChainId === 1301 ? 'https://sepolia.uniscan.xyz' : 'https://sepolia.basescan.org'}/tx/${pool.txHash}`} target="_blank" rel="noopener noreferrer" style={{ padding: '8px 10px', borderRadius: '8px', border: `1px solid ${theme.border}`, background: 'transparent', color: theme.textSecondary, fontSize: '12px', textDecoration: 'none', display: 'flex', alignItems: 'center' }}>↗</a>}
                   </td>
                 </tr>
               ))}
@@ -3627,7 +3893,7 @@ export default function MantuaApp() {
   const [voiceParsedCommand, setVoiceParsedCommand] = useState(null);
   const isVoiceSubmitRef = useRef(false);
   // Persistent chat state from useChat hook — pass chainId for context-aware AI responses
-  const { messages: chatMessages, sendMessage, isSending, isLoading: chatIsLoading } = useChat({ chainId: currentChainId });
+  const { messages: chatMessages, sendMessage, updateSessionTitle, isSending, isLoading: chatIsLoading, userId: chatUserId } = useChat({ chainId: currentChainId });
   const [analyticsMessages, setAnalyticsMessages] = useState<any[]>([]);
   const allMessages = useMemo(() => {
     const combined = [...chatMessages, ...analyticsMessages];
@@ -3646,17 +3912,21 @@ export default function MantuaApp() {
 
   const [recentChats, setRecentChats] = useState([]);
 
-  useEffect(() => {
-    async function loadRecentChats() {
-      try {
-        const sessions = await fetch('/api/chat/sessions').then(res => res.json());
-        setRecentChats(sessions);
-      } catch (error) {
-        console.error('Failed to load recent chats:', error);
-      }
+  const loadRecentChats = React.useCallback(async () => {
+    if (!chatUserId) return;
+    try {
+      const res = await fetch(`/api/chat/sessions/${chatUserId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setRecentChats(data.sessions ?? []);
+    } catch (error) {
+      console.error('Failed to load recent chats:', error);
     }
+  }, [chatUserId]);
+
+  useEffect(() => {
     loadRecentChats();
-  }, []);
+  }, [loadRecentChats]);
 
   const [hasInteracted, setHasInteracted] = useState(false);
 
@@ -4082,8 +4352,7 @@ export default function MantuaApp() {
                       onDelete={async () => {
                         try {
                           await fetch(`/api/chat/sessions/${chat.id}`, { method: 'DELETE' });
-                          const sessions = await fetch('/api/chat/sessions').then(res => res.json());
-                          setRecentChats(sessions);
+                          loadRecentChats();
                         } catch (error) {
                           console.error('Failed to delete chat:', error);
                         }
@@ -4199,6 +4468,7 @@ export default function MantuaApp() {
                         swapDetails={swapDetails}
                         theme={theme}
                         isDark={isDark}
+                        onActionComplete={async (title) => { await updateSessionTitle(title); loadRecentChats(); }}
                       />
                     </div>
                   )}

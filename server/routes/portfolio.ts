@@ -10,8 +10,10 @@ const router = Router();
 
 router.get('/', async (req: Request, res: Response) => {
   try {
+    const chainId = parseInt(req.query.chainId as string) || 84532;
     const { rows } = await dbPool.query(
-      `SELECT * FROM pools WHERE chain_id = 84532 ORDER BY created_at DESC`
+      `SELECT * FROM pools WHERE chain_id = $1 ORDER BY created_at DESC`,
+      [chainId]
     );
     res.json(rows);
   } catch (err) {
@@ -21,14 +23,15 @@ router.get('/', async (req: Request, res: Response) => {
 
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { token0, token1, feeTier, creatorAddress, txHash } = req.body;
+    const { token0, token1, feeTier, creatorAddress, txHash, chainId } = req.body;
     if (!token0 || !token1 || !feeTier || !creatorAddress || !txHash) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
+    const networkChainId = parseInt(chainId) || 84532;
     const { rows } = await dbPool.query(
       `INSERT INTO pools (token0, token1, fee_tier, creator_address, tx_hash, chain_id)
-       VALUES ($1,$2,$3,$4,$5,84532) RETURNING *`,
-      [token0, token1, feeTier, creatorAddress.toLowerCase(), txHash]
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [token0, token1, feeTier, creatorAddress.toLowerCase(), txHash, networkChainId]
     );
     res.status(201).json(rows[0]);
   } catch (err: unknown) {
@@ -56,11 +59,14 @@ router.get('/transactions', async (req: Request, res: Response) => {
 
 router.post('/transactions', async (req: Request, res: Response) => {
   try {
-    const { walletAddress, type, txHash, tokenIn, tokenOut, amountIn, amountOut, poolId } = req.body;
+    const { walletAddress, type, txHash, tokenIn, tokenOut, amountIn, amountOut, poolId, chainId } = req.body;
     if (!walletAddress || !type || !txHash) {
       return res.status(400).json({ error: 'walletAddress, type, txHash required' });
     }
-    const baseScanUrl = `https://sepolia.basescan.org/tx/${txHash}`;
+    const networkChainId = parseInt(chainId) || 84532;
+    const baseScanUrl = networkChainId === 1301
+      ? `https://sepolia.uniscan.xyz/tx/${txHash}`
+      : `https://sepolia.basescan.org/tx/${txHash}`;
     const { rows } = await dbPool.query(
       `INSERT INTO portfolio_transactions
          (wallet_address, type, tx_hash, token_in, token_out, amount_in, amount_out, pool_id, base_scan_url)
@@ -128,11 +134,14 @@ router.get('/agent-transactions', async (req: Request, res: Response) => {
 
 router.post('/agent-transactions', async (req: Request, res: Response) => {
   try {
-    const { agentWalletId, type, txHash, tokenIn, tokenOut, amountIn, amountOut } = req.body;
+    const { agentWalletId, type, txHash, tokenIn, tokenOut, amountIn, amountOut, chainId } = req.body;
     if (!agentWalletId || !type || !txHash) {
       return res.status(400).json({ error: 'agentWalletId, type, txHash required' });
     }
-    const baseScanUrl = `https://sepolia.basescan.org/tx/${txHash}`;
+    const networkChainId = parseInt(chainId) || 84532;
+    const baseScanUrl = networkChainId === 1301
+      ? `https://sepolia.uniscan.xyz/tx/${txHash}`
+      : `https://sepolia.basescan.org/tx/${txHash}`;
     const { rows } = await dbPool.query(
       `INSERT INTO agent_portfolio_transactions
          (agent_wallet_id, type, tx_hash, token_in, token_out, amount_in, amount_out, base_scan_url)

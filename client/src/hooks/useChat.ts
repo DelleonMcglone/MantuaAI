@@ -30,6 +30,7 @@ export interface UseChatReturn {
   isLoading: boolean;
   isSending: boolean;
   sendMessage: (text: string) => Promise<void>;
+  updateSessionTitle: (title: string) => Promise<void>;
   sessionId: string | null;
   userId: string;
 }
@@ -42,6 +43,7 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const sessionIdRef = useRef<string | null>(null);
+  const titleSetRef = useRef(false); // Track if we've set a meaningful title yet
 
   // Keep ref in sync so sendMessage always has latest sessionId
   useEffect(() => {
@@ -114,10 +116,21 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
           sid = data.session.id;
           setSessionId(sid);
           sessionIdRef.current = sid;
+          titleSetRef.current = true; // Title was set in creation
         } catch {
           toast({ title: "Could not create chat session", variant: "destructive" });
           return;
         }
+      }
+
+      // Update title on first user message if session was created with "New Chat"
+      if (!titleSetRef.current && sid) {
+        titleSetRef.current = true;
+        fetch(`/api/chat/sessions/${sid}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: text.slice(0, 60) }),
+        }).catch(() => {});
       }
 
       setIsSending(true);
@@ -179,5 +192,22 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
     [userId, chainId]
   );
 
-  return { messages, isLoading, isSending, sendMessage, sessionId, userId };
+  const updateSessionTitle = useCallback(
+    async (title: string): Promise<void> => {
+      const sid = sessionIdRef.current;
+      if (!sid || !title.trim()) return;
+      try {
+        await fetch(`/api/chat/sessions/${sid}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: title.slice(0, 100) }),
+        });
+      } catch {
+        // Non-critical — don't surface to user
+      }
+    },
+    []
+  );
+
+  return { messages, isLoading, isSending, sendMessage, updateSessionTitle, sessionId, userId };
 }
