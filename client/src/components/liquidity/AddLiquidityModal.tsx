@@ -25,7 +25,8 @@ interface AddLiquidityModalProps {
 }
 
 const HOOKS = [
-  { id: 'none', name: 'No Hook', icon: <SwapIcon />, color: '#6b7280', description: 'Standard Uniswap v4 pool without hook modifications', benefit: 'Standard execution' },
+  { id: 'none',   name: 'No Hook',               icon: <SwapIcon />, color: '#6b7280', description: 'Standard Uniswap v4 pool without hook modifications', benefit: 'Standard execution' },
+  { id: 'stable', name: 'Stable Protection Hook', icon: <SwapIcon />, color: '#10b981', description: 'Zone-based dynamic fees protect stable pairs from depeg events. Fees rise automatically during volatility.', benefit: 'Depeg protection' },
 ];
 
 const TOKEN_GRAD_MAP: Record<string, string> = {
@@ -106,7 +107,7 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
     }
   }, [pool, mode, initialTokenA, initialTokenB]);
 
-  const hookObj = HOOKS.find((h) => h.id === selectedHook) ?? HOOKS[1];
+  const hookObj = HOOKS.find((h) => h.id === selectedHook) ?? HOOKS[0];
   const hookColor = hookObj.color;
   const displayA = tokenA?.symbol ?? (mode === 'create' ? 'Token A' : 'ETH');
   const displayB = tokenB?.symbol ?? (mode === 'create' ? 'Token B' : 'USDC');

@@ -40,6 +40,30 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
+// ─── Stale Pool Cleanup ───────────────────────────────────────────────────────
+
+router.delete('/stale-pools', async (req: Request, res: Response) => {
+  try {
+    const { chainId, feeTier } = req.query;
+    // Delete pools matching optional filters. If no filters, deletes nothing (safety guard).
+    if (!chainId && !feeTier) {
+      return res.status(400).json({ error: 'Provide at least chainId or feeTier to scope deletion' });
+    }
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+    if (chainId) { params.push(parseInt(chainId as string)); conditions.push(`chain_id = $${params.length}`); }
+    if (feeTier) { params.push(parseInt(feeTier as string)); conditions.push(`fee_tier = $${params.length}`); }
+    const { rowCount } = await dbPool.query(
+      `DELETE FROM pools WHERE ${conditions.join(' AND ')} RETURNING id`,
+      params
+    );
+    res.json({ deleted: rowCount ?? 0 });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to delete stale pools', detail: msg });
+  }
+});
+
 // ─── User Portfolio Transactions ──────────────────────────────────────────────
 
 router.get('/transactions', async (req: Request, res: Response) => {

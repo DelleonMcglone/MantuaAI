@@ -19,8 +19,11 @@ const RANGE_TICKS: Record<RangeType, { tickLower: number; tickUpper: number }> =
   'Narrow':     { tickLower: -100,    tickUpper: 100    },
   'Custom':     { tickLower: -887270, tickUpper: 887270 },
 };
-const HOOK_ID_MAP: Record<string, string> = { directional: 'df', jit: 'ym', none: 'none' };
-const EXPLORERS: Record<number, string> = { 84532: 'https://sepolia.basescan.org' };
+const HOOK_ID_MAP: Record<string, string> = { directional: 'df', jit: 'ym', stable: 'stable', none: 'none' };
+const EXPLORERS: Record<number, string> = {
+  84532: 'https://sepolia.basescan.org',
+  1301:  'https://sepolia.uniscan.xyz',
+};
 
 
 interface AddLiquidityFormProps {
@@ -122,6 +125,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
           feeTier: 500,
           creatorAddress: address,
           txHash: hash,
+          chainId,
         }),
       }).catch(() => {});
       // Save transaction record
@@ -136,6 +140,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
           tokenOut: tokenB.symbol,
           amountIn: amount0,
           amountOut: amount1,
+          chainId,
         }),
       }).catch(() => {});
     }
@@ -230,6 +235,45 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
       {tokenA && tokenB && poolState.isInitialized && !poolState.hasLiquidity && (
         <div style={{ marginBottom: '12px', padding: '10px 12px', borderRadius: '10px', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)', fontSize: '12px', color: '#3b82f6' }}>
           Pool is initialized but has no liquidity yet. Be the first to provide!
+        </div>
+      )}
+
+      {/* Stable Protection Hook Panel — shown when stable hook is selected */}
+      {selectedHook === 'stable' && (
+        <div style={{ marginBottom: '12px', padding: '12px 16px', borderRadius: '12px', background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <span style={{ color: '#10b981', fontWeight: '700', fontSize: '13px' }}>Stable Protection Hook</span>
+            <span style={{ padding: '2px 8px', borderRadius: '6px', background: 'rgba(16,185,129,0.15)', color: '#10b981', fontSize: '11px', fontWeight: '700', letterSpacing: '0.05em' }}>● HEALTHY</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+            <div style={{ padding: '8px 10px', borderRadius: '8px', background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }}>
+              <div style={{ color: theme.textMuted, fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Base Fee</div>
+              <div style={{ color: theme.textPrimary, fontWeight: '700', fontSize: '14px' }}>0.05%</div>
+            </div>
+            <div style={{ padding: '8px 10px', borderRadius: '8px', background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }}>
+              <div style={{ color: theme.textMuted, fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Dynamic Fee</div>
+              <div style={{ color: '#10b981', fontWeight: '700', fontSize: '14px' }}>0.05% <span style={{ color: theme.textMuted, fontWeight: '400', fontSize: '10px' }}>now</span></div>
+            </div>
+          </div>
+          <div style={{ fontSize: '11px', color: theme.textSecondary, marginBottom: '8px', fontWeight: '600' }}>Fee Schedule by Depeg Zone</div>
+          {[
+            { zone: 'HEALTHY',  range: '0–0.2%',   fee: '0.05%', color: '#10b981', active: true },
+            { zone: 'MINOR',    range: '0.2–0.5%', fee: '0.10%', color: '#f59e0b', active: false },
+            { zone: 'MODERATE', range: '0.5–1%',   fee: '0.30%', color: '#f97316', active: false },
+            { zone: 'SEVERE',   range: '1–2%',     fee: '0.50%', color: '#ef4444', active: false },
+            { zone: 'CRITICAL', range: '>2%',      fee: '1.00%', color: '#7f1d1d', active: false },
+          ].map(row => (
+            <div key={row.zone} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 6px', borderRadius: '6px', marginBottom: '2px', background: row.active ? 'rgba(16,185,129,0.1)' : 'transparent' }}>
+              <span style={{ color: row.color, fontWeight: row.active ? '700' : '500', fontSize: '11px' }}>{row.zone}</span>
+              <span style={{ color: theme.textMuted, fontSize: '11px' }}>{row.range}</span>
+              <span style={{ color: theme.textPrimary, fontWeight: '600', fontSize: '11px' }}>{row.fee}</span>
+              {row.active && <span style={{ fontSize: '9px', color: '#10b981', fontWeight: '700' }}>◀ NOW</span>}
+            </div>
+          ))}
+          <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: `1px solid rgba(16,185,129,0.15)`, display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+            <span style={{ color: theme.textMuted }}>Circuit Breaker</span>
+            <span style={{ color: '#10b981', fontWeight: '600' }}>✓ Active (triggers at CRITICAL)</span>
+          </div>
         </div>
       )}
 

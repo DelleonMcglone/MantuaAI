@@ -308,22 +308,29 @@ export function registerAgentRoutes(app: Express): void {
       if (q.includes('pool')) {
         try {
           const { rows } = await dbPool.query(
-            `SELECT token0, token1, fee_tier, creator_address, tx_hash, created_at
-             FROM pools WHERE chain_id = 84532 ORDER BY created_at DESC LIMIT 10`
+            `SELECT token0, token1, fee_tier, creator_address, tx_hash, chain_id, created_at
+             FROM pools ORDER BY created_at DESC LIMIT 10`
           );
           if (rows.length === 0) {
             return res.json({ type: 'pools', data: [], message: 'No pools have been created yet.' });
           }
           return res.json({
             type: 'pools',
-            data: rows.map(p => ({
-              pair: `${p.token0}/${p.token1}`,
-              feeTier: `${(p.fee_tier / 10000).toFixed(2)}%`,
-              creator: p.creator_address,
-              createdAt: p.created_at,
-              txHash: p.tx_hash,
-              baseScanUrl: `https://sepolia.basescan.org/tx/${p.tx_hash}`,
-            })),
+            data: rows.map(p => {
+              const explorerBase = p.chain_id === 1301
+                ? 'https://sepolia.uniscan.xyz'
+                : 'https://sepolia.basescan.org';
+              const network = p.chain_id === 1301 ? 'Unichain Sepolia' : 'Base Sepolia';
+              return {
+                pair: `${p.token0}/${p.token1}`,
+                feeTier: `${(p.fee_tier / 10000).toFixed(2)}%`,
+                creator: p.creator_address,
+                network,
+                createdAt: p.created_at,
+                txHash: p.tx_hash,
+                explorerUrl: `${explorerBase}/tx/${p.tx_hash}`,
+              };
+            }),
           });
         } catch {
           return res.json({ type: 'pools', data: [], message: 'No pools found' });
