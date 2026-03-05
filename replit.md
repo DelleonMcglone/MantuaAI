@@ -2,23 +2,44 @@
 
 ## Overview
 
-Mantua.AI is a chat-native DeFi platform that combines natural language interactions with Uniswap v4 hooks and autonomous AI agents. Users interact with DeFi features (swaps, liquidity, vaults, portfolios) through a persistent chat interface, with modals rendered above the chatbot rather than page navigation. The platform supports both light and dark themes and targets Base Sepolia testnet for Web3 operations. Predictions feature has been removed.
+Mantua.AI is a chat-native DeFi platform that combines natural language interactions with Uniswap v4 hooks and autonomous AI agents. Users interact with DeFi features (swaps, liquidity, vaults, portfolios) through a persistent chat interface, with modals rendered above the chatbot rather than page navigation. The platform supports both light and dark themes and targets Base Sepolia and Unichain Sepolia testnets for Web3 operations.
 
-### Token Universe (5 tokens only)
+### Multi-Chain Support
+- **Base Sepolia** (Chain ID: 84532) — primary chain
+- **Unichain Sepolia** (Chain ID: 1301) — secondary chain
+- Pools, positions, and activity are filtered by the currently connected chain
+- Explorer links use chain-specific URLs: `sepolia.basescan.org` or `sepolia.uniscan.xyz`
+
+### Stable Protection Hook
+- Custom Uniswap v4 hook for stablecoin pools (USDC/EURC)
+- Displays zone info (HEALTHY/MINOR/MODERATE/SEVERE/CRITICAL), dynamic fees, fee multipliers (0.5x toward peg, 3.0x away from peg), circuit breaker status
+- Zone thresholds: 0.1% / 0.5% / 2.0% / 5.0%
+- Hook info shows in an expandable panel in the Liquidity interface when clicking a Stable Protection pool
+
+### Dark Theme Colors
+- Page background: `#0a0e17`
+- Card background: `#111827`
+- Border: `#1f2937`
+- Accent: `#14b8a6` (teal)
+- Text primary: `#ffffff`, secondary: `#9ca3af`, muted: `#6b7280`
+
+### Token Universe
+**Base Sepolia (84532):**
 - **ETH** (native, 18 decimals)
-- **mUSDC** (stablecoin, 6 decimals)
-- **mUSDT** (stablecoin, 6 decimals)
-- **mUSDE** (stablecoin, 18 decimals)
-- **mUSDS** (stablecoin, 18 decimals)
-- All RWA, LST, and Wrapped token categories have been removed.
-- Stablecoin amounts display with 2 decimal places in UI.
+- **USDC** (`0x036CbD53842c5426634e7929541eC2318f3dCF7e`, 6 decimals)
+- **EURC** (`0x808456652fdb597867f38412077A9182bf77359F`, 6 decimals)
+- **cbBTC** (`0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf`, 8 decimals)
 
-### Default Pools (4 pools)
-1. mUSDC / mUSDT (Stable)
-2. mUSDC / mUSDE (Stable)
-3. ETH / mUSDC (Standard)
-4. mUSDC / mUSDS (Stable)
-- Users can create additional pools from any pair of the 5 tokens.
+**Unichain Sepolia (1301):**
+- **ETH** (native, 18 decimals)
+- **USDC** (`0x31d0220469e10c4E71834a79b1f276d740d3768F`, 6 decimals)
+
+### Target Pools
+- ETH/USDC on both chains
+- USDC/EURC on Base Sepolia
+- USDC/EURC with Stable Protection Hook on Base Sepolia
+- cbBTC/USDC on Base Sepolia
+- Pools display only on the chain they were created on
 
 ### Pool Lifecycle Management
 - **Pool State Hook** (`usePoolState.ts`): Reads `StateView.getSlot0` and `getLiquidity` to check if a pool is initialized and has liquidity before any operation.

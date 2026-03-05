@@ -267,10 +267,10 @@ const PortfolioSummary = ({ data, theme, currentChain }) => (
           fontWeight: '700',
           fontFamily: 'SF Mono, Monaco, monospace',
         }}>
-          {data.ethBalance.toFixed(4)} ETH
+          {(isNaN(data.ethBalance) ? 0 : data.ethBalance).toFixed(4)} ETH
         </div>
         <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '2px' }}>
-          ${(data.ethBalance * data.ethPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          ${(isNaN(data.ethBalance * data.ethPrice) ? 0 : (data.ethBalance * data.ethPrice)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
       </div>
 
@@ -290,10 +290,10 @@ const PortfolioSummary = ({ data, theme, currentChain }) => (
           fontWeight: '700',
           fontFamily: 'SF Mono, Monaco, monospace',
         }}>
-          {data.usdcBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          {(isNaN(data.usdcBalance) ? 0 : data.usdcBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
         <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '2px' }}>
-          ${data.usdcBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          ${(isNaN(data.usdcBalance) ? 0 : data.usdcBalance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
       </div>
 
@@ -316,30 +316,30 @@ const PortfolioSummary = ({ data, theme, currentChain }) => (
           {data.lpPositions}
         </div>
         <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: '2px' }}>
-          ${data.lpValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} value
+          ${(isNaN(data.lpValue) ? 0 : data.lpValue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} value
         </div>
       </div>
 
       <div style={{
         padding: '16px',
-        background: data.netPnl >= 0 ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)',
+        background: (isNaN(data.netPnl) ? 0 : data.netPnl) >= 0 ? '#0d3b3b' : 'rgba(239, 68, 68, 0.08)',
         borderRadius: '12px',
-        border: `1px solid ${data.netPnl >= 0 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
+        border: `1px solid ${(isNaN(data.netPnl) ? 0 : data.netPnl) >= 0 ? 'rgba(20, 184, 166, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-          {data.netPnl >= 0 ? <TrendUpIcon /> : <TrendDownIcon />}
+          {(isNaN(data.netPnl) ? 0 : data.netPnl) >= 0 ? <TrendUpIcon /> : <TrendDownIcon />}
           <span style={{ color: theme.textSecondary, fontSize: '13px', fontWeight: '500' }}>Net PnL</span>
         </div>
         <div style={{ 
-          color: data.netPnl >= 0 ? '#10b981' : '#ef4444', 
+          color: (isNaN(data.netPnl) ? 0 : data.netPnl) >= 0 ? '#14b8a6' : '#ef4444', 
           fontSize: '20px', 
           fontWeight: '700',
           fontFamily: 'SF Mono, Monaco, monospace',
         }}>
-          {data.netPnl >= 0 ? '+' : ''}{data.netPnl.toFixed(2)}%
+          {(isNaN(data.netPnl) ? 0 : data.netPnl) >= 0 ? '+' : ''}{(isNaN(data.netPnl) ? 0 : data.netPnl).toFixed(2)}%
         </div>
-        <div style={{ color: data.netPnl >= 0 ? '#10b981' : '#ef4444', fontSize: '12px', marginTop: '2px' }}>
-          {data.netPnl >= 0 ? '+' : ''}${data.netPnlUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        <div style={{ color: (isNaN(data.netPnl) ? 0 : data.netPnl) >= 0 ? '#14b8a6' : '#ef4444', fontSize: '12px', marginTop: '2px' }}>
+          {(isNaN(data.netPnl) ? 0 : data.netPnl) >= 0 ? '+' : ''}${(isNaN(data.netPnlUsd) ? 0 : data.netPnlUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
       </div>
     </div>
@@ -381,12 +381,12 @@ const AssetsTable = ({ assets, theme }) => (
             </td>
             <td style={{ padding: '16px 24px', textAlign: 'right' }}>
               <span style={{ color: theme.textPrimary, fontFamily: 'SF Mono, Monaco, monospace', fontSize: '14px', fontWeight: '500' }}>
-                {asset.balance.toLocaleString(undefined, { minimumFractionDigits: asset.symbol === 'ETH' ? 4 : 2, maximumFractionDigits: asset.symbol === 'ETH' ? 4 : 2 })}
+                {(isNaN(asset.balance) ? 0 : asset.balance).toLocaleString(undefined, { minimumFractionDigits: asset.symbol === 'ETH' ? 4 : 2, maximumFractionDigits: asset.symbol === 'ETH' ? 4 : 2 })}
               </span>
             </td>
             <td style={{ padding: '16px 24px', textAlign: 'right' }}>
               <span style={{ color: theme.textPrimary, fontFamily: 'SF Mono, Monaco, monospace', fontSize: '14px', fontWeight: '500' }}>
-                ${asset.usdValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ${(isNaN(asset.usdValue) ? 0 : asset.usdValue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </td>
             <td style={{ padding: '16px 24px', textAlign: 'right' }}>
@@ -403,14 +403,14 @@ const AssetsTable = ({ assets, theme }) => (
                   overflow: 'hidden',
                 }}>
                   <div style={{
-                    width: `${asset.percentage}%`,
+                    width: `${isNaN(asset.percentage) ? 0 : asset.percentage}%`,
                     height: '100%',
                     background: 'linear-gradient(90deg, #8b5cf6, #6366f1)',
                     borderRadius: '3px',
                   }} />
                 </div>
                 <span style={{ color: theme.textSecondary, fontSize: '13px', fontWeight: '600', minWidth: '45px' }}>
-                  {asset.percentage.toFixed(1)}%
+                  {(isNaN(asset.percentage) ? 0 : asset.percentage).toFixed(1)}%
                 </span>
               </div>
             </td>
@@ -476,7 +476,7 @@ const LiquidityPositions = ({ positions, theme, onRemoveLiquidity = null }) => (
                     fontWeight: '700',
                     fontFamily: 'SF Mono, Monaco, monospace',
                   }}>
-                    ${position.tvl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ${(isNaN(position.tvl) ? 0 : position.tvl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                 </div>
                 {onRemoveLiquidity && (
@@ -502,7 +502,7 @@ const LiquidityPositions = ({ positions, theme, onRemoveLiquidity = null }) => (
               <div>
                 <span style={{ color: theme.textSecondary, fontSize: '12px' }}>Fees Earned</span>
                 <div style={{ color: '#10b981', fontSize: '14px', fontWeight: '600', fontFamily: 'SF Mono, Monaco, monospace' }}>
-                  +${position.feesEarned.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  +${(isNaN(position.feesEarned) ? 0 : position.feesEarned).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               </div>
               <div>
@@ -527,6 +527,7 @@ const LiquidityPositions = ({ positions, theme, onRemoveLiquidity = null }) => (
 
 // Activity Item
 const ActivityItem = ({ activity, theme }) => {
+  const activityChainId = useChainId();
   const getActionIcon = (type) => {
     switch (type) {
       case 'Swap': return <SwapIcon />;
@@ -603,7 +604,7 @@ const ActivityItem = ({ activity, theme }) => {
             {activity.timestamp}
           </span>
           <a
-            href={`https://sepolia.basescan.org/tx/${activity.txHash}`}
+            href={getExplorerLink(activity.txHash, activityChainId)}
             target="_blank"
             rel="noopener noreferrer"
             style={{
@@ -778,11 +779,11 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
 
   useEffect(() => {
     if (!address) return;
-    fetch(`/api/portfolio/positions?walletAddress=${address}`)
+    fetch(`/api/portfolio/positions?walletAddress=${address}&chainId=${chainId}`)
       .then(r => r.ok ? r.json() : [])
       .then(rows => setPositions(rows ?? []))
       .catch(() => {});
-  }, [address]);
+  }, [address, chainId]);
 
   const tokenRows = [
     { symbol: 'ETH', name: 'Ethereum', balance: ethBalanceNum, usdValue: isNaN(ethValueUSD) ? 0 : ethValueUSD, price: ethPrice },
@@ -874,7 +875,11 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
   }
 
   // Build data objects for PortfolioSummary and AssetsTable
-  const lpValue = positions.reduce((s, p) => s + (parseFloat(p.amount0 || '0') + parseFloat(p.amount1 || '0')), 0);
+  const lpValue = positions.reduce((s, p) => {
+    const a0 = parseFloat(p.amount0 || '0') || 0;
+    const a1 = parseFloat(p.amount1 || '0') || 0;
+    return s + a0 + a1;
+  }, 0);
   const portfolioData = {
     totalValue: safeTotal,
     ethBalance: ethBalanceNum,
@@ -909,6 +914,12 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
         <PortfolioSummary data={portfolioData} theme={theme} currentChain={currentChain} />
 
         {/* Assets Section */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px', color: theme.textSecondary }}>
+            <input type="checkbox" checked={hideSmall} onChange={(e) => setHideSmall(e.target.checked)} style={{ accentColor: '#14b8a6' }} data-testid="toggle-hide-small" />
+            Hide Small Balances
+          </label>
+        </div>
         <AssetsTable assets={assetsData} theme={theme} />
 
         {/* Liquidity Positions Section */}
@@ -936,13 +947,14 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
                         <span style={{ fontSize: '14px', fontWeight: '600', color: theme.textPrimary }}>{p.token0}/{p.token1}</span>
                       </div>
                     </td>
-                    <td style={{ padding: '16px 24px', textAlign: 'right', fontSize: '12px', color: theme.textMuted }}>None</td>
-                    <td style={{ padding: '16px 24px', textAlign: 'right', fontSize: '14px', color: theme.textPrimary, fontFamily: 'monospace' }}>{fmtUSD(parseFloat(p.amount0 || '0') + parseFloat(p.amount1 || '0'))}</td>
+                    <td style={{ padding: '16px 24px', textAlign: 'right', fontSize: '12px', color: theme.textMuted }}>{p.hook_address && p.hook_address !== '0x0000000000000000000000000000000000000000' ? 'Stable Protection' : 'None'}</td>
+                    <td style={{ padding: '16px 24px', textAlign: 'right', fontSize: '14px', color: theme.textPrimary, fontFamily: 'monospace' }}>{fmtUSD((parseFloat(p.amount0 || '0') || 0) + (parseFloat(p.amount1 || '0') || 0))}</td>
                     <td style={{ padding: '16px 24px', textAlign: 'right', fontSize: '13px', color: theme.textSecondary }}>—</td>
                     <td style={{ padding: '16px 24px', textAlign: 'right', fontSize: '13px', color: theme.textSecondary }}>$0.00</td>
                     <td style={{ padding: '16px 24px', textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                        <button onClick={() => onRemoveLiquidity?.({ token1: p.token0, token2: p.token1 })} style={{ padding: '4px 10px', borderRadius: '6px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Remove</button>
+                        <button onClick={() => onRemoveLiquidity?.({ token1: p.token0, token2: p.token1 })} style={{ padding: '4px 10px', borderRadius: '6px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }} data-testid={`button-remove-lp-${p.id}`}>Remove</button>
+                        <button onClick={() => onRemoveLiquidity?.({ token1: p.token0, token2: p.token1, mode: 'add' })} style={{ padding: '4px 10px', borderRadius: '6px', background: 'rgba(20,184,166,0.08)', border: '1px solid rgba(20,184,166,0.2)', color: '#14b8a6', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }} data-testid={`button-add-more-lp-${p.id}`}>Add More</button>
                       </div>
                     </td>
                   </tr>
@@ -971,7 +983,7 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
                   <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
                     <span style={{ fontSize: '12px', color: theme.textMuted, whiteSpace: 'nowrap' }}>{fmtTime(t.timestamp)}</span>
                     <span style={{ fontSize: '13px', color: theme.textPrimary }}>
-                      {t.type === 'swap' ? `Swapped ${t.amount_in ? parseFloat(t.amount_in).toFixed(6) : ''} ${t.token_in} → ${t.token_out}`
+                      {t.type === 'swap' ? `Swapped ${t.amount_in ? (parseFloat(t.amount_in) || 0).toFixed(6) : ''} ${t.token_in} → ${t.token_out}`
                         : t.type === 'add_liquidity' ? `Added liquidity to ${t.token_in}/${t.token_out}`
                         : t.type === 'remove_liquidity' ? `Removed liquidity from ${t.token_in}/${t.token_out}`
                         : t.type}
@@ -1057,17 +1069,17 @@ const themes = {
     accentLight: '#f3e8ff',
   },
   dark: {
-    bgPrimary: '#0B0E14', // Deep navy-black
-    bgSecondary: '#13161F', // Slightly lighter for cards
-    bgSidebar: '#0B0E14',
-    bgCard: '#13161F',
-    bgInput: '#0B0E14', // Darker for inputs
-    textPrimary: '#FFFFFF',
-    textSecondary: '#94A3B8', // Slate-400
-    textMuted: '#64748B', // Slate-500
-    border: 'rgba(255,255,255,0.06)',
-    accent: '#8b5cf6',
-    accentLight: 'rgba(139, 92, 246, 0.15)',
+    bgPrimary: '#0a0e17',
+    bgSecondary: '#111827',
+    bgSidebar: '#0a0e17',
+    bgCard: '#111827',
+    bgInput: '#0a0e17',
+    textPrimary: '#ffffff',
+    textSecondary: '#9ca3af',
+    textMuted: '#6b7280',
+    border: '#1f2937',
+    accent: '#14b8a6',
+    accentLight: 'rgba(20, 184, 166, 0.15)',
   }
 };
 
@@ -2531,11 +2543,71 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
 };
 
 // ============ LIQUIDITY INTERFACE ============
+const StableProtectionHookInfo = ({ theme, hookAddress }) => {
+  const zoneConfig = {
+    HEALTHY: { color: '#10b981', bg: 'rgba(16,185,129,0.15)', label: 'HEALTHY' },
+    MINOR: { color: '#eab308', bg: 'rgba(234,179,8,0.15)', label: 'MINOR' },
+    MODERATE: { color: '#f97316', bg: 'rgba(249,115,22,0.15)', label: 'MODERATE' },
+    SEVERE: { color: '#ef4444', bg: 'rgba(239,68,68,0.15)', label: 'SEVERE' },
+    CRITICAL: { color: '#000000', bg: 'rgba(0,0,0,0.8)', label: 'CRITICAL' },
+  };
+  const currentZone = 'HEALTHY';
+  const zone = zoneConfig[currentZone];
+  return (
+    <div style={{ padding: '16px', background: theme.bgSecondary, borderRadius: '12px', border: `1px solid ${theme.border}`, marginTop: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+        <ShieldIcon />
+        <span style={{ color: theme.textPrimary, fontSize: '14px', fontWeight: '700' }}>Stable Protection Hook</span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+        <div style={{ padding: '12px', background: theme.bgCard, borderRadius: '8px', border: `1px solid ${theme.border}` }}>
+          <div style={{ fontSize: '11px', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Current Zone</div>
+          <span style={{ padding: '4px 10px', borderRadius: '6px', background: zone.bg, color: zone.color, fontSize: '13px', fontWeight: '700' }} data-testid="hook-zone-badge">{zone.label}</span>
+        </div>
+        <div style={{ padding: '12px', background: theme.bgCard, borderRadius: '8px', border: `1px solid ${theme.border}` }}>
+          <div style={{ fontSize: '11px', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Dynamic Fee</div>
+          <span style={{ color: theme.textPrimary, fontSize: '16px', fontWeight: '700', fontFamily: 'monospace' }} data-testid="hook-dynamic-fee">30 bps</span>
+        </div>
+        <div style={{ padding: '12px', background: theme.bgCard, borderRadius: '8px', border: `1px solid ${theme.border}` }}>
+          <div style={{ fontSize: '11px', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Fee Multipliers</div>
+          <div style={{ fontSize: '12px', color: theme.textSecondary }}>
+            <div>Toward peg: <span style={{ color: '#10b981', fontWeight: '600' }}>0.5x</span></div>
+            <div>Away from peg: <span style={{ color: '#ef4444', fontWeight: '600' }}>3.0x</span></div>
+          </div>
+        </div>
+        <div style={{ padding: '12px', background: theme.bgCard, borderRadius: '8px', border: `1px solid ${theme.border}` }}>
+          <div style={{ fontSize: '11px', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Circuit Breaker</div>
+          <span style={{ color: '#10b981', fontSize: '13px', fontWeight: '600' }} data-testid="hook-circuit-breaker">Inactive</span>
+        </div>
+      </div>
+      <div style={{ marginTop: '12px', padding: '12px', background: theme.bgCard, borderRadius: '8px', border: `1px solid ${theme.border}` }}>
+        <div style={{ fontSize: '11px', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Zone Thresholds</div>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {[
+            { label: 'Minor', val: '0.1%', color: '#eab308' },
+            { label: 'Moderate', val: '0.5%', color: '#f97316' },
+            { label: 'Severe', val: '2.0%', color: '#ef4444' },
+            { label: 'Critical', val: '5.0%', color: '#000' },
+          ].map(t => (
+            <span key={t.label} style={{ padding: '3px 8px', borderRadius: '4px', background: `${t.color}15`, color: t.color, fontSize: '11px', fontWeight: '600' }}>{t.label}: {t.val}</span>
+          ))}
+        </div>
+      </div>
+      {hookAddress && hookAddress !== '0x0000000000000000000000000000000000000000' && (
+        <div style={{ marginTop: '8px', fontSize: '11px', color: theme.textMuted, fontFamily: 'monospace' }}>
+          Hook: {hookAddress.slice(0, 10)}...{hookAddress.slice(-6)}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePool }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedHookFilter, setSelectedHookFilter] = useState('All');
   const [selectedTypeFilter, setSelectedTypeFilter] = useState('All');
   const [sort, setSort] = useState({ key: 'liquidity', direction: 'desc' });
+  const [expandedPool, setExpandedPool] = useState<number | null>(null);
   const currentChainId = useChainId();
 
   const [dbPools, setDbPools] = React.useState([]);
@@ -2554,7 +2626,7 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
     chainId: p.chain_id,
   })) : [];
 
-  const hookOptions = ['All', 'None'];
+  const hookOptions = ['All', 'None', 'Stable Protection'];
   const typeOptions = ['All', 'Standard', 'Stable'];
 
   // Filter and sort pools
@@ -2613,13 +2685,13 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
   };
 
   const HookBadge = ({ hook }) => {
-    const hookConfig = {
-      'None': { icon: null, color: theme.textSecondary, bg: theme.bgSecondary },
-    };
-    const config = hookConfig[hook] || hookConfig['None'];
+    const isStableProtection = hook === 'Stable Protection';
+    const config = isStableProtection
+      ? { icon: <ShieldIcon />, color: '#14b8a6', bg: 'rgba(20,184,166,0.12)' }
+      : { icon: null, color: theme.textSecondary, bg: theme.bgSecondary };
     return (
       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '2px 6px', borderRadius: '4px', background: config.bg, color: config.color, fontSize: '10px', fontWeight: '600', whiteSpace: 'nowrap' }}>
-        {config.icon && <span style={{ transform: 'scale(0.8)' }}>{config.icon}</span>}
+        {config.icon && <span style={{ transform: 'scale(0.7)', display: 'flex' }}>{config.icon}</span>}
         {hook}
       </div>
     );
@@ -2749,7 +2821,8 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
                   No pools yet. Create your first pool →
                 </td></tr>
               ) : filteredPools.map((pool, i) => (
-                <tr key={i} style={{ borderBottom: i === filteredPools.length - 1 ? 'none' : `1px solid ${theme.border}` }}>
+                <React.Fragment key={i}>
+                <tr style={{ borderBottom: (expandedPool === i && pool.hook === 'Stable Protection') ? 'none' : (i === filteredPools.length - 1 ? 'none' : `1px solid ${theme.border}`), cursor: pool.hook === 'Stable Protection' ? 'pointer' : 'default' }} onClick={() => pool.hook === 'Stable Protection' && setExpandedPool(expandedPool === i ? null : i)}>
                   <td style={{ padding: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <TokenPairIcon token1={pool.token1} token2={pool.token2} size={24} />
@@ -2768,10 +2841,18 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
                   <td style={{ padding: '12px' }}><span style={{ color: theme.textPrimary, fontFamily: 'SF Mono, Monaco, monospace', fontSize: '13px' }}>${pool.liquidity.toLocaleString()}</span></td>
                   <td style={{ padding: '12px' }}><YieldBadge value={pool.yield} /></td>
                   <td style={{ padding: '12px', textAlign: 'right', display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                     <button onClick={() => onAddLiquidity(pool)} style={{ padding: '8px 12px', borderRadius: '8px', border: `1px solid ${theme.accent}40`, background: `${theme.accent}10`, color: theme.accent, fontSize: '12px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}>+ Add</button>
-                     {pool.txHash && <a href={`${currentChainId === 1301 ? 'https://sepolia.uniscan.xyz' : 'https://sepolia.basescan.org'}/tx/${pool.txHash}`} target="_blank" rel="noopener noreferrer" style={{ padding: '8px 10px', borderRadius: '8px', border: `1px solid ${theme.border}`, background: 'transparent', color: theme.textSecondary, fontSize: '12px', textDecoration: 'none', display: 'flex', alignItems: 'center' }}>↗</a>}
+                     <button onClick={(e) => { e.stopPropagation(); onAddLiquidity(pool); }} style={{ padding: '8px 12px', borderRadius: '8px', border: `1px solid ${theme.accent}40`, background: `${theme.accent}10`, color: theme.accent, fontSize: '12px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }} data-testid={`button-add-liquidity-${i}`}>+ Add</button>
+                     {pool.txHash && <a href={getExplorerLink(pool.txHash, currentChainId)} target="_blank" rel="noopener noreferrer" style={{ padding: '8px 10px', borderRadius: '8px', border: `1px solid ${theme.border}`, background: 'transparent', color: theme.textSecondary, fontSize: '12px', textDecoration: 'none', display: 'flex', alignItems: 'center' }} data-testid={`link-pool-tx-${i}`}>↗</a>}
                   </td>
                 </tr>
+                {expandedPool === i && pool.hook === 'Stable Protection' && (
+                  <tr style={{ borderBottom: i === filteredPools.length - 1 ? 'none' : `1px solid ${theme.border}` }}>
+                    <td colSpan={6} style={{ padding: '0 12px 12px 12px' }}>
+                      <StableProtectionHookInfo theme={theme} hookAddress={pool.hookAddress} />
+                    </td>
+                  </tr>
+                )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>
@@ -2786,7 +2867,7 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
 
 // Sub-panel: Wallet Management (v2 — CDP-backed)
 const AgentWalletPanel = ({ theme, isDark, address, balance }) => {
-  const [agentWallet, setAgentWallet] = useState<{address:string;walletId:string;baseScanUrl?:string} | null>(null);
+  const [agentWallet, setAgentWallet] = useState<{address:string;walletId:string;baseScanUrl?:string;explorerUrl?:string} | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState('');
 
@@ -2802,7 +2883,7 @@ const AgentWalletPanel = ({ theme, isDark, address, balance }) => {
       });
       if (!res.ok) throw new Error('Server error');
       const data = await res.json();
-      if (data.address) setAgentWallet({ address: data.address, walletId: data.walletId, baseScanUrl: data.baseScanUrl });
+      if (data.address) setAgentWallet({ address: data.address, walletId: data.walletId, explorerUrl: data.explorerUrl || data.baseScanUrl });
     } catch {
       setError('Failed to create wallet. Please try again.');
     } finally {
@@ -2833,10 +2914,10 @@ const AgentWalletPanel = ({ theme, isDark, address, balance }) => {
             <div style={{ fontFamily: 'monospace', fontSize: '13px', color: theme.textPrimary, marginBottom: '10px', wordBreak: 'break-all' }}>
               {agentWallet.address}
             </div>
-            {agentWallet.baseScanUrl && (
-              <a href={agentWallet.baseScanUrl} target="_blank" rel="noopener noreferrer"
+            {agentWallet.explorerUrl && (
+              <a href={agentWallet.explorerUrl} target="_blank" rel="noopener noreferrer"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '8px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#10b981', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }}>
-                View on BaseScan →
+                View on Explorer →
               </a>
             )}
           </div>
@@ -2861,6 +2942,7 @@ const AgentWalletPanel = ({ theme, isDark, address, balance }) => {
 // Sub-panel: Token Transfer
 const AgentTransferPanel = ({ theme, isDark }) => {
   const { address } = useAccount();
+  const currentChainId = useChainId();
   const [toAddress, setToAddress] = useState('');
   const [selectedToken, setSelectedToken] = useState('ETH');
   const [amount, setAmount] = useState('');
@@ -2935,7 +3017,7 @@ const AgentTransferPanel = ({ theme, isDark }) => {
         </button>
         {txStatus === 'success' && (
           <div style={{ padding: '12px 16px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', color: '#10b981', fontSize: '13px' }}>
-            ✓ Transaction submitted!{txHash && <> &nbsp;<a href={`https://sepolia.basescan.org/tx/${txHash}`} target="_blank" rel="noopener noreferrer" style={{ color: '#10b981' }}>View on explorer ↗</a></>}
+            ✓ Transaction submitted!{txHash && <> &nbsp;<a href={getExplorerLink(txHash, currentChainId)} target="_blank" rel="noopener noreferrer" style={{ color: '#10b981' }}>View on explorer ↗</a></>}
           </div>
         )}
         {txStatus === 'error' && (
@@ -3199,7 +3281,7 @@ const AgentFaucetPanel = ({ theme, isDark }) => {
                   {r.baseScanUrl && (
                     <a href={r.baseScanUrl} target="_blank" rel="noopener noreferrer"
                       style={{ color: '#10b981', fontSize: '12px', textDecoration: 'underline' }}>
-                      View on BaseScan →
+                      View on Explorer →
                     </a>
                   )}
                 </div>
@@ -3273,7 +3355,7 @@ const AgentAutonomousPanel = ({ theme, isDark, onNavigate }) => {
         if (!address) { setMessages(prev => [...prev, { role: 'agent', text: '⚠️ Connect your wallet first to create an agent wallet.' }]); return; }
         const res = await fetch('/api/agent/wallet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: address }) });
         const data = await res.json();
-        setMessages(prev => [...prev, { role: 'agent', text: `✅ Agent wallet created!\nAddress: ${data.address}\n\n${data.baseScanUrl ? `View on BaseScan: ${data.baseScanUrl}` : ''}` }]);
+        setMessages(prev => [...prev, { role: 'agent', text: `✅ Agent wallet created!\nAddress: ${data.address}\n\n${data.explorerUrl ? `View on Explorer: ${data.explorerUrl}` : ''}` }]);
       } else if (lower.includes('faucet') || lower.includes('testnet eth') || lower.includes('get me eth')) {
         setMessages(prev => [...prev, { role: 'agent', text: '🚰 Opening faucet panel... Use the "Get Testnet Funds" action card below.' }]);
       } else if (lower.includes('swap')) {
@@ -3861,9 +3943,10 @@ export default function MantuaApp() {
     const isDuneMessage = duneKeywords.some(kw => inputValue.toLowerCase().includes(kw));
 
     if (isDuneMessage) {
+      updateSessionTitle(`Analyzed: ${inputValue.slice(0, 50)}`);
+      loadRecentChats();
       const placeholderId = 'dune-' + Date.now();
       const userMsgId = 'user-dune-' + Date.now();
-      // Add user message + loading placeholder
       setAnalyticsMessages(prev => [...prev,
         { id: userMsgId, sessionId: '', role: 'user' as const, content: inputValue, createdAt: new Date().toISOString() },
         { id: placeholderId, sessionId: '', role: 'assistant' as const, content: '', dune: { rows: [], columns: [], rowCount: 0, label: 'Querying Dune...', isLoading: true }, createdAt: new Date().toISOString() },
@@ -3989,6 +4072,11 @@ export default function MantuaApp() {
        }
        setShowAddLiquidityModal(true);
        sendMessage(inputValue);
+       const tokenA = command.params?.tokenA || '';
+       const tokenB = command.params?.tokenB || '';
+       const chainName = currentChainId === 1301 ? 'Unichain Sepolia' : 'Base Sepolia';
+       updateSessionTitle(tokenA && tokenB ? `Add liquidity to ${tokenA}/${tokenB} on ${chainName}` : `Add liquidity on ${chainName}`);
+       loadRecentChats();
        return;
     }
 
@@ -3996,6 +4084,8 @@ export default function MantuaApp() {
        resetModals();
        setShowLiquidity(true);
        sendMessage(inputValue);
+       updateSessionTitle('View liquidity pools');
+       loadRecentChats();
        return;
     }
 
@@ -4003,6 +4093,8 @@ export default function MantuaApp() {
        resetModals();
        setShowAgentBuilder(true);
        sendMessage(inputValue);
+       updateSessionTitle(`Agent: ${inputValue.slice(0, 50)}`);
+       loadRecentChats();
        return;
     }
 
@@ -4015,6 +4107,8 @@ export default function MantuaApp() {
         }
         setShowPortfolioModal(true);
         sendMessage(inputValue);
+        updateSessionTitle('View portfolio');
+        loadRecentChats();
         return;
     }
 
@@ -4022,7 +4116,7 @@ export default function MantuaApp() {
         resetModals();
         // Build a balance summary from on-chain data
         const ethBal = ethBalanceData
-          ? `${parseFloat(ethBalanceData.formatted).toFixed(4)} ETH`
+          ? `${(parseFloat(ethBalanceData.formatted) || 0).toFixed(4)} ETH`
           : null;
         const topTokens = tokenBalances
           .filter(b => parseFloat(b.formatted) > 0)
@@ -4060,6 +4154,11 @@ export default function MantuaApp() {
       setSwapDetails(command.params);
       setShowSwap(true);
       sendMessage(inputValue);
+      const fromT = command.params?.fromToken || '';
+      const toT = command.params?.toToken || '';
+      const amt = command.params?.amount || '';
+      updateSessionTitle(fromT && toT ? `Swap ${amt ? amt + ' ' : ''}${fromT} → ${toT}` : 'Swap tokens');
+      loadRecentChats();
       return;
     }
 

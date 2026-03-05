@@ -5,6 +5,7 @@
  */
 import { ExternalLink, CheckCircle2, XCircle, Clock, Trash2 } from 'lucide-react';
 import { useTxHistory, type TxRecord } from '@/hooks/useTxHistory';
+import { getExplorerTxUrl } from '@/config/contracts';
 
 const STATUS_CONFIG = {
   success: { icon: CheckCircle2, color: 'text-emerald-400', label: 'Confirmed' },
@@ -43,7 +44,7 @@ function TxRow({ tx }: { tx: TxRecord }) {
       )}
       <span className={`text-xs flex-shrink-0 ${cfg.color}`}>{cfg.label}</span>
       <a
-        href={`https://sepolia.basescan.org/tx/${tx.hash}`}
+        href={getExplorerTxUrl(tx.hash, tx.chainId)}
         target="_blank"
         rel="noopener noreferrer"
         className="text-gray-600 hover:text-gray-300 flex-shrink-0 opacity-0

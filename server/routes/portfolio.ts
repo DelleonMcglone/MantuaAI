@@ -184,13 +184,17 @@ router.post('/agent-transactions', async (req: Request, res: Response) => {
 
 router.get('/positions', async (req: Request, res: Response) => {
   try {
-    const { walletAddress, poolId } = req.query;
+    const { walletAddress, poolId, chainId } = req.query;
     if (!walletAddress) return res.status(400).json({ error: 'walletAddress required' });
-    const params: string[] = [(walletAddress as string).toLowerCase()];
+    const params: unknown[] = [(walletAddress as string).toLowerCase()];
     let whereClause = `WHERE wallet_address = $1 AND status = 'active'`;
+    if (chainId) {
+      params.push(parseInt(chainId as string));
+      whereClause += ` AND chain_id = $${params.length}`;
+    }
     if (poolId) {
       params.push(poolId as string);
-      whereClause += ` AND pool_id = $2`;
+      whereClause += ` AND pool_id = $${params.length}`;
     }
     const { rows } = await dbPool.query(
       `SELECT * FROM positions ${whereClause} ORDER BY created_at DESC LIMIT 20`,
@@ -204,18 +208,19 @@ router.get('/positions', async (req: Request, res: Response) => {
 
 router.post('/positions', async (req: Request, res: Response) => {
   try {
-    const { walletAddress, poolId, positionTokenId, token0, token1, liquidity, amount0, amount1, feeTier } = req.body;
+    const { walletAddress, poolId, positionTokenId, token0, token1, liquidity, amount0, amount1, feeTier, chainId } = req.body;
     if (!walletAddress || !token0 || !token1 || !liquidity) {
       return res.status(400).json({ error: 'walletAddress, token0, token1, liquidity required' });
     }
+    const networkChainId = parseInt(chainId) || 84532;
     const { rows } = await dbPool.query(
       `INSERT INTO positions
          (wallet_address, pool_id, position_token_id, token0, token1, liquidity, amount0, amount1,
           fee_tier, pool_address, tick_lower, tick_upper, status, chain_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'0x0000000000000000000000000000000000000000',0,0,'active',84532)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'0x0000000000000000000000000000000000000000',0,0,'active',$10)
        RETURNING *`,
       [walletAddress.toLowerCase(), poolId || null, positionTokenId || null,
-       token0, token1, liquidity, amount0 || 0, amount1 || 0, feeTier || 3000]
+       token0, token1, liquidity, amount0 || 0, amount1 || 0, feeTier || 3000, networkChainId]
     );
     res.status(201).json(rows[0]);
   } catch (err: unknown) {

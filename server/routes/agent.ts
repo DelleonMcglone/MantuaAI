@@ -35,6 +35,23 @@ const sendSchema = z.object({
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const EXPLORERS: Record<number, string> = {
+  84532: 'https://sepolia.basescan.org',
+  1301:  'https://sepolia.uniscan.xyz',
+};
+
+function getExplorerBase(chainId?: number): string {
+  return EXPLORERS[chainId ?? 84532] ?? EXPLORERS[84532];
+}
+
+function getExplorerTxUrl(txHash: string, chainId?: number): string {
+  return `${getExplorerBase(chainId)}/tx/${txHash}`;
+}
+
+function getExplorerAddressUrl(address: string, chainId?: number): string {
+  return `${getExplorerBase(chainId)}/address/${address}`;
+}
+
 function generateMockAddress(): `0x${string}` {
   const hex = Array.from({ length: 40 }, () =>
     Math.floor(Math.random() * 16).toString(16)
@@ -158,7 +175,8 @@ export function registerAgentRoutes(app: Express): void {
             address: rows[0].address,
             network: 'base-sepolia',
             createdAt: rows[0].created_at,
-            baseScanUrl: `https://sepolia.basescan.org/address/${rows[0].address}`,
+            explorerUrl: getExplorerAddressUrl(rows[0].address),
+            baseScanUrl: getExplorerAddressUrl(rows[0].address),
             message: 'Existing agent wallet retrieved',
             existing: true,
           });
@@ -202,7 +220,8 @@ export function registerAgentRoutes(app: Express): void {
         address,
         network: 'base-sepolia',
         createdAt: new Date().toISOString(),
-        baseScanUrl: `https://sepolia.basescan.org/address/${address}`,
+        explorerUrl: getExplorerAddressUrl(address),
+        baseScanUrl: getExplorerAddressUrl(address),
         message: 'Agent wallet created successfully',
       });
     } catch (err) {
@@ -236,6 +255,7 @@ export function registerAgentRoutes(app: Express): void {
         token: string;
         success: boolean;
         txHash?: string;
+        explorerUrl?: string;
         baseScanUrl?: string;
         error?: string;
       }> = [];
@@ -259,7 +279,8 @@ export function registerAgentRoutes(app: Express): void {
             token,
             success: true,
             txHash: faucetResult.transactionHash,
-            baseScanUrl: `https://sepolia.basescan.org/tx/${faucetResult.transactionHash}`,
+            explorerUrl: getExplorerTxUrl(faucetResult.transactionHash),
+            baseScanUrl: getExplorerTxUrl(faucetResult.transactionHash),
           });
         } catch (cdpErr) {
           // CDP unavailable — instruct user to use web faucet
@@ -317,9 +338,6 @@ export function registerAgentRoutes(app: Express): void {
           return res.json({
             type: 'pools',
             data: rows.map(p => {
-              const explorerBase = p.chain_id === 1301
-                ? 'https://sepolia.uniscan.xyz'
-                : 'https://sepolia.basescan.org';
               const network = p.chain_id === 1301 ? 'Unichain Sepolia' : 'Base Sepolia';
               return {
                 pair: `${p.token0}/${p.token1}`,
@@ -328,7 +346,7 @@ export function registerAgentRoutes(app: Express): void {
                 network,
                 createdAt: p.created_at,
                 txHash: p.tx_hash,
-                explorerUrl: `${explorerBase}/tx/${p.tx_hash}`,
+                explorerUrl: getExplorerTxUrl(p.tx_hash, p.chain_id),
               };
             }),
           });

@@ -8,9 +8,9 @@ import type { Token } from '../../config/tokens';
 import { SkeletonLine } from '../ui/skeleton';
 import { parseError } from '../../lib/errorMessages';
 import { createPoolKey, getHookAddress } from '../../lib/swap-utils';
+import { getExplorerTxUrl } from '../../config/contracts';
 
 const HOOK_MAP: Record<string, string> = { directional: 'df', jit: 'ym', none: 'none' };
-const EXPLORER: Record<number, string> = { 84532: 'https://sepolia.basescan.org' };
 
 interface Props {
   theme: any; isDark: boolean; tokenA: Token | null; tokenB: Token | null;
@@ -31,7 +31,6 @@ export const RemoveLiquidityForm: React.FC<Props> = ({
     ? { a: '0.1234', b: '312.56', usd: '$624.80', liq: BigInt(1e18) }
     : null;
 
-  const explorerUrl = EXPLORER[chainId] ?? EXPLORER[84532];
   const canSubmit = isConnected && !!pos && pct > 0;
 
   const handleRemove = () => {
@@ -105,7 +104,7 @@ export const RemoveLiquidityForm: React.FC<Props> = ({
 
       {isSuccess && hash && (
         <div style={{ marginTop: '8px', padding: '10px 12px', borderRadius: '10px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#10b981', fontSize: '13px' }}>
-          Liquidity removed!{' '}<a href={`${explorerUrl}/tx/${hash}`} target="_blank" rel="noopener noreferrer" style={{ color: '#10b981', textDecoration: 'underline' }}>View transaction</a>
+          Liquidity removed!{' '}<a href={getExplorerTxUrl(hash, chainId)} target="_blank" rel="noopener noreferrer" style={{ color: '#10b981', textDecoration: 'underline' }}>View transaction</a>
         </div>
       )}
       {errMsg && (

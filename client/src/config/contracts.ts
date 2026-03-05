@@ -38,9 +38,18 @@ export const UNISWAP_V4_ADDRESSES_UNICHAIN_SEPOLIA = {
   quoter:                   '0x56dcd40a3f2d466f48e7f48bdbe5cc9b92ae4472' as Address,
   permit2:                  '0x000000000022d473030f116ddee9f6b43ac78ba3' as Address,
   // Test helpers (same pattern as Base Sepolia)
-  poolSwapTest:             '0x8b5bcc363dde2614281ad875bad385e0a785d3b9' as Address,
-  poolModifyLiquidityTest:  '0x37429cd17cb1454c34e7f50b09725202fd533039' as Address,
+  poolSwapTest:             '0x9140a78c1a137c7ff1c151ec8231272af78a99a4' as Address,
+  poolModifyLiquidityTest:  '0x5fa728c0a5cfd51bee4b060773f50554c0c8a7ab' as Address,
 };
+
+export const STABLE_PROTECTION_HOOK_ADDRESSES: Record<number, Address> = {
+  [BASE_SEPOLIA_CHAIN_ID]: '0x0000000000000000000000000000000000000000' as Address,
+  [UNICHAIN_SEPOLIA_CHAIN_ID]: '0x0000000000000000000000000000000000000000' as Address,
+};
+
+export function getStableProtectionHookAddress(chainId: number): Address {
+  return STABLE_PROTECTION_HOOK_ADDRESSES[chainId] ?? '0x0000000000000000000000000000000000000000' as Address;
+}
 
 export const UNISWAP_V4_ADDRESSES_BY_CHAIN: Record<number, typeof UNISWAP_V4_ADDRESSES> = {
   [BASE_SEPOLIA_CHAIN_ID]:    UNISWAP_V4_ADDRESSES,

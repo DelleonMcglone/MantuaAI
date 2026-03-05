@@ -9,10 +9,9 @@ import { useAddLiquidity, computeSqrtPriceX96 } from '../../hooks/useAddLiquidit
 import { usePoolState } from '../../hooks/usePoolState';
 import { createPoolKey, getHookAddress, isNativeEth } from '../../lib/swap-utils';
 import { LiquidityTokenInput } from './LiquidityTokenInput';
+import { getExplorerTxUrl } from '../../config/contracts';
 
 type RangeType = 'Full Range' | 'Wide' | 'Narrow' | 'Custom';
-// Ticks must be multiples of tickSpacing (10 for the 0.05% fee tier used here).
-// MAX_TICK = 887272; floor(887272 / 10) * 10 = 887270.
 const RANGE_TICKS: Record<RangeType, { tickLower: number; tickUpper: number }> = {
   'Full Range': { tickLower: -887270, tickUpper: 887270 },
   'Wide':       { tickLower: -887270, tickUpper: 887270 },
@@ -20,10 +19,6 @@ const RANGE_TICKS: Record<RangeType, { tickLower: number; tickUpper: number }> =
   'Custom':     { tickLower: -887270, tickUpper: 887270 },
 };
 const HOOK_ID_MAP: Record<string, string> = { directional: 'df', jit: 'ym', stable: 'stable', none: 'none' };
-const EXPLORERS: Record<number, string> = {
-  84532: 'https://sepolia.basescan.org',
-  1301:  'https://sepolia.uniscan.xyz',
-};
 
 
 interface AddLiquidityFormProps {
@@ -183,7 +178,6 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
 
   const isButtonDisabled = !canSubmit || isPending || isConfirming;
 
-  const explorerUrl = EXPLORERS[chainId] ?? 'https://sepolia.basescan.org';
   return (
     <div style={{ width: isMobile ? '100%' : '400px', flexShrink: 0, background: theme.bgCard, borderRadius: '16px', padding: '24px', border: `1px solid ${theme.border}`, boxShadow: isDark ? 'none' : '0 4px 6px -1px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' }}>
 
@@ -298,7 +292,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
         </button>
         {isSuccess && hash && (
           <div data-testid="text-liquidity-success" style={{ marginTop: '8px', padding: '10px 12px', borderRadius: '10px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#10b981', fontSize: '13px' }}>
-            Liquidity added!{' '}<a href={`${explorerUrl}/tx/${hash}`} target="_blank" rel="noopener noreferrer" style={{ color: '#10b981', textDecoration: 'underline' }}>View transaction</a>
+            Liquidity added!{' '}<a href={getExplorerTxUrl(hash, chainId)} target="_blank" rel="noopener noreferrer" style={{ color: '#10b981', textDecoration: 'underline' }}>View transaction</a>
           </div>
         )}
         {error && (
