@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useAccount, useChainId } from 'wagmi';
 import { parseUnits } from 'viem';
 import type { Token } from '../../config/tokens';
-import { getPriceBySymbol } from '../../services/priceService';
+import { useLivePriceUSD } from '../../hooks/useLivePriceUSD';
 import { ArrowLeftRightIcon } from '../icons';
 import { parseError } from '../../lib/errorMessages';
 import { useAddLiquidity, computeSqrtPriceX96 } from '../../hooks/useAddLiquidity';
@@ -53,8 +53,10 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
   const hookAddr = getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none');
   const poolState = usePoolState(tokenA?.address, tokenB?.address, 500, hookAddr);
 
-  const priceA = tokenA ? getPriceBySymbol(tokenA.symbol) : 0;
-  const priceB = tokenB ? getPriceBySymbol(tokenB.symbol) : 0;
+  const { price: priceALive } = useLivePriceUSD(tokenA?.symbol ?? '');
+  const { price: priceBLive } = useLivePriceUSD(tokenB?.symbol ?? '');
+  const priceA = priceALive ?? 0;
+  const priceB = priceBLive ?? 0;
 
   const parsedAmount0 = parseFloat(amount0) || 0;
   const parsedAmount1 = parseFloat(amount1) || 0;
@@ -141,6 +143,21 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
           tokenOut: tokenB.symbol,
           amountIn: amount0,
           amountOut: amount1,
+          chainId,
+        }),
+      }).catch(() => {});
+      // Save LP position so it appears in the portfolio
+      fetch('/api/portfolio/positions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress: address,
+          token0: sym0,
+          token1: sym1,
+          liquidity: '1',
+          amount0: amount0,
+          amount1: amount1,
+          feeTier: 500,
           chainId,
         }),
       }).catch(() => {});

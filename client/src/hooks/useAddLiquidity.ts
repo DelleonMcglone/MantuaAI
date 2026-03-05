@@ -431,7 +431,7 @@ export function useAddLiquidity() {
               tokenAddr,
               positionManagerAddr,
               amount * 10n,
-              BigInt(nowSecs + 3600),
+              nowSecs + 3600,
             ],
           });
           await publicClient.waitForTransactionReceipt({ hash: tx });
@@ -467,49 +467,50 @@ export function useAddLiquidity() {
       const ethValue = isNative0 ? amount0Max : (isNative1 ? amount1Max : 0n);
 
       if (!poolInitialized) {
-        // Two separate transactions to stay within block gas limits:
-        // Tx A: initialize the pool
-        setStepLabel('Initializing pool…');
-        try {
-          const initTx = await writeContractAsync({
-            address: positionManagerAddr,
-            abi: PositionManagerABI,
-            functionName: 'initializePool',
-            args: [
-              {
-                currency0:   poolKey.currency0,
-                currency1:   poolKey.currency1,
-                fee:         poolKey.fee,
-                tickSpacing: poolKey.tickSpacing,
-                hooks:       poolKey.hooks,
-              },
-              currentSqrtPrice,
-            ],
-          });
-          await publicClient.waitForTransactionReceipt({ hash: initTx });
-        } catch (initErr) {
-          const initMsg = initErr instanceof Error ? initErr.message : String(initErr);
-          // If pool was already initialized by a concurrent tx, continue anyway
-          if (!isAlreadyInitializedError(initMsg)) {
-            setSetupError(new Error(decodeV4Error(initMsg) || `Pool initialization failed: ${initMsg.slice(0, 150)}`));
-            return;
-          }
-        }
-        setStep(s => s + 1);
-        setTotalSteps(t => t + 1);
+        // Single multicall: initializePool + modifyLiquidities in one transaction.
+        // Using multicall avoids nonce collisions that occur when MetaMask caches
+        // the nonce between two separate writeContractAsync calls.
+        setStepLabel('Initializing pool & adding liquidity…');
+        const initData = encodeFunctionData({
+          abi: PositionManagerABI,
+          functionName: 'initializePool',
+          args: [
+            {
+              currency0:   poolKey.currency0,
+              currency1:   poolKey.currency1,
+              fee:         poolKey.fee,
+              tickSpacing: poolKey.tickSpacing,
+              hooks:       poolKey.hooks,
+            },
+            currentSqrtPrice,
+          ],
+        });
+        const modifyData = encodeFunctionData({
+          abi: PositionManagerABI,
+          functionName: 'modifyLiquidities',
+          args: [unlockData, deadline],
+        });
+        const modifyTx = await writeContractAsync({
+          address: positionManagerAddr,
+          abi: PositionManagerABI,
+          functionName: 'multicall',
+          args: [[initData, modifyData]],
+          value: ethValue,
+        });
+        // Set the final hash *before* the finally block so isSuccess fires correctly
+        setFinalHash(modifyTx);
+      } else {
+        // Pool already initialized — just add liquidity
+        setStepLabel('Adding liquidity…');
+        const modifyTx = await writeContractAsync({
+          address: positionManagerAddr,
+          abi: PositionManagerABI,
+          functionName: 'modifyLiquidities',
+          args: [unlockData, deadline],
+          value: ethValue,
+        });
+        setFinalHash(modifyTx);
       }
-
-      // Tx B: add liquidity
-      setStepLabel('Adding liquidity…');
-      const modifyTx = await writeContractAsync({
-        address: positionManagerAddr,
-        abi: PositionManagerABI,
-        functionName: 'modifyLiquidities',
-        args: [unlockData, deadline],
-        value: ethValue,
-      });
-      // Set the final hash *before* the finally block so isSuccess fires correctly
-      setFinalHash(modifyTx);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (isAlreadyInitializedError(msg)) {

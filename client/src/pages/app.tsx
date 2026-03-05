@@ -2724,10 +2724,8 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
     </div>
   );
 
-  // Calculate totals
-  const totalTVL = pools.reduce((sum, p) => sum + p.liquidity, 0);
-  const totalVolume = pools.reduce((sum, p) => sum + p.volume, 0);
-  const totalFees = pools.reduce((sum, p) => sum + p.fees, 0);
+  // On-chain stats (volume/fees/yield) are not indexed on testnet — show pool count instead
+  const totalPoolCount = pools.length;
 
   return (
     <div style={{ width: '100%', fontFamily: '"DM Sans", sans-serif' }}>
@@ -2767,9 +2765,9 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
 
         {/* Stats Cards */}
         <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
-          <StatsCard label="TVL" value={`$${totalTVL.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} change={null} />
-          <StatsCard label="Volume 24h" value={`$${totalVolume.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} change={null} />
-          <StatsCard label="Fees 24h" value={`$${totalFees.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} change={null} />
+          <StatsCard label="Pools" value={String(totalPoolCount)} change={null} />
+          <StatsCard label="Volume 24h" value="—" change={null} />
+          <StatsCard label="Fees 24h" value="—" change={null} />
         </div>
 
         {/* Filters */}
@@ -2835,10 +2833,10 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
                       </div>
                     </div>
                   </td>
-                  <td style={{ padding: '12px' }}><span style={{ color: theme.textPrimary, fontFamily: 'SF Mono, Monaco, monospace', fontSize: '13px' }}>${pool.volume.toLocaleString()}</span></td>
-                  <td style={{ padding: '12px' }}><span style={{ color: theme.textPrimary, fontFamily: 'SF Mono, Monaco, monospace', fontSize: '13px' }}>${pool.fees.toLocaleString()}</span></td>
-                  <td style={{ padding: '12px' }}><span style={{ color: theme.textPrimary, fontFamily: 'SF Mono, Monaco, monospace', fontSize: '13px' }}>${pool.liquidity.toLocaleString()}</span></td>
-                  <td style={{ padding: '12px' }}><YieldBadge value={pool.yield} /></td>
+                  <td style={{ padding: '12px' }}><span style={{ color: theme.textMuted, fontSize: '13px' }}>—</span></td>
+                  <td style={{ padding: '12px' }}><span style={{ color: theme.textMuted, fontSize: '13px' }}>—</span></td>
+                  <td style={{ padding: '12px' }}><span style={{ color: theme.textMuted, fontSize: '13px' }}>—</span></td>
+                  <td style={{ padding: '12px' }}><span style={{ color: theme.textMuted, fontSize: '13px' }}>—</span></td>
                   <td style={{ padding: '12px', textAlign: 'right', display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
                      <button onClick={(e) => { e.stopPropagation(); onAddLiquidity(pool); }} style={{ padding: '8px 12px', borderRadius: '8px', border: `1px solid ${theme.accent}40`, background: `${theme.accent}10`, color: theme.accent, fontSize: '12px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }} data-testid={`button-add-liquidity-${i}`}>+ Add</button>
                      {pool.txHash && <a href={getExplorerLink(pool.txHash, currentChainId)} target="_blank" rel="noopener noreferrer" style={{ padding: '8px 10px', borderRadius: '8px', border: `1px solid ${theme.border}`, background: 'transparent', color: theme.textSecondary, fontSize: '12px', textDecoration: 'none', display: 'flex', alignItems: 'center' }} data-testid={`link-pool-tx-${i}`}>↗</a>}
@@ -3341,10 +3339,14 @@ const AgentAutonomousPanel = ({ theme, isDark, onNavigate }) => {
         const json = await res.json();
         if (json.success && json.data?.rows?.length > 0) {
           setDuneTableData(json.data);
-          setMessages(prev => [...prev, { role: 'agent', text: `📊 Retrieved ${json.data.rowCount} rows for: ${json.data.label}` }]);
+          setMessages(prev => [...prev, { role: 'agent', text: `📊 Retrieved ${json.data.rowCount} rows for: ${json.data.label}\nView on Dune: ${json.data.duneUrl}` }]);
+        } else if (json.success && json.data?.rows?.length === 0) {
+          setMessages(prev => [...prev, { role: 'agent', text: `📊 Query matched (${json.data?.label}) but returned no rows yet — Dune may still be indexing. Try again in a moment.\nView on Dune: ${json.data?.duneUrl}` }]);
         } else {
-          const msg = json.message || 'No matching Dune query found. Try: "NFT marketplace rankings", "DEX volume", or "ETH gas analytics".';
-          setMessages(prev => [...prev, { role: 'agent', text: `🟡 ${msg}` }]);
+          // No match — show available topics as suggestions
+          const suggestions = json.suggestions?.map((s: {name: string; id: number}) => `• ${s.name} (queryId: ${s.id})`).join('\n') ?? '';
+          const msg = json.message ?? 'Could not match query to known Dune data.';
+          setMessages(prev => [...prev, { role: 'agent', text: `🟡 ${msg}\n\nAvailable topics:\n${suggestions || '• DEX Volume\n• NFT Marketplace Rankings\n• Uniswap v4 Base Activity\n• ETH Gas Analytics'}` }]);
         }
       } else if (lower.includes('price') || lower.includes('worth')) {
         const res = await fetch('/api/agent/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: text, walletAddress: address }) });
@@ -3355,8 +3357,29 @@ const AgentAutonomousPanel = ({ theme, isDark, onNavigate }) => {
         const res = await fetch('/api/agent/wallet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: address }) });
         const data = await res.json();
         setMessages(prev => [...prev, { role: 'agent', text: `✅ Agent wallet created!\nAddress: ${data.address}\n\n${data.explorerUrl ? `View on Explorer: ${data.explorerUrl}` : ''}` }]);
-      } else if (lower.includes('faucet') || lower.includes('testnet eth') || lower.includes('get me eth')) {
-        setMessages(prev => [...prev, { role: 'agent', text: '🚰 Opening faucet panel... Use the "Get Testnet Funds" action card below.' }]);
+      } else if (lower.includes('faucet') || lower.includes('testnet eth') || lower.includes('get me eth') || lower.includes('get testnet')) {
+        if (!address) {
+          setMessages(prev => [...prev, { role: 'agent', text: '⚠️ Connect your wallet first so I know where to send testnet funds.' }]);
+        } else {
+          setMessages(prev => [...prev, { role: 'agent', text: `🚰 Requesting testnet ETH for ${address.slice(0, 8)}...${address.slice(-6)}` }]);
+          try {
+            const res = await fetch('/api/agent/faucet', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ address, tokens: ['eth'] }),
+            });
+            const data = await res.json();
+            const r = data.results?.[0];
+            if (r?.success) {
+              setMessages(prev => [...prev, { role: 'agent', text: `✅ ETH sent!\nTx: ${r.txHash}\n${r.explorerUrl ? `View: ${r.explorerUrl}` : ''}` }]);
+            } else {
+              const hint = r?.error ?? 'Faucet unavailable.';
+              setMessages(prev => [...prev, { role: 'agent', text: `🟡 ${hint}` }]);
+            }
+          } catch {
+            setMessages(prev => [...prev, { role: 'agent', text: '❌ Faucet request failed. Visit https://portal.cdp.coinbase.com/products/faucet to claim tokens manually.' }]);
+          }
+        }
       } else if (lower.includes('swap')) {
         setMessages(prev => [...prev, { role: 'agent', text: '🔄 Opening swap interface...' }]);
         setTimeout(() => onNavigate('swap'), 1000);

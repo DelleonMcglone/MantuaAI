@@ -1,0 +1,10 @@
+My wallet is connected and I'm on Unichain Sequoia. I have two tokens, ETH and USDC. I go to create a liquidity pool. I select create the pool. I'm going to do $5 worth, $6 worth of ETH. And that is the equivalent to $6 USDC. I select add liquidity with no hook. Metamask pops up. I select confirm. Confirm again. It says transaction reverted, not too low. Next nonce, 25 TX, nonce 24.
+If I cant create the pool then I cant swap the tokens.
+
+
+I switched networks and my wallet is now on base Sephoya. I go to create a USDC CBBTC pool. I put in $20 for the USDC, which is 0.000222 worth of CBBTC. Also, when I put in the CBBTC, it says the current price is $90,000. That's incorrect, so it should be the correct value of what CBBTC is. Before I can even, once I select initialize pool and add liquidity, it says token approval needed. Please approve the token first. I have ETH, USDC, EURC, and CBBTC, but now the wallet is now no longer recognizing the CBBTC in my wallet when it was before.When I go to the liquidity pools, it says that the volume is zero, the fees are zero, the liquidity is zero, the yield is zero. The liquidity should at least show the amount of liquidity in the pools.
+
+When I select the user portfolio, it doesn't show the ETH balance or the LP positions. They both are zero. The assets should match the user's wallet. And under liquidity positions, it says no liquidity positions yet, even though I added liquidity to a USDC-EURC stable protection pool.
+
+In agent mode, I select Get Testnet Funds. I select ETH. It says ❌ ETH: CDP faucet unavailable. Visit https://portal.cdp.coinbase.com/products/faucet to claim ETH on Base Sepolia. The agent should be able to get funds programmatically https://docs.cdp.coinbase.com/faucets/introduction/quickstart
+ When I select autonomous mode and I request show DEX volume overview, it says querying Dune analytics for on-chain data, no matching Dune query found. I select autonomous mode again, I request get me testnet ETH, it says opening faucet panel, use the get testnet funds action card below.

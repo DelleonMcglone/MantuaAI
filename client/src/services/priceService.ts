@@ -9,9 +9,11 @@ export interface TokenPrice {
   lastUpdated: number;
 }
 
+// Fallback prices used only before live CoinGecko prices load.
+// These are rough reference values; the app fetches live prices via useLivePriceUSD.
 const REFERENCE_PRICES: Record<string, number> = {
-  'ETH':   2000,
-  'cbBTC': 90000,
+  'ETH':   2500,
+  'cbBTC': 85000,
   'USDC':  1.00,
   'EURC':  1.10,
 };
