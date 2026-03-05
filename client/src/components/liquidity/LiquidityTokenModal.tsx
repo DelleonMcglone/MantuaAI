@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ALL_TOKENS, type Token } from '../../config/tokens';
+import { useChainId } from 'wagmi';
+import { getTokensForChain, type Token } from '../../config/tokens';
 import { CloseIcon } from '../icons';
 
 interface LiquidityTokenModalProps {
@@ -80,7 +81,8 @@ export const LiquidityTokenModal: React.FC<LiquidityTokenModalProps> = ({
   if (!isOpen) return null;
 
   const STABLE_SYMBOLS = new Set(['USDC', 'EURC']);
-  const filtered = ALL_TOKENS.filter((t) => {
+  const chainId = useChainId();
+  const filtered = getTokensForChain(chainId).filter((t) => {
     if (excludeToken && t.address.toLowerCase() === excludeToken.address.toLowerCase()) return false;
     if (category === 'stablecoin' && !STABLE_SYMBOLS.has(t.symbol)) return false;
     if (search) {

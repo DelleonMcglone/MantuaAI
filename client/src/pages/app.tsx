@@ -33,7 +33,7 @@ import { useSwapExecution, getExplorerLink } from '../hooks/useSwapExecution';
 import { useTokenBalances } from '../hooks/useTokenBalances';
 import { PriceImpact, SwapButton, SwapButtonStyles, SwapConfirmation, SwapPriceChart } from '../components/swap';
 import { parseTokenAmount, formatTokenAmount, isNativeEth, getZeroAddress, getHookAddress } from '../lib/swap-utils';
-import { ALL_TOKENS, NATIVE_ETH, getTokenBySymbol } from '../config/tokens';
+import { ALL_TOKENS, NATIVE_ETH, getTokenBySymbol, getTokensForChain } from '../config/tokens';
 import { calculateUsdValue as calcUsdValue, getPriceBySymbol } from '../services/priceService';
 import { useLivePriceUSD, useLivePairRate } from '../hooks/useLivePriceUSD';
 import {
@@ -1116,18 +1116,16 @@ const MiniChart = ({ data, color = "#10b981" }) => {
 const TokenSelectModal = ({ isOpen, onClose, onSelect, theme, isDark, getTokenBalance, calculateUsdValue, selectingSide }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const currentChainId = useChainId();
 
   if (!isOpen) return null;
 
-  // Helper to abbreviate address for display
   const abbreviateAddress = (address: string) => {
     if (address.length < 10) return address;
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  // Use the actual token configuration from config/tokens.ts
-  // Map tokens to include display properties
-  const allTokens = ALL_TOKENS.map(token => ({
+  const allTokens = getTokensForChain(currentChainId).map(token => ({
     symbol: token.symbol,
     name: token.name,
     address: token.address,
