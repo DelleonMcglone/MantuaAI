@@ -52,6 +52,7 @@ export const HOOK_ADDRESSES: { [hookId: string]: Address } = {
   'df': '0x0000000000000000000000000000000000000000' as Address,   // Dynamic Fee
   'twamm': '0x0000000000000000000000000000000000000000' as Address, // TWAMM Rebalance
   'ym': '0x0000000000000000000000000000000000000000' as Address,   // Yield Maximizer
+  'stable-protection': '0x0000000000000000000000000000000000000000' as Address, // Stable Protection Hook
   'none': '0x0000000000000000000000000000000000000000' as Address,  // No hook (standard swap)
 };
 

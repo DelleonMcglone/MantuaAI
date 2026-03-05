@@ -1601,10 +1601,10 @@ const HookSelectorModal = ({ isOpen, onClose, hooks, selectedHook, onSelect, the
                   padding: '16px',
                   borderRadius: '12px',
                   border: selectedHook === hook.id 
-                    ? `2px solid #8b5cf6` 
+                    ? `2px solid ${hook.id === 'stable-protection' ? '#14b8a6' : '#8b5cf6'}` 
                     : `1px solid ${theme.border}`,
                   background: selectedHook === hook.id 
-                    ? (isDark ? 'rgba(139, 92, 246, 0.1)' : 'rgba(139, 92, 246, 0.05)') 
+                    ? (hook.id === 'stable-protection' ? (isDark ? 'rgba(20,184,166,0.1)' : 'rgba(20,184,166,0.05)') : (isDark ? 'rgba(139, 92, 246, 0.1)' : 'rgba(139, 92, 246, 0.05)')) 
                     : theme.bgSecondary,
                   cursor: 'pointer',
                   width: '100%',
@@ -1634,11 +1634,11 @@ const HookSelectorModal = ({ isOpen, onClose, hooks, selectedHook, onSelect, the
                   width: '40px',
                   height: '40px',
                   borderRadius: '10px',
-                  background: selectedHook === hook.id ? 'rgba(139, 92, 246, 0.2)' : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'),
+                  background: selectedHook === hook.id ? (hook.id === 'stable-protection' ? 'rgba(20,184,166,0.2)' : 'rgba(139, 92, 246, 0.2)') : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'),
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: selectedHook === hook.id ? '#8b5cf6' : theme.textSecondary,
+                  color: selectedHook === hook.id ? (hook.id === 'stable-protection' ? '#14b8a6' : '#8b5cf6') : theme.textSecondary,
                   flexShrink: 0,
                 }}>
                   {hook.icon}
@@ -2074,6 +2074,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
 
   const hooks = [
     { id: 'none', name: 'No Hook', description: 'Standard Uniswap v4 swap without modifications', icon: <SwapIcon /> },
+    { id: 'stable-protection', name: 'Stable Protection', description: 'Dynamic fees that protect stablecoin pegs — lower fees toward peg, higher fees away', icon: <ShieldIcon />, benefit: 'Peg protection' },
   ];
 
   useEffect(() => {
