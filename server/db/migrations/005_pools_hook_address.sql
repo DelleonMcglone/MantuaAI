@@ -1,0 +1,2 @@
+-- Migration: add hook_address column to pools table
+ALTER TABLE pools ADD COLUMN IF NOT EXISTS hook_address VARCHAR(42) DEFAULT '0x0000000000000000000000000000000000000000';

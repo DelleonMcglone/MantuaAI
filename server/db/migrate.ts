@@ -7,7 +7,7 @@ const { Pool } = pkg;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const MIGRATIONS = ['001_chat_schema.sql', '002_analytics_events.sql', '003_pools_portfolio.sql', '004_positions_lp.sql'];
+const MIGRATIONS = ['001_chat_schema.sql', '002_analytics_events.sql', '003_pools_portfolio.sql', '004_positions_lp.sql', '005_pools_hook_address.sql'];
 
 export async function runMigrations(): Promise<void> {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });

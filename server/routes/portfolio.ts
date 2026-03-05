@@ -23,15 +23,16 @@ router.get('/', async (req: Request, res: Response) => {
 
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { token0, token1, feeTier, creatorAddress, txHash, chainId } = req.body;
+    const { token0, token1, feeTier, creatorAddress, txHash, chainId, hookAddress } = req.body;
     if (!token0 || !token1 || !feeTier || !creatorAddress || !txHash) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     const networkChainId = parseInt(chainId) || 84532;
+    const resolvedHookAddress = hookAddress || '0x0000000000000000000000000000000000000000';
     const { rows } = await dbPool.query(
-      `INSERT INTO pools (token0, token1, fee_tier, creator_address, tx_hash, chain_id)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [token0, token1, feeTier, creatorAddress.toLowerCase(), txHash, networkChainId]
+      `INSERT INTO pools (token0, token1, fee_tier, creator_address, tx_hash, chain_id, hook_address)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [token0, token1, feeTier, creatorAddress.toLowerCase(), txHash, networkChainId, resolvedHookAddress]
     );
     res.status(201).json(rows[0]);
   } catch (err: unknown) {

@@ -18,7 +18,7 @@ const RANGE_TICKS: Record<RangeType, { tickLower: number; tickUpper: number }> =
   'Narrow':     { tickLower: -100,    tickUpper: 100    },
   'Custom':     { tickLower: -887270, tickUpper: 887270 },
 };
-const HOOK_ID_MAP: Record<string, string> = { directional: 'df', jit: 'ym', stable: 'stable', none: 'none' };
+const HOOK_ID_MAP: Record<string, string> = { directional: 'df', jit: 'ym', 'stable-protection': 'stable-protection', none: 'none' };
 
 
 interface AddLiquidityFormProps {
@@ -115,6 +115,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
       const sym0 = params.poolKey.currency0 === tokenA.address.toLowerCase() ? tokenA.symbol : tokenB.symbol;
       const sym1 = params.poolKey.currency0 === tokenA.address.toLowerCase() ? tokenB.symbol : tokenA.symbol;
       // Save pool record
+      const hookAddress = getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none');
       fetch('/api/portfolio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -125,6 +126,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
           creatorAddress: address,
           txHash: hash,
           chainId,
+          hookAddress,
         }),
       }).catch(() => {});
       // Save transaction record

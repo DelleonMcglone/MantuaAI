@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { SwapIcon } from '../icons';
+import { SwapIcon, ShieldIcon } from '../icons';
 import { getTokenBySymbol, type Token } from '../../config/tokens';
 import PoolActivityChart from './PoolActivityChart';
 import HookSelector from './HookSelector';
@@ -26,8 +26,8 @@ interface AddLiquidityModalProps {
 }
 
 const HOOKS = [
-  { id: 'none',   name: 'No Hook',               icon: <SwapIcon />, color: '#6b7280', description: 'Standard Uniswap v4 pool without hook modifications', benefit: 'Standard execution' },
-  { id: 'stable', name: 'Stable Protection Hook', icon: <SwapIcon />, color: '#10b981', description: 'Zone-based dynamic fees protect stable pairs from depeg events. Fees rise automatically during volatility.', benefit: 'Depeg protection' },
+  { id: 'none',                name: 'No Hook',               icon: <SwapIcon />,   color: '#6b7280', description: 'Standard Uniswap v4 pool without hook modifications', benefit: 'Standard execution' },
+  { id: 'stable-protection',   name: 'Stable Protection',     icon: <ShieldIcon />, color: '#14b8a6', description: 'Zone-based dynamic fees protect stable pairs from depeg events. Fees rise automatically during volatility.', benefit: 'Peg protection' },
 ];
 
 const TOKEN_GRAD_MAP: Record<string, string> = {
@@ -99,6 +99,10 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
     if ((mode === 'add' || mode === 'remove') && pool) {
       setTokenA(getTokenBySymbol(pool.token1) ?? null);
       setTokenB(getTokenBySymbol(pool.token2) ?? null);
+      if (pool.hook && pool.hook !== 'None') {
+        const matched = HOOKS.find(h => h.name.toLowerCase().includes(pool.hook!.toLowerCase()));
+        if (matched) setSelectedHook(matched.id);
+      }
     } else if (initialTokenA || initialTokenB) {
       if (initialTokenA) setTokenA(getTokenBySymbol(initialTokenA) ?? null);
       if (initialTokenB) setTokenB(getTokenBySymbol(initialTokenB) ?? null);

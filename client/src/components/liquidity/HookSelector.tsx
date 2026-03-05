@@ -81,10 +81,10 @@ const HookSelector: React.FC<HookSelectorProps> = ({ isOpen, onClose, hooks, sel
                   padding: '16px',
                   borderRadius: '12px',
                   border: selectedHook === hook.id 
-                    ? `2px solid #8b5cf6` 
+                    ? `2px solid ${hook.color || '#8b5cf6'}` 
                     : `1px solid ${theme.border}`,
                   background: selectedHook === hook.id 
-                    ? (isDark ? 'rgba(139, 92, 246, 0.1)' : 'rgba(139, 92, 246, 0.05)') 
+                    ? (isDark ? `${hook.color || '#8b5cf6'}1a` : `${hook.color || '#8b5cf6'}0d`) 
                     : theme.bgSecondary,
                   cursor: 'pointer',
                   width: '100%',
@@ -114,11 +114,11 @@ const HookSelector: React.FC<HookSelectorProps> = ({ isOpen, onClose, hooks, sel
                   width: '40px',
                   height: '40px',
                   borderRadius: '10px',
-                  background: selectedHook === hook.id ? 'rgba(139, 92, 246, 0.2)' : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'),
+                  background: selectedHook === hook.id ? `${hook.color || '#8b5cf6'}33` : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'),
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: selectedHook === hook.id ? '#8b5cf6' : theme.textSecondary,
+                  color: selectedHook === hook.id ? (hook.color || '#8b5cf6') : theme.textSecondary,
                   flexShrink: 0,
                 }}>
                   {hook.icon}
