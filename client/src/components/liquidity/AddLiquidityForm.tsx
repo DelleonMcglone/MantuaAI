@@ -40,12 +40,14 @@ interface AddLiquidityFormProps {
   hookColor: string;
   onOpenHookSelector: () => void;
   isMobile: boolean;
+  onActionComplete?: (title: string) => void;
+  mode?: 'add' | 'create' | 'remove';
 }
 
 export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
   theme, isDark, tokenA, tokenB, onTokenAChange, onTokenBChange,
   onTokenAClick, onTokenBClick, selectedHook, hookObj, hookColor,
-  onOpenHookSelector, isMobile,
+  onOpenHookSelector, isMobile, onActionComplete, mode = 'add',
 }) => {
   const [amount0, setAmount0] = useState('');
   const [amount1, setAmount1] = useState('');
@@ -115,13 +117,15 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
     if (isSuccess && hash && address && tokenA && tokenB) {
       const params = buildPoolParams();
       if (!params) return;
+      const sym0 = params.poolKey.currency0 === tokenA.address.toLowerCase() ? tokenA.symbol : tokenB.symbol;
+      const sym1 = params.poolKey.currency0 === tokenA.address.toLowerCase() ? tokenB.symbol : tokenA.symbol;
       // Save pool record
       fetch('/api/portfolio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          token0: params.poolKey.currency0 === tokenA.address.toLowerCase() ? tokenA.symbol : tokenB.symbol,
-          token1: params.poolKey.currency0 === tokenA.address.toLowerCase() ? tokenB.symbol : tokenA.symbol,
+          token0: sym0,
+          token1: sym1,
           feeTier: 500,
           creatorAddress: address,
           txHash: hash,
@@ -143,6 +147,12 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
           chainId,
         }),
       }).catch(() => {});
+      // Update chat session title with action description
+      const chainName = chainId === 1301 ? 'Unichain Sepolia' : 'Base Sepolia';
+      const actionLabel = mode === 'create'
+        ? `Created ${sym0}/${sym1} pool on ${chainName}`
+        : `Added liquidity to ${sym0}/${sym1}`;
+      onActionComplete?.(actionLabel);
     }
   }, [isSuccess, hash]);
 

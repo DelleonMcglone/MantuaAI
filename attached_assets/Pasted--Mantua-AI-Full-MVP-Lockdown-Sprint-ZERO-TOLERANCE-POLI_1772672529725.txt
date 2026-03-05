@@ -1,0 +1,400 @@
+# Mantua.AI — Full MVP Lockdown Sprint
+
+## ZERO TOLERANCE POLICY
+- Every feature described below MUST work end-to-end
+- No placeholder data, no mock responses, no "coming soon" UI
+- Every transaction MUST produce a real block explorer link
+- Every balance MUST come from on-chain reads
+- If something doesn't work, fix it before moving on
+- TEST AND VERIFY EACH FEATURE BEFORE MOVING TO THE NEXT
+
+---
+
+## WALLET ADDRESS
+`0xbaacDCFfA93B984C914014F83Ee28B68dF88DC87`
+
+## VERIFIED TOKEN ADDRESSES
+
+### Base Sepolia (Chain ID: 84532)
+| Token | Address | Decimals |
+|-------|---------|----------|
+| ETH | native | 18 |
+| USDC | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` | 6 |
+| EURC | `0x808456652fdb597867f38412077A9182bf77359F` | 6 |
+| cbBTC | `0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf` | 8 |
+
+### Unichain Sepolia (Chain ID: 1301)
+| Token | Address | Decimals |
+|-------|---------|----------|
+| ETH | native | 18 |
+| USDC | `0x31d0220469e10c4E71834a79b1f276d740d3768F` | 6 |
+
+### Uniswap v4 Contracts — Unichain Sepolia
+| Contract | Address |
+|----------|---------|
+| PoolManager | `0x00b036b58a818b1bc34d502d3fe730db729e62ac` |
+| PoolSwapTest | `0x9140a78c1a137c7ff1c151ec8231272af78a99a4` |
+| PoolModifyLiquidityTest | `0x5fa728c0a5cfd51bee4b060773f50554c0c8a7ab` |
+
+### Uniswap v4 Contracts — Base Sepolia
+Look up the canonical v4 deployment addresses for Base Sepolia from https://docs.uniswap.org/contracts/v4/deployments. They are different from Unichain Sepolia.
+
+### Stable Protection Hook
+GitHub: https://github.com/DelleonMcglone/stableprotection-hook
+The hook is deployed on Unichain Sepolia. For Base Sepolia, it needs to be deployed separately or referenced if already deployed.
+
+---
+
+## SECTION 1: POOL CREATION
+
+### 1A: Unichain Sepolia Pools
+When wallet is connected to Unichain Sepolia, create:
+- **ETH/USDC pool** — $20 ETH + $20 USDC
+
+Requirements:
+- Pool uses Uniswap v4 PoolManager at `0x00b036b58a818b1bc34d502d3fe730db729e62ac`
+- After creation, the pool MUST appear on the Liquidity page ONLY when the user is on Unichain Sepolia
+- Display transaction confirmation link: `https://sepolia.uniscan.xyz/tx/<hash>`
+
+### 1B: Base Sepolia Pools
+When wallet is connected to Base Sepolia, create:
+1. **ETH/USDC pool** — $20 ETH + $20 USDC
+2. **USDC/EURC pool** — $20 USDC + $20 EURC
+3. **USDC/EURC pool with Stable Protection Hook** — $20 USDC + $20 EURC, using the deployed Stable Protection Hook address
+4. **cbBTC/USDC pool** — $20 cbBTC + $20 USDC
+
+Requirements:
+- After creation, pools MUST appear on the Liquidity page ONLY when the user is on Base Sepolia
+- Display transaction confirmation link: `https://sepolia.basescan.org/tx/<hash>`
+- The USDC/EURC pool with Stable Protection Hook: when this pool is selected in the Liquidity UI, show the hook's zone/fee information:
+  - Current zone (HEALTHY/MINOR/MODERATE/SEVERE/CRITICAL)
+  - Current dynamic fee
+  - Directional fee multipliers (toward-peg: 0.5x, away-from-peg: 3.0x)
+  - Circuit breaker status
+
+### 1C: Remove Previous Pools
+The two ETH/USDC pools visible in the screenshot (Standard 0.05% and Standard 0.30% with $0 volume) must be removed from the Liquidity page. These are stale/empty pools that should not display.
+
+---
+
+## SECTION 2: SWAPS
+
+### 2A: Unichain Sepolia Swap
+After pool creation, execute:
+- Swap 0.00046128 ETH → USDC (exact input)
+- Route through the ETH/USDC pool created in 1A
+- Display transaction link: `https://sepolia.uniscan.xyz/tx/<hash>`
+
+### 2B: Base Sepolia Swaps
+After pool creation, execute:
+1. Swap 0.00046128 ETH → USDC (exact input)
+   - Route through ETH/USDC pool from 1B
+   - Display link: `https://sepolia.basescan.org/tx/<hash>`
+
+2. Swap 10 USDC → EURC with Stable Protection Hook
+   - Route through the USDC/EURC Stable Protection pool from 1B
+   - This swap triggers `beforeSwap` (zone classification + dynamic fee) and `afterSwap` (zone update)
+   - Display link: `https://sepolia.basescan.org/tx/<hash>`
+
+---
+
+## SECTION 3: RECENT CHATS — ACTION LABELS
+
+**Bug:** When a swap, pool creation, analysis, or agent action occurs, the Recent Chats sidebar always shows "New chat" instead of describing the action.
+
+**Fix:** When an action completes, update the chat title to describe what happened:
+- Swap: "Swap 0.00046128 ETH → USDC"
+- Pool creation: "Created ETH/USDC pool on Base Sepolia"
+- Agent action: "Agent: Created wallet" or "Agent: Sent 5 USDC to 0x..."
+- Analysis: "Analyzed ETH/USDC pool performance"
+
+Implementation:
+- Find where chat sessions are created/stored (likely a `chats` table or state array)
+- After the first meaningful action in a chat, update the `title` field
+- Use the action type + key details as the title
+- If no action has occurred yet, keep "New chat" as default
+
+---
+
+## SECTION 4: AGENT MODE — FULL FUNCTIONALITY
+
+When the user selects Agent from the sidebar and enters Agent/Chat mode, EVERY card action must work end-to-end with real transactions:
+
+### 4A: Create and Manage a Wallet
+- Agent creates a new wallet via Coinbase AgentKit (or generates a local keypair)
+- Display the wallet address
+- Provide a confirmation link on BaseScan: `https://sepolia.basescan.org/address/<agent_wallet>`
+- If on Unichain Sepolia: `https://sepolia.uniscan.xyz/address/<agent_wallet>`
+
+### 4B: Send Tokens
+- Agent must first get testnet funds from a faucet (programmatically or guide the user)
+- After receiving funds, show confirmation link
+- When sending tokens to an address, complete the full flow:
+  1. Build transaction
+  2. Sign and broadcast
+  3. Wait for confirmation
+  4. Display explorer link: `https://sepolia.basescan.org/tx/<hash>` or `https://sepolia.uniscan.xyz/tx/<hash>`
+
+### 4C: Swap Tokens
+- Agent can swap tokens from the agent wallet
+- Uses available pool liquidity
+- Full flow with explorer confirmation link
+
+### 4D: Add Liquidity
+- Agent can add liquidity to any existing pool
+- Agent can add liquidity to a pool using the Stable Protection Hook
+- Full flow with explorer confirmation link
+
+### 4E: Query On-Chain Data
+- User types a question (e.g., "What's the TVL on Uniswap v4?")
+- After Dune MCP integration: query executes against Dune Analytics
+- Output renders as formatted content (table, text) above the chat
+- Must work end-to-end: input → API call → formatted response
+
+### 4F: Autonomous Mode
+- Same capabilities as chat mode but agent runs independently
+- Monitors pools, executes actions based on conditions
+- All actions produce explorer confirmation links
+
+---
+
+## SECTION 5: PORTFOLIO — FIX $NaN
+
+**Bug:** User Portfolio shows "$NaN" for total portfolio value.
+
+**Fix:**
+- Find where portfolio value is calculated (sum of token balances × prices)
+- The NaN comes from either: undefined token prices, failed balance reads, or dividing by zero
+- Add null checks: if a price or balance is undefined, treat it as 0
+- Format: `$XXX.XX` — never show NaN, Infinity, or undefined
+- Portfolio must show real balances from on-chain reads per chain:
+  - Base Sepolia: ETH, USDC, EURC, cbBTC balances
+  - Unichain Sepolia: ETH, USDC balances
+
+---
+
+## SECTION 6: CHAIN-SPECIFIC POOL DISPLAY
+
+**Critical rule:** Pools created on Base Sepolia ONLY show when the user is on Base Sepolia. Pools created on Unichain Sepolia ONLY show when the user is on Unichain Sepolia.
+
+Implementation:
+- Store pool data with a `chainId` field
+- Filter displayed pools by `useChainId()` from wagmi
+- When the user switches chains, the pool list updates immediately
+
+---
+
+## SECTION 7: STABLE PROTECTION HOOK UI
+
+When a pool uses the Stable Protection Hook, the Liquidity modal must show additional information:
+
+- **Zone Badge**: Color-coded indicator (Green=HEALTHY, Yellow=MINOR, Orange=MODERATE, Red=SEVERE, Black=CRITICAL)
+- **Dynamic Fee**: Current fee in basis points with direction indicator
+- **Fee Schedule**:
+  - Toward peg: base fee × 0.5
+  - Away from peg: base fee × 3.0
+- **Circuit Breaker Status**: Active/Inactive
+- **Zone Thresholds**: 0.1% / 0.5% / 2.0% / 5.0%
+
+Read this data from the hook's view functions:
+- `getPoolState(poolId)` → returns current zone + last deviation
+- `getPoolConfig(poolId)` → returns fee config + thresholds
+
+---
+
+
+
+---
+
+## SECTION 8: PORTFOLIO PAGE — EXACT LAYOUT FROM SCREENSHOT
+
+Replace the current portfolio page with the EXACT layout shown in the uploaded screenshot. This is the definitive spec — match it pixel-for-pixel.
+
+### Page Title
+- "User Portfolio" in white, top-left
+- "X" close button top-right (closes portfolio modal/page, returns to chat)
+
+### Portfolio Summary Card (top section, full width)
+Dark card (`#111827` background, `#1f2937` border, rounded corners)
+
+**Left side:**
+- "Portfolio Summary" title in white, bold
+- Chain badge below it: pill-shaped, e.g. "● Base Sepolia" with a blue/green dot and text, background slightly lighter than card
+
+**Right side:**
+- "Total Value" label in small teal/gray text
+- Large `$X.XX` value in white, bold, monospace-style font
+- This MUST be the real sum of all token balances × prices. NEVER show $0.00 if the wallet has tokens. NEVER show $NaN.
+
+### Four Metric Cards (row of 4, inside the Portfolio Summary card)
+Each card: dark inner card with subtle border, icon + label at top, large value below, USD value in small gray text underneath.
+
+**Card 1: ETH Balance**
+- Blue circle icon with "E" or ETH diamond
+- Label: "ETH Balance"
+- Value: `0.1607 ETH` (actual balance from `useBalance`)
+- Sub: `$321.49` (balance × ETH price)
+
+**Card 2: USDC Balance**
+- Blue circle icon with "$"
+- Label: "USDC Balance"
+- Value: `40.00` (actual balance from ERC20 read)
+- Sub: `$40.00`
+
+**Card 3: LP Positions**
+- Green circle icon
+- Label: "LP Positions"
+- Value: count of active LP positions (integer)
+- Sub: `$XX.XX value` (total USD value of LP positions)
+
+**Card 4: Net PnL**
+- Teal/dark-teal background (slightly different from other cards — this card has a highlighted background like `#0d3b3b` or similar dark teal)
+- Chart-line icon
+- Label: "Net PnL"
+- Value: `+0.00%` in teal/green color (`#14b8a6`)
+- Sub: `+$0.00` in teal
+- If PnL is negative: show in red (`#ef4444`)
+
+### Assets Section (below Portfolio Summary)
+Full-width card with:
+- "Assets" title, bold white, top-left
+- Table with columns: ASSET | BALANCE | USD VALUE | % OF PORTFOLIO
+- Column headers in uppercase, small, gray (`#6b7280`)
+- Each row shows:
+  - ASSET: token icon (colored circle) + token symbol (e.g., "ETH", "USDC", "EURC", "cbBTC")
+  - BALANCE: formatted token balance (e.g., "0.1607", "40.00")
+  - USD VALUE: `$XXX.XX`
+  - % OF PORTFOLIO: percentage of total portfolio this token represents (e.g., "84.2%")
+- Show ALL tokens for the current chain that have a non-zero balance
+- If no tokens: show empty state (no rows, but keep headers)
+
+**Chain-specific tokens:**
+- Base Sepolia: ETH, USDC, EURC, cbBTC
+- Unichain Sepolia: ETH, USDC
+
+### Liquidity Positions Section (below Assets)
+Full-width card with:
+- "Liquidity Positions" title, bold white, top-left
+- If no positions: show "No liquidity positions yet" centered, gray text
+- If positions exist, show table: POOL | HOOK | LIQUIDITY | SHARE | FEES EARNED | ACTIONS
+  - POOL: pair name (e.g., "ETH/USDC")
+  - HOOK: hook name or "None"
+  - LIQUIDITY: USD value
+  - SHARE: pool share percentage
+  - FEES EARNED: unclaimed fees in USD
+  - ACTIONS: [Remove] [Add More] buttons
+
+### Activity Section (below Liquidity Positions)
+Full-width card with:
+- "Activity" title, bold white, top-left
+- Filter tabs on the right: "All" | "Swaps" | "Liquidity"
+  - "All" selected by default (white text), others gray
+  - Clicking a tab filters the activity list
+- If no activity: show "No recent activity" centered, gray text
+- If activity exists, show list:
+  - Each row: timestamp | action description | amount | tx link (clickable, opens explorer)
+  - Actions: "Swapped 0.00046128 ETH → USDC", "Added liquidity to ETH/USDC", "Created ETH/USDC pool"
+  - Tx link: chain-specific explorer URL
+
+### Styling Rules (MUST MATCH SCREENSHOT EXACTLY)
+- Page background: `#0a0e17` (very dark navy/black)
+- Card backgrounds: `#111827` (dark gray-blue)
+- Card borders: `#1f2937` (subtle)
+- Border radius: `12px` or `0.75rem` on all cards
+- Text colors: white (`#ffffff`) for primary, gray (`#9ca3af`) for secondary, teal (`#14b8a6`) for accent/PnL positive
+- Font: system font, monospace for numbers
+- Inner metric cards have slightly darker background than the parent card
+- Net PnL card has distinct teal-tinted background
+- Chain badge: small pill with colored dot + chain name
+- Spacing: consistent padding `24px` inside cards, `16px` gap between cards
+
+### Data Sources (ALL must be live on-chain reads)
+- ETH balance: wagmi `useBalance({ address, chainId })`
+- ERC20 balances: wagmi `useReadContract` with ERC20 `balanceOf` ABI, per token, per chain
+- Token prices: hardcoded for testnet (ETH=$2000, USDC=$1, EURC=$1.06, cbBTC=$50000)
+- LP positions: read from PoolManager events or backend database tracking
+- Activity: read from backend database (stored when transactions complete)
+- Total Value = sum of all (token_balance × token_price)
+- % of Portfolio = (token_usd_value / total_value) × 100
+
+### Critical Rules
+1. NEVER show $0.00 for Total Value if the wallet has tokens — this means the balance read failed, debug it
+2. NEVER show $NaN anywhere — add `|| 0` guards on all parseFloat calls
+3. All data must update when chain switches (Base Sepolia ↔ Unichain Sepolia)
+4. The portfolio must work in both dark mode and light mode (invert colors appropriately)
+5. "X" close button must work — returns to previous view
+6. Chain badge must show the CURRENT connected chain, not hardcoded
+
+## TESTING CHECKLIST
+
+Before marking ANY section complete, verify:
+
+### Wallet & Chain
+- [ ] Wallet connects via Reown → MetaMask
+- [ ] Defaults to Base Sepolia
+- [ ] Chain switching works bi-directionally (wallet ↔ app)
+- [ ] Token balances show correctly on both chains
+- [ ] Portfolio shows real USD values, no $NaN
+
+### Pools
+- [ ] ETH/USDC pool created on Unichain Sepolia with tx link
+- [ ] ETH/USDC pool created on Base Sepolia with tx link
+- [ ] USDC/EURC pool created on Base Sepolia with tx link
+- [ ] USDC/EURC + Stable Protection Hook pool created with tx link
+- [ ] cbBTC/USDC pool created on Base Sepolia with tx link
+- [ ] Pools display on correct chain only
+- [ ] Stale pools (screenshot) removed
+- [ ] Stable Protection Hook pool shows zone/fee UI
+
+### Swaps
+- [ ] ETH → USDC swap on Unichain Sepolia with tx link
+- [ ] ETH → USDC swap on Base Sepolia with tx link
+- [ ] USDC → EURC swap through Stable Protection Hook with tx link
+- [ ] Swap triggers hook callbacks (visible in tx logs)
+
+### Chat
+- [ ] Recent chats show action descriptions, not "New chat"
+
+### Agent
+- [ ] Create wallet works with explorer link
+- [ ] Send tokens works with explorer link
+- [ ] Swap tokens works with explorer link
+- [ ] Add liquidity works with explorer link
+- [ ] Query on-chain data returns results
+- [ ] Autonomous mode runs and produces results
+
+
+### Portfolio Page
+- [ ] Total portfolio value shows real USD amount, never $NaN
+- [ ] Account breakdown card shows Spot + LP equity
+- [ ] Account value chart renders (even if flat line for new wallets)
+- [ ] Fee card shows swap fees for current chain
+- [ ] Balances tab shows all tokens with correct amounts
+- [ ] Available Balance = Total - LP locked amount
+- [ ] LP Positions tab shows pools where user has liquidity
+- [ ] Stable Protection Hook pools show zone badge
+- [ ] Swap History tab shows past swaps with tx links
+- [ ] Pool History tab shows liquidity events with tx links
+- [ ] "Hide Small Balances" toggle works
+- [ ] Data updates when switching chains
+- [ ] Dark mode and light mode both render correctly
+
+### Explorer Links
+- [ ] Every Unichain Sepolia tx links to `https://sepolia.uniscan.xyz/tx/<hash>`
+- [ ] Every Base Sepolia tx links to `https://sepolia.basescan.org/tx/<hash>`
+- [ ] Links are clickable and open in new tab
+- [ ] Links resolve to valid transactions
+
+---
+
+## EXECUTION ORDER
+
+1. Fix chain switching + token balances (foundation for everything)
+2. Fix portfolio $NaN
+3. Create pools on both chains
+4. Execute swaps on both chains
+5. Fix recent chat labels
+6. Wire up agent mode end-to-end
+7. Add Stable Protection Hook UI to liquidity modal
+8. Remove stale pools
+9. Full regression test of all features

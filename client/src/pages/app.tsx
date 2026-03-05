@@ -245,7 +245,7 @@ const PortfolioSummary = ({ data, theme, currentChain }) => (
           fontWeight: '700',
           fontFamily: 'SF Mono, Monaco, monospace',
         }}>
-          ${data.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          ${(isNaN(data.totalValue) ? 0 : data.totalValue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
       </div>
     </div>
@@ -873,254 +873,117 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
     );
   }
 
+  // Build data objects for PortfolioSummary and AssetsTable
+  const lpValue = positions.reduce((s, p) => s + (parseFloat(p.amount0 || '0') + parseFloat(p.amount1 || '0')), 0);
+  const portfolioData = {
+    totalValue: safeTotal,
+    ethBalance: ethBalanceNum,
+    ethPrice,
+    usdcBalance,
+    lpPositions: positions.length,
+    lpValue,
+    netPnl: 0,
+    netPnlUsd: 0,
+  };
+  const assetsData = tokenRows.map(t => ({
+    ...t,
+    percentage: safeTotal > 0 ? (t.usdValue / safeTotal) * 100 : 0,
+  }));
+
+  const activityAll = txns;
+  const activitySwaps = txns.filter(t => t.type === 'swap');
+  const activityLiquidity = txns.filter(t => t.type === 'add_liquidity' || t.type === 'remove_liquidity');
+  const activityFiltered = activeTab === 'swaps' ? activitySwaps : activeTab === 'liquidity' ? activityLiquidity : activityAll;
+
   return (
     <div style={{ width: '100%', fontFamily: '"DM Sans", sans-serif' }}>
       <div style={{ background: theme.bgSecondary, borderRadius: '16px', border: `1px solid ${theme.border}`, padding: '24px', maxHeight: '90vh', overflowY: 'auto' }}>
 
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: theme.textPrimary }}>Portfolio</h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <button style={{ padding: '8px 16px', borderRadius: '8px', background: 'rgba(20,184,166,0.12)', border: '1px solid rgba(20,184,166,0.25)', color: '#14b8a6', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>Deposit</button>
-            <button style={{ padding: '8px 16px', borderRadius: '8px', background: theme.bgCard, border: `1px solid ${theme.border}`, color: theme.textSecondary, fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>Send</button>
-            <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '8px', color: theme.textSecondary }}><CloseIcon /></button>
-          </div>
+          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: theme.textPrimary }}>User Portfolio</h2>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '8px', color: theme.textSecondary, fontSize: '18px', lineHeight: 1 }}>✕</button>
         </div>
 
-        {/* Top 3 Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+        {/* Portfolio Summary Card */}
+        <PortfolioSummary data={portfolioData} theme={theme} currentChain={currentChain} />
 
-          {/* Card 1: Total Portfolio Value */}
-          <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ fontSize: '12px', color: theme.textMuted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Value</div>
-            <div style={{ fontSize: '32px', fontWeight: '800', color: theme.textPrimary, fontFamily: 'SF Mono, Monaco, monospace', letterSpacing: '-0.02em' }}>
-              {fmtUSD(safeTotal)}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
-              {tokenRows.map(t => t.balance > 0 && (
-                <div key={t.symbol} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <TokenIcon token={t.symbol} size={18} />
-                  <span style={{ flex: 1, fontSize: '12px', color: theme.textSecondary }}>{fmtBal(t.balance, t.symbol)} {t.symbol}</span>
-                  <span style={{ fontSize: '12px', color: theme.textMuted, fontFamily: 'monospace' }}>{fmtUSD(t.usdValue)}</span>
-                </div>
-              ))}
-            </div>
-            <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: `1px solid ${theme.border}` }}>
-              <div style={{ fontSize: '11px', color: theme.textMuted }}>Fees (Swap)</div>
-              <div style={{ fontSize: '12px', color: theme.textSecondary, marginTop: '2px' }}>
-                Taker 0.05% / 0.30% · <span style={{ color: '#14b8a6', cursor: 'pointer' }}>Dynamic (Hook pools)</span>
-              </div>
-            </div>
+        {/* Assets Section */}
+        <AssetsTable assets={assetsData} theme={theme} />
+
+        {/* Liquidity Positions Section */}
+        <div style={{ background: theme.bgCard, borderRadius: '12px', border: `1px solid ${theme.border}`, marginBottom: '24px', overflow: 'hidden' }}>
+          <div style={{ padding: '20px 24px', borderBottom: `1px solid ${theme.border}` }}>
+            <h3 style={{ color: theme.textPrimary, fontSize: '16px', fontWeight: '700', margin: 0 }}>Liquidity Positions</h3>
           </div>
-
-          {/* Card 2: Account Breakdown */}
-          <div style={{ ...cardStyle }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div style={{ fontSize: '13px', fontWeight: '600', color: theme.textPrimary }}>Spot + LP</div>
-              <div style={{ fontSize: '11px', color: theme.textMuted, background: theme.bgSecondary, padding: '3px 8px', borderRadius: '6px', border: `1px solid ${theme.border}` }}>30D</div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {[
-                { label: 'PNL', value: fmtUSD(0), color: theme.textSecondary },
-                { label: 'Volume', value: fmtUSD(0), color: theme.textSecondary },
-                { label: 'Total Equity', value: fmtUSD(safeTotal), color: theme.textPrimary },
-                { label: 'LP Equity', value: fmtUSD(positions.reduce((s, p) => s + (parseFloat(p.amount0 || '0') + parseFloat(p.amount1 || '0')), 0)), color: theme.textSecondary },
-                { label: 'Spot Equity', value: fmtUSD(safeTotal), color: theme.textSecondary },
-              ].map(row => (
-                <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '13px', color: theme.textSecondary }}>{row.label}</span>
-                  <span style={{ fontSize: '13px', fontWeight: '600', color: row.color, fontFamily: 'SF Mono, monospace' }}>{row.value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Card 3: Account Value Chart */}
-          <div style={{ ...cardStyle }}>
-            <div style={{ fontSize: '13px', fontWeight: '600', color: theme.textPrimary, marginBottom: '4px' }}>Account Value</div>
-            <div style={{ fontSize: '11px', color: theme.textMuted, marginBottom: '16px' }}>PNL: <span style={{ color: theme.textSecondary }}>$0.00</span></div>
-            <div style={{ position: 'relative', height: `${chartH}px`, overflow: 'hidden' }}>
-              <svg width="100%" height={chartH} viewBox={`0 0 ${chartW} ${chartH}`} preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="portfolioGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor="#14b8a6" stopOpacity="0.3"/>
-                    <stop offset="100%" stopColor="#14b8a6" stopOpacity="0"/>
-                  </linearGradient>
-                </defs>
-                <polygon points={`0,${chartH} ${svgPoints} ${chartW},${chartH}`} fill="url(#portfolioGrad)"/>
-                <polyline points={svgPoints} fill="none" stroke="#14b8a6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
-              <span style={{ fontSize: '11px', color: theme.textMuted }}>30 days ago</span>
-              <span style={{ fontSize: '11px', color: theme.textMuted }}>Now</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <div style={{ display: 'flex', gap: '2px', marginBottom: '-1px', overflowX: 'auto' }}>
-          {['balances', 'lp', 'swaps', 'pools', 'deposits'].map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab)} style={tabStyle(tab)}>
-              {{ balances: 'Balances', lp: 'LP Positions', swaps: 'Swap History', pools: 'Pool History', deposits: 'Deposits' }[tab]}
-            </button>
-          ))}
-        </div>
-
-        {/* Tab Content */}
-        <div style={{ ...cardStyle, borderRadius: '0 12px 12px 12px', minHeight: '200px' }}>
-
-          {/* Balances Tab */}
-          {activeTab === 'balances' && (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: theme.textSecondary, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={hideSmall} onChange={e => setHideSmall(e.target.checked)} style={{ accentColor: '#14b8a6' }} />
-                  Hide Small Balances (&lt;$1)
-                </label>
-              </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    {['Coin', 'Total Balance', 'Available', 'USD Value', 'Pool Share', 'Action'].map(h => (
-                      <th key={h} style={{ padding: '8px 12px', textAlign: h === 'Coin' ? 'left' : 'right', fontSize: '11px', fontWeight: '600', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${theme.border}` }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {tokenRows.length === 0 ? (
-                    <tr><td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: theme.textMuted, fontSize: '13px' }}>No balances yet</td></tr>
-                  ) : tokenRows.map(t => (
-                    <tr key={t.symbol} style={{ borderBottom: `1px solid ${theme.border}` }}>
-                      <td style={{ padding: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <TokenIcon token={t.symbol} size={28} />
-                        <div>
-                          <div style={{ fontSize: '13px', fontWeight: '600', color: theme.textPrimary }}>{t.symbol}</div>
-                          <div style={{ fontSize: '11px', color: theme.textMuted }}>{t.name}</div>
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px', textAlign: 'right', fontSize: '13px', color: theme.textPrimary, fontFamily: 'monospace' }}>{fmtBal(t.balance, t.symbol)}</td>
-                      <td style={{ padding: '12px', textAlign: 'right', fontSize: '13px', color: theme.textSecondary, fontFamily: 'monospace' }}>{fmtBal(t.balance, t.symbol)}</td>
-                      <td style={{ padding: '12px', textAlign: 'right', fontSize: '13px', color: theme.textPrimary, fontFamily: 'monospace' }}>{fmtUSD(t.usdValue)}</td>
-                      <td style={{ padding: '12px', textAlign: 'right', fontSize: '13px', color: theme.textMuted }}>—</td>
-                      <td style={{ padding: '12px', textAlign: 'right' }}>
-                        <button style={{ padding: '4px 12px', borderRadius: '6px', background: 'rgba(20,184,166,0.1)', border: '1px solid rgba(20,184,166,0.25)', color: '#14b8a6', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Swap</button>
-                      </td>
-                    </tr>
+          {positions.length === 0 ? (
+            <div style={{ padding: '40px', textAlign: 'center', color: theme.textMuted, fontSize: '13px' }}>No liquidity positions yet</div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: theme.bgSecondary }}>
+                  {['Pool', 'Hook', 'Liquidity', 'Share', 'Fees Earned', 'Actions'].map(h => (
+                    <th key={h} style={{ padding: '12px 24px', textAlign: h === 'Pool' ? 'left' : 'right', color: theme.textSecondary, fontSize: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{h}</th>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </tr>
+              </thead>
+              <tbody>
+                {positions.map(p => (
+                  <tr key={p.id} style={{ borderBottom: `1px solid ${theme.border}` }}>
+                    <td style={{ padding: '16px 24px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <TokenPairIcon token1={p.token0} token2={p.token1} size={22} />
+                        <span style={{ fontSize: '14px', fontWeight: '600', color: theme.textPrimary }}>{p.token0}/{p.token1}</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: '16px 24px', textAlign: 'right', fontSize: '12px', color: theme.textMuted }}>None</td>
+                    <td style={{ padding: '16px 24px', textAlign: 'right', fontSize: '14px', color: theme.textPrimary, fontFamily: 'monospace' }}>{fmtUSD(parseFloat(p.amount0 || '0') + parseFloat(p.amount1 || '0'))}</td>
+                    <td style={{ padding: '16px 24px', textAlign: 'right', fontSize: '13px', color: theme.textSecondary }}>—</td>
+                    <td style={{ padding: '16px 24px', textAlign: 'right', fontSize: '13px', color: theme.textSecondary }}>$0.00</td>
+                    <td style={{ padding: '16px 24px', textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        <button onClick={() => onRemoveLiquidity?.({ token1: p.token0, token2: p.token1 })} style={{ padding: '4px 10px', borderRadius: '6px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Remove</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
+        </div>
 
-          {/* LP Positions Tab */}
-          {activeTab === 'lp' && (
-            <div>
-              {positions.length === 0 ? (
-                <div style={{ padding: '40px', textAlign: 'center', color: theme.textMuted, fontSize: '13px' }}>No LP positions yet. Add liquidity to get started.</div>
-              ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      {['Pool', 'Hook', 'Liquidity', 'Fee Tier', 'Action'].map(h => (
-                        <th key={h} style={{ padding: '8px 12px', textAlign: h === 'Pool' ? 'left' : 'right', fontSize: '11px', fontWeight: '600', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${theme.border}` }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {positions.map(p => (
-                      <tr key={p.id} style={{ borderBottom: `1px solid ${theme.border}` }}>
-                        <td style={{ padding: '12px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <TokenPairIcon token1={p.token0} token2={p.token1} size={22} />
-                            <span style={{ fontSize: '13px', fontWeight: '600', color: theme.textPrimary }}>{p.token0}/{p.token1}</span>
-                          </div>
-                        </td>
-                        <td style={{ padding: '12px', textAlign: 'right', fontSize: '12px', color: theme.textMuted }}>None</td>
-                        <td style={{ padding: '12px', textAlign: 'right', fontSize: '13px', color: theme.textPrimary, fontFamily: 'monospace' }}>{fmtUSD(parseFloat(p.amount0 || '0') + parseFloat(p.amount1 || '0'))}</td>
-                        <td style={{ padding: '12px', textAlign: 'right', fontSize: '12px', color: theme.textMuted }}>{(p.fee_tier / 10000).toFixed(2)}%</td>
-                        <td style={{ padding: '12px', textAlign: 'right' }}>
-                          <button onClick={() => onRemoveLiquidity?.({ token1: p.token0, token2: p.token1 })} style={{ padding: '4px 10px', borderRadius: '6px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Remove</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+        {/* Activity Section */}
+        <div style={{ background: theme.bgCard, borderRadius: '12px', border: `1px solid ${theme.border}`, overflow: 'hidden' }}>
+          <div style={{ padding: '20px 24px', borderBottom: `1px solid ${theme.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ color: theme.textPrimary, fontSize: '16px', fontWeight: '700', margin: 0 }}>Activity</h3>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              {[['all', 'All'], ['swaps', 'Swaps'], ['liquidity', 'Liquidity']].map(([tab, label]) => (
+                <button key={tab} onClick={() => setActiveTab(tab)} style={{ padding: '4px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', background: activeTab === tab ? theme.textPrimary : 'transparent', color: activeTab === tab ? theme.bgPrimary : theme.textSecondary, border: 'none' }}>{label}</button>
+              ))}
             </div>
-          )}
-
-          {/* Swap History Tab */}
-          {activeTab === 'swaps' && (
-            <div>
-              {txns.filter(t => t.type === 'swap').length === 0 ? (
-                <div style={{ padding: '40px', textAlign: 'center', color: theme.textMuted, fontSize: '13px' }}>No swap history yet.</div>
-              ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      {['Time', 'Pair', 'Amount In', 'Amount Out', 'Tx'].map(h => (
-                        <th key={h} style={{ padding: '8px 12px', textAlign: h === 'Time' || h === 'Pair' ? 'left' : 'right', fontSize: '11px', fontWeight: '600', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${theme.border}` }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {txns.filter(t => t.type === 'swap').map((t, i) => (
-                      <tr key={i} style={{ borderBottom: `1px solid ${theme.border}` }}>
-                        <td style={{ padding: '12px', fontSize: '12px', color: theme.textMuted }}>{fmtTime(t.timestamp)}</td>
-                        <td style={{ padding: '12px', fontSize: '13px', color: theme.textPrimary }}>{t.token_in} → {t.token_out}</td>
-                        <td style={{ padding: '12px', textAlign: 'right', fontSize: '13px', color: theme.textSecondary, fontFamily: 'monospace' }}>{t.amount_in ? parseFloat(t.amount_in).toFixed(6) : '—'}</td>
-                        <td style={{ padding: '12px', textAlign: 'right', fontSize: '13px', color: theme.textSecondary, fontFamily: 'monospace' }}>{t.amount_out ? parseFloat(t.amount_out).toFixed(6) : '—'}</td>
-                        <td style={{ padding: '12px', textAlign: 'right' }}>
-                          <a href={t.base_scan_url} target="_blank" rel="noopener noreferrer" style={{ color: '#14b8a6', fontSize: '12px', textDecoration: 'none' }}>Tx →</a>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          )}
-
-          {/* Pool History Tab */}
-          {activeTab === 'pools' && (
-            <div>
-              {txns.filter(t => t.type === 'add_liquidity' || t.type === 'remove_liquidity').length === 0 ? (
-                <div style={{ padding: '40px', textAlign: 'center', color: theme.textMuted, fontSize: '13px' }}>No pool history yet.</div>
-              ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      {['Time', 'Action', 'Pool', 'Amount', 'Tx'].map(h => (
-                        <th key={h} style={{ padding: '8px 12px', textAlign: h === 'Time' || h === 'Action' ? 'left' : 'right', fontSize: '11px', fontWeight: '600', color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${theme.border}` }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {txns.filter(t => t.type === 'add_liquidity' || t.type === 'remove_liquidity').map((t, i) => (
-                      <tr key={i} style={{ borderBottom: `1px solid ${theme.border}` }}>
-                        <td style={{ padding: '12px', fontSize: '12px', color: theme.textMuted }}>{fmtTime(t.timestamp)}</td>
-                        <td style={{ padding: '12px', fontSize: '13px', color: t.type === 'add_liquidity' ? '#10b981' : '#ef4444' }}>{t.type === 'add_liquidity' ? 'Added' : 'Removed'}</td>
-                        <td style={{ padding: '12px', textAlign: 'right', fontSize: '13px', color: theme.textPrimary }}>{t.token_in}/{t.token_out}</td>
-                        <td style={{ padding: '12px', textAlign: 'right', fontSize: '13px', color: theme.textSecondary, fontFamily: 'monospace' }}>{t.amount_in || '—'}</td>
-                        <td style={{ padding: '12px', textAlign: 'right' }}>
-                          <a href={t.base_scan_url} target="_blank" rel="noopener noreferrer" style={{ color: '#14b8a6', fontSize: '12px', textDecoration: 'none' }}>Tx →</a>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          )}
-
-          {/* Deposits Tab */}
-          {activeTab === 'deposits' && (
-            <div style={{ padding: '40px', textAlign: 'center', color: theme.textMuted, fontSize: '13px' }}>
-              Deposit & withdrawal history will appear here once transactions are recorded.
+          </div>
+          {activityFiltered.length === 0 ? (
+            <div style={{ padding: '40px', textAlign: 'center', color: theme.textMuted, fontSize: '13px' }}>No recent activity</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {activityFiltered.map((t, i) => (
+                <div key={i} style={{ padding: '14px 24px', borderBottom: `1px solid ${theme.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '12px', color: theme.textMuted, whiteSpace: 'nowrap' }}>{fmtTime(t.timestamp)}</span>
+                    <span style={{ fontSize: '13px', color: theme.textPrimary }}>
+                      {t.type === 'swap' ? `Swapped ${t.amount_in ? parseFloat(t.amount_in).toFixed(6) : ''} ${t.token_in} → ${t.token_out}`
+                        : t.type === 'add_liquidity' ? `Added liquidity to ${t.token_in}/${t.token_out}`
+                        : t.type === 'remove_liquidity' ? `Removed liquidity from ${t.token_in}/${t.token_out}`
+                        : t.type}
+                    </span>
+                  </div>
+                  <a href={t.base_scan_url} target="_blank" rel="noopener noreferrer" style={{ color: '#14b8a6', fontSize: '12px', textDecoration: 'none', whiteSpace: 'nowrap' }}>View Tx →</a>
+                </div>
+              ))}
             </div>
           )}
         </div>
+
       </div>
     </div>
   );
@@ -4507,6 +4370,7 @@ export default function MantuaApp() {
                         mode={addLiquidityMode}
                         initialTokenA={liquidityInitialTokens?.tokenA}
                         initialTokenB={liquidityInitialTokens?.tokenB}
+                        onActionComplete={async (title) => { await updateSessionTitle(title); loadRecentChats(); }}
                       />
                     </div>
                   )}
