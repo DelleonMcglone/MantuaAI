@@ -33,7 +33,7 @@ import { useSwapExecution, getExplorerLink } from '../hooks/useSwapExecution';
 import { useTokenBalances } from '../hooks/useTokenBalances';
 import { PriceImpact, SwapButton, SwapButtonStyles, SwapConfirmation, SwapPriceChart } from '../components/swap';
 import { parseTokenAmount, formatTokenAmount, isNativeEth, getZeroAddress, getHookAddress } from '../lib/swap-utils';
-import { ALL_TOKENS, NATIVE_ETH, getTokenBySymbol, getTokensForChain } from '../config/tokens';
+import { ALL_TOKENS, ALL_CHAIN_TOKENS, NATIVE_ETH, getTokenBySymbol, getTokensForChain } from '../config/tokens';
 import { calculateUsdValue as calcUsdValue, getPriceBySymbol } from '../services/priceService';
 import { useLivePriceUSD, useLivePairRate } from '../hooks/useLivePriceUSD';
 import {
@@ -85,7 +85,8 @@ import {
 
 // Token icon component — uses logoURI from token config with character fallback
 const TokenIcon = ({ token, size = 32 }) => {
-  const tokenData = ALL_TOKENS.find(t => t.symbol === token);
+  // Search across all supported chains for logo data (display only)
+  const tokenData = ALL_CHAIN_TOKENS.find(t => t.symbol === token);
   const logoURI = tokenData?.logoURI ?? null;
 
   const getTokenColor = (t: string) => {
@@ -1852,14 +1853,16 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
   const [fromAmount, setFromAmount] = useState(swapDetails?.fromAmount || "");
   const [toAmount, setToAmount] = useState(swapDetails?.toAmount || "");
 
-  // Find token data from ALL_TOKENS
+  // Chain-aware token lookup — must use the correct contract addresses for the connected chain
+  const chainTokens = useMemo(() => getTokensForChain(currentChainId), [currentChainId]);
+
   const fromTokenData = useMemo(() => {
-    return ALL_TOKENS.find(t => t.symbol === fromToken) || NATIVE_ETH;
-  }, [fromToken]);
+    return chainTokens.find(t => t.symbol === fromToken) || chainTokens[0];
+  }, [fromToken, chainTokens]);
 
   const toTokenData = useMemo(() => {
-    return ALL_TOKENS.find(t => t.symbol === toToken) || ALL_TOKENS[1];
-  }, [toToken]);
+    return chainTokens.find(t => t.symbol === toToken) || chainTokens[1] || chainTokens[0];
+  }, [toToken, chainTokens]);
 
   // Parse amount for hooks
   const parsedAmount = useMemo(() => {

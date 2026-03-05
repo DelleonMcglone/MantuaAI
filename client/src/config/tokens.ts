@@ -123,6 +123,15 @@ export const ERC20_TOKENS: Token[] = BASE_SEPOLIA_ERC20_TOKENS;
 
 export const SUPPORTED_TOKENS: Token[] = [NATIVE_ETH, ...BASE_SEPOLIA_ERC20_TOKENS];
 
+// All tokens across all supported chains — used for icon lookups and display only.
+// For actual contract interactions, always use getTokensForChain(chainId).
+export const ALL_CHAIN_TOKENS: Token[] = [
+  NATIVE_ETH,
+  ...BASE_SEPOLIA_ERC20_TOKENS,
+  UNICHAIN_SEPOLIA_NATIVE_ETH,
+  ...UNICHAIN_SEPOLIA_ERC20_TOKENS,
+];
+
 // Legacy aliases — kept for backward compatibility
 export const MOCK_TOKENS: Token[] = SUPPORTED_TOKENS;
 export const ALL_TOKENS: Token[] = SUPPORTED_TOKENS;
