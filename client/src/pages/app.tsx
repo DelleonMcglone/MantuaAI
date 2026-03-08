@@ -4088,7 +4088,6 @@ export default function MantuaApp() {
        resetModals();
        setAnalyticsMessages([]);
        setHasInteracted(false);
-       setInputValue('');
        startNewSession();
        return;
     }
@@ -4219,7 +4218,6 @@ export default function MantuaApp() {
               setShowAddLiquidityModal(false);
               setHasInteracted(false);
               setAnalyticsMessages([]);
-              setInputValue('');
               startNewSession();
             }}
             style={{
