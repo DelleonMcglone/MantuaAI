@@ -31,6 +31,7 @@ export interface UseChatReturn {
   isSending: boolean;
   sendMessage: (text: string) => Promise<void>;
   updateSessionTitle: (title: string) => Promise<void>;
+  startNewSession: () => Promise<void>;
   sessionId: string | null;
   userId: string;
 }
@@ -209,5 +210,23 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
     []
   );
 
-  return { messages, isLoading, isSending, sendMessage, updateSessionTitle, sessionId, userId };
+  const startNewSession = useCallback(async (): Promise<void> => {
+    try {
+      const res = await fetch("/api/chat/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, title: "New Chat" }),
+      });
+      if (!res.ok) throw new Error("Failed to create session");
+      const data: CreateSessionResponse = await res.json();
+      setSessionId(data.session.id);
+      sessionIdRef.current = data.session.id;
+      titleSetRef.current = false;
+      setMessages([]);
+    } catch (err) {
+      console.error("[useChat] startNewSession error:", err);
+    }
+  }, [userId]);
+
+  return { messages, isLoading, isSending, sendMessage, updateSessionTitle, startNewSession, sessionId, userId };
 }

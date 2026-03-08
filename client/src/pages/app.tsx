@@ -3868,7 +3868,7 @@ export default function MantuaApp() {
   const [voiceParsedCommand, setVoiceParsedCommand] = useState(null);
   const isVoiceSubmitRef = useRef(false);
   // Persistent chat state from useChat hook — pass chainId for context-aware AI responses
-  const { messages: chatMessages, sendMessage, updateSessionTitle, isSending, isLoading: chatIsLoading, userId: chatUserId } = useChat({ chainId: currentChainId });
+  const { messages: chatMessages, sendMessage, updateSessionTitle, startNewSession, isSending, isLoading: chatIsLoading, userId: chatUserId } = useChat({ chainId: currentChainId });
   const [analyticsMessages, setAnalyticsMessages] = useState<any[]>([]);
   const allMessages = useMemo(() => {
     const combined = [...chatMessages, ...analyticsMessages];
@@ -4087,9 +4087,9 @@ export default function MantuaApp() {
     if (command.type === 'newChat') {
        resetModals();
        setAnalyticsMessages([]);
-       setCurrentSessionId(null);
        setHasInteracted(false);
        setInputValue('');
+       startNewSession();
        return;
     }
 
@@ -4210,6 +4210,7 @@ export default function MantuaApp() {
         <div style={{ padding: '16px', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           {/* New Chat */}
           <button
+            data-testid="button-new-chat"
             onClick={() => {
               setShowSwap(false);
               setShowLiquidity(false);
@@ -4217,6 +4218,9 @@ export default function MantuaApp() {
               setShowPortfolioModal(false);
               setShowAddLiquidityModal(false);
               setHasInteracted(false);
+              setAnalyticsMessages([]);
+              setInputValue('');
+              startNewSession();
             }}
             style={{
               display: 'flex',
