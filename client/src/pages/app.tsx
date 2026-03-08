@@ -3299,104 +3299,139 @@ const AgentFaucetPanel = ({ theme, isDark }) => {
 };
 
 // ─── Agent v2: Autonomous Mode ────────────────────────────────────────────────
+// Helper: render agent text with clickable BaseScan / Uniscan tx links
+const renderAgentText = (text: string) => {
+  const urlPattern = /(https:\/\/sepolia\.(basescan\.org|uniscan\.xyz)\/tx\/0x[a-fA-F0-9]+)/g;
+  const parts = text.split(urlPattern);
+  if (parts.length === 1) return <>{text}</>;
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (/^https:\/\/sepolia\.(basescan\.org|uniscan\.xyz)\/tx\/0x[a-fA-F0-9]+$/.test(part)) {
+          return (
+            <a key={i} href={part} target="_blank" rel="noopener noreferrer"
+              style={{ color: '#10b981', textDecoration: 'underline', wordBreak: 'break-all' }}>
+              {part}
+            </a>
+          );
+        }
+        return <React.Fragment key={i}>{part}</React.Fragment>;
+      })}
+    </>
+  );
+};
+
+// ─── Shared chat thread for Chat Mode action cards ────────────────────────────
+const CHAT_ACTION_STARTERS: Record<string, { message: string; action: string }> = {
+  'wallet':    { action: 'create-wallet', message: 'Get my wallet details including address, network, and ETH balance. Show the BaseScan link.' },
+  'faucet':    { action: 'get-funds',     message: 'Request testnet ETH from the faucet for my wallet. Show the transaction hash and BaseScan link.' },
+  'swap':      { action: 'swap',          message: 'I want to swap tokens. Ask me which tokens and how much.' },
+  'transfer':  { action: 'send',          message: 'I want to send tokens. Ask me the recipient address, token, and amount.' },
+  'liquidity': { action: 'create-pool',   message: 'Create a USDC/EURC pool with the Stable Protection Hook on Unichain Sepolia.' },
+  'query':     { action: 'query',         message: "I want to query on-chain data. Ask me what I'd like to know." },
+};
+
+const AgentChatThreadPanel = ({ theme, isDark, actionId }) => {
+  const [messages, setMessages] = useState<Array<{role:'agent'|'user';text:string}>>([]);
+  const [input, setInput] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const hasStarted = useRef(false);
+
+  const sendMessage = async (text: string, action?: string) => {
+    if (!text.trim()) return;
+    setMessages(prev => [...prev, { role: 'user', text }]);
+    setInput('');
+    setIsSending(true);
+    try {
+      const res = await fetch('/api/agent/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, action }),
+      });
+      const data = await res.json();
+      const responseText = data.response ?? data.error ?? 'No response from agent.';
+      setMessages(prev => [...prev, { role: 'agent', text: responseText }]);
+    } catch {
+      setMessages(prev => [...prev, { role: 'agent', text: '❌ Request failed. Please try again.' }]);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  useEffect(() => {
+    if (hasStarted.current) return;
+    hasStarted.current = true;
+    const starter = CHAT_ACTION_STARTERS[actionId];
+    if (starter) sendMessage(starter.message, starter.action);
+  }, [actionId]);
+
+  return (
+    <div style={{ padding: '20px', background: theme.bgCard, borderRadius: '14px', border: `1px solid ${theme.border}` }}>
+      <div style={{ minHeight: '120px', maxHeight: '280px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+        {messages.map((m, i) => (
+          <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+            <div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: m.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: m.role === 'user' ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'), color: m.role === 'user' ? 'white' : theme.textPrimary, fontSize: '13px', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+              {m.role === 'agent' ? renderAgentText(m.text) : m.text}
+            </div>
+          </div>
+        ))}
+        {isSending && (
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', padding: '10px 14px', borderRadius: '14px 14px 14px 4px', background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', width: 'fit-content' }}>
+            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#8b5cf6', animation: 'pulse 1s infinite' }} />
+            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#8b5cf6', animation: 'pulse 1s 0.2s infinite' }} />
+            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#8b5cf6', animation: 'pulse 1s 0.4s infinite' }} />
+          </div>
+        )}
+        {messages.length === 0 && !isSending && (
+          <div style={{ color: theme.textMuted, fontSize: '13px', padding: '20px', textAlign: 'center' }}>Starting conversation...</div>
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: '10px' }}>
+        <input value={input} onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && !isSending && sendMessage(input)}
+          placeholder="Follow up..."
+          style={{ flex: 1, padding: '10px 14px', background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)', border: `1px solid ${theme.border}`, borderRadius: '10px', color: theme.textPrimary, fontSize: '13px', outline: 'none' }} />
+        <button onClick={() => sendMessage(input)} disabled={!input.trim() || isSending}
+          style={{ padding: '10px 18px', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', border: 'none', borderRadius: '10px', color: 'white', fontSize: '13px', fontWeight: '600', cursor: (!input.trim() || isSending) ? 'not-allowed' : 'pointer', opacity: (!input.trim() || isSending) ? 0.6 : 1 }}>
+          Send
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ─── Agent v2: Autonomous Mode ────────────────────────────────────────────────
 const AgentAutonomousPanel = ({ theme, isDark, onNavigate }) => {
-  const { address } = useAccount();
   const [instruction, setInstruction] = useState('');
   const [isExecuting, setIsExecuting] = useState(false);
-  const [messages, setMessages] = useState<Array<{role:'agent'|'user';text:string;txHash?:string}>>([]);
-
-  const [duneTableData, setDuneTableData] = useState<any>(null);
+  const [messages, setMessages] = useState<Array<{role:'agent'|'user';text:string}>>([]);
 
   const suggestions = [
-    'Swap 0.001 ETH for USDC',
-    'What is the current ETH price?',
+    'Create a wallet for me',
     'Get me testnet ETH',
-    'NFT marketplace rankings',
-    'Show DEX volume overview',
+    'Swap 0.00001 ETH for USDC',
+    'What is the current ETH price?',
+    'Show my wallet balance',
+    'Create a pool with the Stable Protection Hook',
   ];
-
-  const isOnChainQuery = (text: string) => {
-    const lower = text.toLowerCase();
-    return lower.includes('dune') || lower.includes('on-chain') || lower.includes('tvl') ||
-      lower.includes('nft') || lower.includes('volume') || lower.includes('analytics') ||
-      lower.includes('uniswap v4') || lower.includes('defi') || lower.includes('gas fee') ||
-      lower.includes('gas trend') || lower.includes('marketplace') || lower.includes('protocol') ||
-      lower.includes('dex') || lower.includes('opensea') || lower.includes('blur');
-  };
 
   const execute = async (cmd?: string) => {
     const text = cmd ?? instruction;
     if (!text.trim()) return;
-    const userMsg = { role: 'user' as const, text };
-    setMessages(prev => [...prev, userMsg]);
+    setMessages(prev => [...prev, { role: 'user', text }]);
     setInstruction('');
     setIsExecuting(true);
-    setDuneTableData(null);
-
-    const lower = text.toLowerCase();
     try {
-      if (isOnChainQuery(text)) {
-        // Route on-chain analytics queries to /api/dune/query
-        setMessages(prev => [...prev, { role: 'agent', text: '🟡 Querying Dune Analytics for on-chain data...' }]);
-        const res = await fetch('/api/dune/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text }) });
-        const json = await res.json();
-        if (json.success && json.data?.rows?.length > 0) {
-          setDuneTableData(json.data);
-          setMessages(prev => [...prev, { role: 'agent', text: `📊 Retrieved ${json.data.rowCount} rows for: ${json.data.label}\nView on Dune: ${json.data.duneUrl}` }]);
-        } else if (json.success && json.data?.rows?.length === 0) {
-          setMessages(prev => [...prev, { role: 'agent', text: `📊 Query matched (${json.data?.label}) but returned no rows yet — Dune may still be indexing. Try again in a moment.\nView on Dune: ${json.data?.duneUrl}` }]);
-        } else {
-          // No match — show available topics as suggestions
-          const suggestions = json.suggestions?.map((s: {name: string; id: number}) => `• ${s.name} (queryId: ${s.id})`).join('\n') ?? '';
-          const msg = json.message ?? 'Could not match query to known Dune data.';
-          setMessages(prev => [...prev, { role: 'agent', text: `🟡 ${msg}\n\nAvailable topics:\n${suggestions || '• DEX Volume\n• NFT Marketplace Rankings\n• Uniswap v4 Base Activity\n• ETH Gas Analytics'}` }]);
-        }
-      } else if (lower.includes('price') || lower.includes('worth')) {
-        const res = await fetch('/api/agent/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: text, walletAddress: address }) });
-        const data = await res.json();
-        setMessages(prev => [...prev, { role: 'agent', text: `📊 ${JSON.stringify(data.data ?? data, null, 2)}` }]);
-      } else if (lower.includes('create wallet') || lower.includes('make wallet')) {
-        if (!address) { setMessages(prev => [...prev, { role: 'agent', text: '⚠️ Connect your wallet first to create an agent wallet.' }]); return; }
-        const res = await fetch('/api/agent/wallet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: address }) });
-        const data = await res.json();
-        setMessages(prev => [...prev, { role: 'agent', text: `✅ Agent wallet created!\nAddress: ${data.address}\n\n${data.explorerUrl ? `View on Explorer: ${data.explorerUrl}` : ''}` }]);
-      } else if (lower.includes('faucet') || lower.includes('testnet eth') || lower.includes('get me eth') || lower.includes('get testnet')) {
-        if (!address) {
-          setMessages(prev => [...prev, { role: 'agent', text: '⚠️ Connect your wallet first so I know where to send testnet funds.' }]);
-        } else {
-          setMessages(prev => [...prev, { role: 'agent', text: `🚰 Requesting testnet ETH for ${address.slice(0, 8)}...${address.slice(-6)}` }]);
-          try {
-            const res = await fetch('/api/agent/faucet', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ address, tokens: ['eth'] }),
-            });
-            const data = await res.json();
-            const r = data.results?.[0];
-            if (r?.success) {
-              setMessages(prev => [...prev, { role: 'agent', text: `✅ ETH sent!\nTx: ${r.txHash}\n${r.explorerUrl ? `View: ${r.explorerUrl}` : ''}` }]);
-            } else {
-              const hint = r?.error ?? 'Faucet unavailable.';
-              setMessages(prev => [...prev, { role: 'agent', text: `🟡 ${hint}` }]);
-            }
-          } catch {
-            setMessages(prev => [...prev, { role: 'agent', text: '❌ Faucet request failed. Visit https://portal.cdp.coinbase.com/products/faucet to claim tokens manually.' }]);
-          }
-        }
-      } else if (lower.includes('swap')) {
-        setMessages(prev => [...prev, { role: 'agent', text: '🔄 Opening swap interface...' }]);
-        setTimeout(() => onNavigate('swap'), 1000);
-      } else if (lower.includes('liquidity') || lower.includes('pool')) {
-        setMessages(prev => [...prev, { role: 'agent', text: '💧 Opening liquidity interface...' }]);
-        setTimeout(() => onNavigate('liquidity'), 1000);
-      } else {
-        // Generic query — try local first
-        const res = await fetch('/api/agent/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: text, walletAddress: address }) });
-        const data = await res.json();
-        setMessages(prev => [...prev, { role: 'agent', text: `📋 ${JSON.stringify(data.data ?? data, null, 2)}` }]);
-      }
+      const res = await fetch('/api/agent/autonomous', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text }),
+      });
+      const data = await res.json();
+      const responseText = data.response ?? data.error ?? 'No response from agent.';
+      setMessages(prev => [...prev, { role: 'agent', text: responseText }]);
     } catch {
-      setMessages(prev => [...prev, { role: 'agent', text: '❌ Action failed. Please try again or use the action cards below.' }]);
+      setMessages(prev => [...prev, { role: 'agent', text: '❌ Agent request failed. Please try again.' }]);
     } finally {
       setIsExecuting(false);
     }
@@ -3408,7 +3443,7 @@ const AgentAutonomousPanel = ({ theme, isDark, onNavigate }) => {
         <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🤖</div>
         <div>
           <div style={{ color: theme.textPrimary, fontWeight: '700', fontSize: '16px' }}>Autonomous Mode</div>
-          <div style={{ color: theme.textMuted, fontSize: '12px' }}>Tell the agent what to do · Dune on-chain data enabled</div>
+          <div style={{ color: theme.textMuted, fontSize: '12px' }}>Powered by AgentKit · Real on-chain execution</div>
         </div>
       </div>
 
@@ -3417,8 +3452,8 @@ const AgentAutonomousPanel = ({ theme, isDark, onNavigate }) => {
         <div style={{ marginBottom: '16px', maxHeight: '240px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {messages.map((m, i) => (
             <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-              <div style={{ maxWidth: '80%', padding: '10px 14px', borderRadius: m.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: m.role === 'user' ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'), color: m.role === 'user' ? 'white' : theme.textPrimary, fontSize: '13px', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
-                {m.text}
+              <div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: m.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: m.role === 'user' ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'), color: m.role === 'user' ? 'white' : theme.textPrimary, fontSize: '13px', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                {m.role === 'agent' ? renderAgentText(m.text) : m.text}
               </div>
             </div>
           ))}
@@ -3429,13 +3464,6 @@ const AgentAutonomousPanel = ({ theme, isDark, onNavigate }) => {
               <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#8b5cf6', animation: 'pulse 1s 0.4s infinite' }} />
             </div>
           )}
-        </div>
-      )}
-
-      {/* Dune Analytics result table */}
-      {duneTableData && !isExecuting && (
-        <div style={{ marginBottom: '16px' }}>
-          <DuneResultTable data={duneTableData} isDark={isDark} />
         </div>
       )}
 
@@ -3522,33 +3550,10 @@ const AgentBuilderInterface = ({ onClose, theme, isDark, onNavigate }) => {
     );
   }
 
-  // Chat mode: 6 action cards
+  // Chat mode: 6 action cards — each opens a chat thread with a starter message
   const renderPanel = () => {
-    switch (activeAction) {
-      case 'wallet': return <AgentWalletPanel theme={theme} isDark={isDark} address={address} balance={balance} />;
-      case 'transfer': return <AgentTransferPanel theme={theme} isDark={isDark} />;
-      case 'swap': return (
-        <div style={{ padding: '24px', background: theme.bgCard, borderRadius: '14px', border: `1px solid ${theme.border}` }}>
-          <h3 style={{ color: theme.textPrimary, margin: '0 0 12px 0' }}>🔄 Swap Tokens</h3>
-          <p style={{ color: theme.textSecondary, fontSize: '14px', marginBottom: '20px' }}>Execute token swaps via Uniswap v4 on Base Sepolia. Supports ETH, cbBTC, USDC, EURC.</p>
-          <button onClick={() => onNavigate('swap')} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #f59e0b, #d97706)', border: 'none', borderRadius: '8px', color: 'white', fontWeight: '600', cursor: 'pointer' }}>
-            Open Swap Interface →
-          </button>
-        </div>
-      );
-      case 'liquidity': return (
-        <div style={{ padding: '24px', background: theme.bgCard, borderRadius: '14px', border: `1px solid ${theme.border}` }}>
-          <h3 style={{ color: theme.textPrimary, margin: '0 0 12px 0' }}>💧 Liquidity Management</h3>
-          <p style={{ color: theme.textSecondary, fontSize: '14px', marginBottom: '20px' }}>Add or remove liquidity from Uniswap v4 pools. Supports ETH, cbBTC, USDC, EURC pairs.</p>
-          <button onClick={() => onNavigate('liquidity')} style={{ padding: '12px 24px', background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', border: 'none', borderRadius: '8px', color: 'white', fontWeight: '600', cursor: 'pointer' }}>
-            Open Liquidity Interface →
-          </button>
-        </div>
-      );
-      case 'query': return <AgentQueryPanel theme={theme} isDark={isDark} />;
-      case 'faucet': return <AgentFaucetPanel theme={theme} isDark={isDark} />;
-      default: return null;
-    }
+    if (!activeAction) return null;
+    return <AgentChatThreadPanel theme={theme} isDark={isDark} actionId={activeAction} />;
   };
 
   return (

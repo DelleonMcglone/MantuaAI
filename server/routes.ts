@@ -22,6 +22,7 @@ import analyticsQueryRouter from "./routes/analyticsQuery";
 import poolsRouter         from "./routes/pools";
 import portfolioRouter     from "./routes/portfolio";
 import duneRouter          from "./routes/dune";
+import agentKitRouter      from "./routes/agentRoutes";
 
 // ============ VOICE TRANSCRIPTION SETUP ============
 
@@ -92,8 +93,13 @@ export async function registerRoutes(
   // Register new userId-based chat routes first (they fall through for legacy requests)
   registerChatRoutes(app);
 
-  // Register AgentKit routes
+  // Register legacy AgentKit routes (wallet create, faucet, query, etc.)
   registerAgentRoutes(app);
+
+  // Register new AgentKit v2 routes (chat, autonomous, create-pool)
+  // Note: must come AFTER registerAgentRoutes to avoid GET /api/agent/wallet conflict
+  // (legacy: POST /wallet — new: GET /wallet)
+  app.use('/api/agent', agentKitRouter);
 
   // ============ USERS ============
   app.post("/api/users", async (req, res) => {

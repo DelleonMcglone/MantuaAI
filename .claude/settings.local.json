@@ -72,7 +72,11 @@
       "Bash(claude mcp add --scope user --transport http dune https://api.dune.com/mcp/v1 --header \"x-dune-api-key: gKezRWgqcIZKII5VMDZ5ItBb9SoDGy1G\")",
       "Bash(claude mcp list)",
       "WebFetch(domain:docs.dune.com)",
-      "WebFetch(domain:sepolia.uniscan.xyz)"
+      "WebFetch(domain:sepolia.uniscan.xyz)",
+      "Bash(npm info @coinbase/cdp-sdk version)",
+      "Bash(npm info @coinbase/agentkit version)",
+      "Bash(npm info @coinbase/agentkit versions --json)",
+      "Bash(npm info @coinbase/agentkit@0.10.4 exports)"
     ]
   }
 }
