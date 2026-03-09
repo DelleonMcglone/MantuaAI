@@ -21,6 +21,14 @@ const normalizeTokenSymbol = (sym: string): string => {
   return upper;
 };
 
+const extractHookFromMessage = (msg: string): string => {
+  const hookMatch = msg.match(/(?:with|using)\s+(stable\s*protection|limit\s*order|twamm|dynamic\s*fee|no\s*hook)/i);
+  if (hookMatch) return hookMatch[1].trim();
+  return '';
+};
+
+const KNOWN_TOKENS_LOWER = ['eth', 'usdc', 'eurc', 'cbbtc', 'btc', 'wbtc', 'weth', 'usd', 'eur'];
+
 const extractPoolFromMessage = (msg: string) => {
   const poolMatch = msg.match(/([a-zA-Z0-9]+)\/([a-zA-Z0-9]+)/);
   if (poolMatch) {
@@ -30,13 +38,48 @@ const extractPoolFromMessage = (msg: string) => {
       pool: `${tokenA}/${tokenB}`,
       tokenA,
       tokenB,
+      hook: extractHookFromMessage(msg),
     };
   }
+
+  const amountTokenPattern = /\$?\d+\.?\d*\s*([a-zA-Z]+)/g;
+  const amountTokens: string[] = [];
+  let m;
+  while ((m = amountTokenPattern.exec(msg)) !== null) {
+    const sym = m[1].toLowerCase();
+    if (KNOWN_TOKENS_LOWER.includes(sym)) amountTokens.push(normalizeTokenSymbol(m[1]));
+  }
+  if (amountTokens.length >= 2) {
+    return {
+      pool: `${amountTokens[0]}/${amountTokens[1]}`,
+      tokenA: amountTokens[0],
+      tokenB: amountTokens[1],
+      hook: extractHookFromMessage(msg),
+    };
+  }
+
+  const words = msg.replace(/[^a-zA-Z\s]/g, ' ').split(/\s+/);
+  const foundTokens: string[] = [];
+  for (const w of words) {
+    if (KNOWN_TOKENS_LOWER.includes(w.toLowerCase()) && foundTokens.length < 2) {
+      const normalized = normalizeTokenSymbol(w);
+      if (!foundTokens.includes(normalized)) foundTokens.push(normalized);
+    }
+  }
+  if (foundTokens.length >= 2) {
+    return {
+      pool: `${foundTokens[0]}/${foundTokens[1]}`,
+      tokenA: foundTokens[0],
+      tokenB: foundTokens[1],
+      hook: extractHookFromMessage(msg),
+    };
+  }
+
   return null;
 };
 
 const extractSwapParams = (msg: string) => {
-  const match = msg.match(/swap\s+(\d*\.?\d+)?\s*(\w+)?\s*(?:for|to|->|→)?\s*(\w+)?(?:\s+(?:using|with)\s+(.+))?/i);
+  const match = msg.match(/swap\s+(\d*\.?\d+)?\s*(\w+)?\s*(?:for|to|->|→)?\s*(\w+)?(?:\s+(?:using|with|from(?:\s+the)?)\s+(.+?))?(?:\s+pool)?$/i);
   if (match) {
     return {
       fromAmount: match[1] || '',

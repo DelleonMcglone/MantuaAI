@@ -3860,6 +3860,7 @@ export default function MantuaApp() {
   const [selectedPool, setSelectedPool] = useState(null);
   const [addLiquidityMode, setAddLiquidityMode] = useState<'add' | 'create' | 'remove'>('add');
   const [liquidityInitialTokens, setLiquidityInitialTokens] = useState<{tokenA?: string; tokenB?: string} | null>(null);
+  const [liquidityInitialHook, setLiquidityInitialHook] = useState<string>('');
   const [portfolioType, setPortfolioType] = useState('User');
   const [swapDetails, setSwapDetails] = useState(null);
   // Voice command state
@@ -4088,7 +4089,7 @@ export default function MantuaApp() {
        resetModals();
        setAnalyticsMessages([]);
        setHasInteracted(false);
-       startNewSession();
+       startNewSession().then(() => loadRecentChats());
        return;
     }
 
@@ -4099,6 +4100,7 @@ export default function MantuaApp() {
        } else {
          setLiquidityInitialTokens(null);
        }
+       setLiquidityInitialHook(command.params?.hook || '');
        setShowAddLiquidityModal(true);
        sendMessage(inputValue);
        const tokenA = command.params?.tokenA || '';
@@ -4218,7 +4220,7 @@ export default function MantuaApp() {
               setShowAddLiquidityModal(false);
               setHasInteracted(false);
               setAnalyticsMessages([]);
-              startNewSession();
+              startNewSession().then(() => loadRecentChats());
             }}
             style={{
               display: 'flex',
@@ -4494,13 +4496,14 @@ export default function MantuaApp() {
                   {showAddLiquidityModal && !showSwap && !showAgentBuilder && !showLiquidity && (
                     <div style={{ width: '100%', marginTop: 20, marginBottom: 20, display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
                       <AddLiquidityModal
-                        onClose={() => { setShowAddLiquidityModal(false); setSelectedPool(null); setLiquidityInitialTokens(null); }}
+                        onClose={() => { setShowAddLiquidityModal(false); setSelectedPool(null); setLiquidityInitialTokens(null); setLiquidityInitialHook(''); }}
                         theme={theme}
                         isDark={isDark}
                         pool={selectedPool}
                         mode={addLiquidityMode}
                         initialTokenA={liquidityInitialTokens?.tokenA}
                         initialTokenB={liquidityInitialTokens?.tokenB}
+                        initialHook={liquidityInitialHook}
                         onActionComplete={async (title) => { await updateSessionTitle(title); loadRecentChats(); }}
                       />
                     </div>

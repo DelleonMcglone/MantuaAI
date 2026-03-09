@@ -22,6 +22,7 @@ interface AddLiquidityModalProps {
   mode?: 'add' | 'create' | 'remove';
   initialTokenA?: string;
   initialTokenB?: string;
+  initialHook?: string;
   onActionComplete?: (title: string) => void;
 }
 
@@ -79,7 +80,7 @@ const PairTokenIcon = ({ token, size = 36 }: { token: Token | null; size?: numbe
 };
 
 const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
-  onClose, theme, isDark, pool, mode = 'add', initialTokenA, initialTokenB, onActionComplete,
+  onClose, theme, isDark, pool, mode = 'add', initialTokenA, initialTokenB, initialHook, onActionComplete,
 }) => {
   const [selectedHook, setSelectedHook] = useState('none');
   const [isHookModalOpen, setIsHookModalOpen] = useState(false);
@@ -110,7 +111,15 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
       setTokenA(null);
       setTokenB(null);
     }
-  }, [pool, mode, initialTokenA, initialTokenB]);
+
+    if (initialHook) {
+      const matched = HOOKS.find(h =>
+        h.name.toLowerCase().includes(initialHook.toLowerCase()) ||
+        h.id.toLowerCase().includes(initialHook.toLowerCase().replace(/\s+/g, '-'))
+      );
+      if (matched) setSelectedHook(matched.id);
+    }
+  }, [pool, mode, initialTokenA, initialTokenB, initialHook]);
 
   const hookObj = HOOKS.find((h) => h.id === selectedHook) ?? HOOKS[0];
   const hookColor = hookObj.color;
