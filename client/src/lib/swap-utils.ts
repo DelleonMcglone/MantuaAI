@@ -52,7 +52,7 @@ export const HOOK_ADDRESSES: { [hookId: string]: Address } = {
   'df': '0x0000000000000000000000000000000000000000' as Address,   // Dynamic Fee
   'twamm': '0x0000000000000000000000000000000000000000' as Address, // TWAMM Rebalance
   'ym': '0x0000000000000000000000000000000000000000' as Address,   // Yield Maximizer
-  'stable-protection': '0x0000000000000000000000000000000000000000' as Address, // Stable Protection Hook
+  'stable-protection': '0xB5faDA071CD56b3F56632F6771356C3e3834a0C0' as Address, // Stable Protection Hook (Base Sepolia)
   'none': '0x0000000000000000000000000000000000000000' as Address,  // No hook (standard swap)
 };
 
@@ -91,6 +91,7 @@ export const TICK_SPACINGS: { [fee: number]: number } = {
   500: 10,
   3000: 60,
   10000: 200,
+  0x800000: 1, // DYNAMIC_FEE_FLAG pools (e.g. StableProtectionHook)
 };
 
 export const SQRT_PRICE_LIMIT_X96 = {

@@ -51,7 +51,9 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
   const chainId = useChainId();
   const { addLiquidity, isPending, isConfirming, step, totalSteps, stepLabel, isSuccess, error, hash, reset } = useAddLiquidity();
   const hookAddr = getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none');
-  const poolState = usePoolState(tokenA?.address, tokenB?.address, 500, hookAddr);
+  // Stable Protection hook requires DYNAMIC_FEE_FLAG (0x800000) and tickSpacing=1
+  const poolFee = selectedHook === 'stable-protection' ? 0x800000 : 500;
+  const poolState = usePoolState(tokenA?.address, tokenB?.address, poolFee, hookAddr);
 
   const { price: priceALive } = useLivePriceUSD(tokenA?.symbol ?? '');
   const { price: priceBLive } = useLivePriceUSD(tokenB?.symbol ?? '');
@@ -91,7 +93,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
   const buildPoolParams = () => {
     if (!tokenA || !tokenB) return null;
     const { tickLower, tickUpper } = RANGE_TICKS[range];
-    const poolKey = createPoolKey(tokenA.address, tokenB.address, 500, getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none'));
+    const poolKey = createPoolKey(tokenA.address, tokenB.address, poolFee, getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none'));
     const isCurrency0A = poolKey.currency0.toLowerCase() === tokenA.address.toLowerCase();
     const c0Dec = isCurrency0A ? tokenA.decimals : tokenB.decimals;
     const c1Dec = isCurrency0A ? tokenB.decimals : tokenA.decimals;
@@ -111,63 +113,48 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
 
   // Save liquidity to DB after successful confirmation
   useEffect(() => {
-    if (isSuccess && hash && address && tokenA && tokenB) {
-      const params = buildPoolParams();
-      if (!params) return;
-      const sym0 = params.poolKey.currency0 === tokenA.address.toLowerCase() ? tokenA.symbol : tokenB.symbol;
-      const sym1 = params.poolKey.currency0 === tokenA.address.toLowerCase() ? tokenB.symbol : tokenA.symbol;
-      // Save pool record
-      const hookAddress = getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none');
-      fetch('/api/portfolio', {
+    if (!isSuccess || !hash || !address || !tokenA || !tokenB) return;
+    const params = buildPoolParams();
+    if (!params) return;
+    const sym0 = params.poolKey.currency0 === tokenA.address.toLowerCase() ? tokenA.symbol : tokenB.symbol;
+    const sym1 = params.poolKey.currency0 === tokenA.address.toLowerCase() ? tokenB.symbol : tokenA.symbol;
+    const hookAddress = getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none');
+    const chainName = chainId === 1301 ? 'Unichain Sepolia' : 'Base Sepolia';
+    const actionLabel = mode === 'create'
+      ? `Created ${sym0}/${sym1} pool on ${chainName}`
+      : `Added liquidity to ${sym0}/${sym1}`;
+
+    (async () => {
+      // Await pool save so the list is ready before navigation
+      await fetch('/api/portfolio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          token0: sym0,
-          token1: sym1,
-          feeTier: 500,
-          creatorAddress: address,
-          txHash: hash,
-          chainId,
-          hookAddress,
+          token0: sym0, token1: sym1, feeTier: poolFee,
+          creatorAddress: address, txHash: hash, chainId, hookAddress,
         }),
       }).catch(() => {});
-      // Save transaction record
+      // Fire-and-forget secondary records
       fetch('/api/portfolio/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          walletAddress: address,
-          type: 'add_liquidity',
-          txHash: hash,
-          tokenIn: tokenA.symbol,
-          tokenOut: tokenB.symbol,
-          amountIn: amount0,
-          amountOut: amount1,
-          chainId,
+          walletAddress: address, type: 'add_liquidity', txHash: hash,
+          tokenIn: tokenA.symbol, tokenOut: tokenB.symbol,
+          amountIn: amount0, amountOut: amount1, chainId,
         }),
       }).catch(() => {});
-      // Save LP position so it appears in the portfolio
       fetch('/api/portfolio/positions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          walletAddress: address,
-          token0: sym0,
-          token1: sym1,
-          liquidity: '1',
-          amount0: amount0,
-          amount1: amount1,
-          feeTier: 500,
-          chainId,
+          walletAddress: address, token0: sym0, token1: sym1,
+          liquidity: '1', amount0: amount0, amount1: amount1,
+          feeTier: poolFee, chainId,
         }),
       }).catch(() => {});
-      // Update chat session title with action description
-      const chainName = chainId === 1301 ? 'Unichain Sepolia' : 'Base Sepolia';
-      const actionLabel = mode === 'create'
-        ? `Created ${sym0}/${sym1} pool on ${chainName}`
-        : `Added liquidity to ${sym0}/${sym1}`;
       onActionComplete?.(actionLabel);
-    }
+    })();
   }, [isSuccess, hash]);
 
   const handleSubmit = () => {
@@ -262,7 +249,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
       )}
 
       {/* Stable Protection Hook Panel — shown when stable hook is selected */}
-      {selectedHook === 'stable' && (
+      {selectedHook === 'stable-protection' && (
         <div style={{ marginBottom: '12px', padding: '12px 16px', borderRadius: '12px', background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             <span style={{ color: '#10b981', fontWeight: '700', fontSize: '13px' }}>Stable Protection Hook</span>

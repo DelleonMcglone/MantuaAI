@@ -38,6 +38,9 @@ export function parseError(err: unknown): string {
     return 'Transaction reverted. Check token approvals and pool parameters.';
   }
 
+  if (msg.toLowerCase().includes('exceeds max transaction gas limit') || msg.toLowerCase().includes('exceeds block gas limit'))
+    return 'Transaction failed: pool parameters are incorrect or the pool does not exist with these settings. Check the hook and fee tier.';
+
   if (msg.includes('gas') || msg.includes('Gas'))
     return 'Transaction failed due to gas estimation. Try again.';
 

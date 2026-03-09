@@ -375,33 +375,49 @@ export function useAddLiquidity() {
     if (!isNative1 && amount1Desired > 0n)
       erc20Tokens.push({ address: poolKey.currency1, amount: amount1Desired });
 
-    setTotalSteps(erc20Tokens.length * 2 + 1);
-
     const deadline    = BigInt(Math.floor(Date.now() / 1000) + 1200);
     const amount0Max  = (amount0Desired * 105n) / 100n;
     const amount1Max  = (amount1Desired * 105n) / 100n;
+    const nowSecs     = Math.floor(Date.now() / 1000);
 
-    // ── Step 1 per ERC20: token → Permit2 approval ────────────────────────────
+    // ── Pre-check allowances to know exactly how many steps are needed ────────
+    const needsErc20Approval: boolean[] = [];
+    const needsPermit2Approval: boolean[] = [];
     for (const { address: tokenAddr, amount } of erc20Tokens) {
       try {
         const existing = await publicClient.readContract({
-          address: tokenAddr,
-          abi: erc20Abi,
-          functionName: 'allowance',
+          address: tokenAddr, abi: erc20Abi, functionName: 'allowance',
           args: [userAddress, permit2Addr],
         }) as bigint;
+        needsErc20Approval.push(existing < amount);
+      } catch { needsErc20Approval.push(true); }
+    }
+    for (const { address: tokenAddr, amount } of erc20Tokens) {
+      try {
+        const [p2Amount, p2Expiry] = await publicClient.readContract({
+          address: permit2Addr, abi: PERMIT2_ABI, functionName: 'allowance',
+          args: [userAddress, tokenAddr, positionManagerAddr],
+        }) as [bigint, number, number];
+        needsPermit2Approval.push(p2Amount < amount || p2Expiry < nowSecs + 120);
+      } catch { needsPermit2Approval.push(true); }
+    }
+    const actualSteps = 1
+      + needsErc20Approval.filter(Boolean).length
+      + needsPermit2Approval.filter(Boolean).length;
+    setTotalSteps(actualSteps);
 
-        if (existing < amount) {
-          setStep(s => s + 1);
-          setStepLabel('Approving token for Permit2…');
-          const tx = await writeContractAsync({
-            address: tokenAddr,
-            abi: erc20Abi,
-            functionName: 'approve',
-            args: [permit2Addr, maxUint256],
-          });
-          await publicClient.waitForTransactionReceipt({ hash: tx });
-        }
+    // ── Step 1 per ERC20: token → Permit2 approval (only if needed) ──────────
+    for (let i = 0; i < erc20Tokens.length; i++) {
+      if (!needsErc20Approval[i]) continue;
+      const { address: tokenAddr } = erc20Tokens[i];
+      try {
+        setStep(s => s + 1);
+        setStepLabel('Approving token for Permit2…');
+        const tx = await writeContractAsync({
+          address: tokenAddr, abi: erc20Abi, functionName: 'approve',
+          args: [permit2Addr, maxUint256],
+        });
+        await publicClient.waitForTransactionReceipt({ hash: tx });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         setSetupError(new Error(`Token approval failed: ${decodeV4Error(msg) || msg.slice(0, 150)}`));
@@ -409,33 +425,18 @@ export function useAddLiquidity() {
       }
     }
 
-    // ── Step 2 per ERC20: Permit2 → PositionManager allowance ────────────────
-    for (const { address: tokenAddr, amount } of erc20Tokens) {
+    // ── Step 2 per ERC20: Permit2 → PositionManager allowance (only if needed) ─
+    for (let i = 0; i < erc20Tokens.length; i++) {
+      if (!needsPermit2Approval[i]) continue;
+      const { address: tokenAddr, amount } = erc20Tokens[i];
       try {
-        const [p2Amount, p2Expiry] = await publicClient.readContract({
-          address: permit2Addr,
-          abi: PERMIT2_ABI,
-          functionName: 'allowance',
-          args: [userAddress, tokenAddr, positionManagerAddr],
-        }) as [bigint, number, number];
-
-        const nowSecs = Math.floor(Date.now() / 1000);
-        if (p2Amount < amount || p2Expiry < nowSecs + 120) {
-          setStep(s => s + 1);
-          setStepLabel('Setting up Permit2 allowance…');
-          const tx = await writeContractAsync({
-            address: permit2Addr,
-            abi: PERMIT2_ABI,
-            functionName: 'approve',
-            args: [
-              tokenAddr,
-              positionManagerAddr,
-              amount * 10n,
-              nowSecs + 3600,
-            ],
-          });
-          await publicClient.waitForTransactionReceipt({ hash: tx });
-        }
+        setStep(s => s + 1);
+        setStepLabel('Setting up Permit2 allowance…');
+        const tx = await writeContractAsync({
+          address: permit2Addr, abi: PERMIT2_ABI, functionName: 'approve',
+          args: [tokenAddr, positionManagerAddr, amount * 10n, nowSecs + 3600],
+        });
+        await publicClient.waitForTransactionReceipt({ hash: tx });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         setSetupError(new Error(`Permit2 approval failed: ${decodeV4Error(msg) || msg.slice(0, 150)}`));

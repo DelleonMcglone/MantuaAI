@@ -2604,7 +2604,7 @@ const StableProtectionHookInfo = ({ theme, hookAddress }) => {
   );
 };
 
-const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePool }) => {
+const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePool, refreshKey = 0 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedHookFilter, setSelectedHookFilter] = useState('All');
   const [selectedTypeFilter, setSelectedTypeFilter] = useState('All');
@@ -2615,7 +2615,7 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
   const [dbPools, setDbPools] = React.useState([]);
   React.useEffect(() => {
     fetch(`/api/portfolio?chainId=${currentChainId}`).then(r => r.ok ? r.json() : []).then(rows => setDbPools(rows ?? [])).catch(() => {});
-  }, [currentChainId]);
+  }, [currentChainId, refreshKey]);
 
   // Merge DB pools with display-friendly format
   const pools = dbPools.length > 0 ? dbPools.map(p => ({
@@ -2830,7 +2830,7 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
                         <div style={{ color: theme.textPrimary, fontWeight: '600', fontSize: '14px', marginBottom: '2px' }}>{pool.token1} / {pool.token2}</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
                           <PoolTypeBadge type={pool.type} />
-                          {pool.feeTier && <span style={{ padding: '2px 6px', borderRadius: '4px', background: theme.bgSecondary, color: theme.textSecondary, fontSize: '10px', fontWeight: '600' }}>{(pool.feeTier/10000).toFixed(2)}%</span>}
+                          {pool.feeTier && <span style={{ padding: '2px 6px', borderRadius: '4px', background: theme.bgSecondary, color: theme.textSecondary, fontSize: '10px', fontWeight: '600' }}>{pool.feeTier === 0x800000 ? 'Dynamic' : `${(pool.feeTier/10000).toFixed(2)}%`}</span>}
                           <HookBadge hook={pool.hook} />
                         </div>
                       </div>
@@ -3854,6 +3854,7 @@ export default function MantuaApp() {
   const [portfolioOpen, setPortfolioOpen] = useState(false);
   const [showSwap, setShowSwap] = useState(false);
   const [showLiquidity, setShowLiquidity] = useState(false);
+  const [liquidityRefreshKey, setLiquidityRefreshKey] = useState(0);
   const [showAgentBuilder, setShowAgentBuilder] = useState(false);
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const [showAddLiquidityModal, setShowAddLiquidityModal] = useState(false);
@@ -4472,10 +4473,11 @@ export default function MantuaApp() {
                   {/* Liquidity Overlay */}
                   {showLiquidity && !showSwap && !showAgentBuilder && !showAddLiquidityModal && (
                     <div style={{ width: '100%', marginTop: 20, marginBottom: 20 }}>
-                      <LiquidityInterface 
-                        onClose={() => setShowLiquidity(false)} 
-                        theme={theme} 
-                        isDark={isDark} 
+                      <LiquidityInterface
+                        onClose={() => setShowLiquidity(false)}
+                        theme={theme}
+                        isDark={isDark}
+                        refreshKey={liquidityRefreshKey}
                         onAddLiquidity={(pool) => {
                            setSelectedPool(pool);
                            setAddLiquidityMode('add');
@@ -4504,7 +4506,17 @@ export default function MantuaApp() {
                         initialTokenA={liquidityInitialTokens?.tokenA}
                         initialTokenB={liquidityInitialTokens?.tokenB}
                         initialHook={liquidityInitialHook}
-                        onActionComplete={async (title) => { await updateSessionTitle(title); loadRecentChats(); }}
+                        onActionComplete={async (title) => {
+                          await updateSessionTitle(title);
+                          loadRecentChats();
+                          // Navigate back to pool list and refresh it
+                          setShowAddLiquidityModal(false);
+                          setSelectedPool(null);
+                          setLiquidityInitialTokens(null);
+                          setLiquidityInitialHook('');
+                          setLiquidityRefreshKey(k => k + 1);
+                          setShowLiquidity(true);
+                        }}
                       />
                     </div>
                   )}
