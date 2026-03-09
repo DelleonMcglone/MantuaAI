@@ -26,7 +26,9 @@ export const BASE_SEPOLIA_ERC20_TOKENS: Token[] = [
   {
     symbol: 'cbBTC',
     name: 'Coinbase Wrapped BTC',
-    address: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf',
+    // Verified: https://sepolia.basescan.org/tx/0x2a0c23fe06fee9b8e93a8fb0988f0c31b4c09b5127e477677e2eed8cc067553f
+    // Base Sepolia testnet address (different from mainnet 0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf)
+    address: '0xcbb7c0006f23900c38eb856149f799620fcb8a4a',
     decimals: 8,
     chainId: 84532,
     logoURI: 'https://assets.coingecko.com/coins/images/40143/small/cbbtc.webp',

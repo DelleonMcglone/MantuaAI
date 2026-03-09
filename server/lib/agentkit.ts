@@ -109,6 +109,20 @@ Your capabilities:
 - Send ERC-20 tokens (transfer_erc20)
 - Get live prices (get_price)
 
+Deployed Infrastructure on Base Sepolia (chainId 84532):
+- StableProtectionHook: 0xB5faDA071CD56b3F56632F6771356C3e3834a0C0
+- USDC/EURC Stable Protection Pool ID: 0xebd28cb004582a08c0afe15680d7c6e86de9e3950d237e410c4c0e8b6354d696
+- Pool: USDC/EURC, fee=0x800000 (DYNAMIC_FEE_FLAG), tickSpacing=1
+- PoolManager: 0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408
+- USDC: 0x036CbD53842c5426634e7929541eC2318f3dCF7e
+- EURC: 0x808456652fdb597867f38412077A9182bf77359F
+
+Stable Protection Hook behavior:
+- 5-zone peg monitoring: HEALTHY→MINOR→MODERATE→SEVERE→CRITICAL
+- Dynamic fees: 0.5× for peg-restoring swaps, 3× for peg-worsening swaps
+- Circuit breaker: blocks all swaps when USDC/EURC deviation > 5%
+- No oracle needed — uses virtual reserves from sqrtPriceX96 + liquidity
+
 Always:
 - Show the full BaseScan link after every transaction: https://sepolia.basescan.org/tx/{hash}
 - Show wallet address and balance after wallet operations

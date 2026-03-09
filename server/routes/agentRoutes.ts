@@ -12,7 +12,7 @@
 
 import { Router } from "express";
 import { runAgent } from "../lib/agentkit";
-import { createStableProtectionPool } from "../services/poolService";
+import { createStableProtectionPool, swapViaStablePool, getStablePoolId } from "../services/poolService";
 import { detectIntent } from "../services/intentRouter";
 
 const router = Router();
@@ -66,19 +66,50 @@ router.post("/autonomous", async (req, res) => {
 
   const intent = detectIntent(message);
 
-  // Handle pool creation separately — it's a custom viem action, not in AgentKit tools
+  // Handle pool creation — custom viem action, not in AgentKit tools
   if (intent.type === "create-pool") {
     try {
       const result = await createStableProtectionPool();
+      const alreadyExisted = result.transactionHash === "pool-already-exists";
       return res.json({
         success: true,
         intent: "create-pool",
         response:
-          `Pool created on Unichain Sepolia!\n\n` +
+          (alreadyExisted
+            ? `✅ USDC/EURC Stable Protection pool is already live on Base Sepolia!\n\n`
+            : `✅ USDC/EURC Stable Protection pool created on Base Sepolia!\n\nTransaction: ${result.explorerUrl}\n`) +
+          `Pool ID: ${result.poolId}\n` +
+          `Hook: 0xB5faDA071CD56b3F56632F6771356C3e3834a0C0\n` +
+          `Fee: DYNAMIC (Stable Protection — 1-100 bps based on peg zone)\n` +
+          `Pair: USDC / EURC\n\n` +
+          `The Stable Protection Hook monitors peg deviation in real time:\n` +
+          `• HEALTHY (≤0.1%): 0.5 bps fee\n` +
+          `• MINOR (≤0.5%): 2.5 bps fee\n` +
+          `• MODERATE (≤2%): 7.5 bps fee\n` +
+          `• SEVERE (≤5%): 150 bps fee\n` +
+          `• CRITICAL (>5%): circuit breaker — swaps blocked`,
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  // Handle swap via Stable Protection pool
+  if (intent.type === "swap-stable-pool") {
+    const fromToken = intent.fromToken ?? "USDC";
+    const toToken   = intent.toToken   ?? "EURC";
+    const amount    = intent.amount    ?? "1";
+    try {
+      const result = await swapViaStablePool(fromToken, amount);
+      return res.json({
+        success: true,
+        intent: "swap-stable-pool",
+        response:
+          `✅ Swapped ${amount} ${fromToken} → ${toToken} via Stable Protection pool!\n\n` +
           `Transaction: ${result.explorerUrl}\n` +
-          `Pool: ${result.poolKey.currency0}/${result.poolKey.currency1}\n` +
-          `Fee: DYNAMIC (0x800000)\n` +
-          `Hook: ${result.poolKey.hooks}`,
+          `Hook: 0xB5faDA071CD56b3F56632F6771356C3e3834a0C0\n` +
+          `Pool ID: ${getStablePoolId()}\n\n` +
+          `The dynamic fee was automatically adjusted by the Stable Protection Hook based on current peg deviation.`,
       });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message });

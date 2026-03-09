@@ -1,0 +1,22 @@
+[
+  {
+    "name": "ETH",
+    "txHash": "FAILED",
+    "basescanLink": "N/A"
+  },
+  {
+    "name": "USDC",
+    "txHash": "0x314d5fef903c9e25afe3d2ffde0165e4c83fd50e7ab71e8d738d45d963e52b4c",
+    "basescanLink": "https://sepolia.basescan.org/tx/0x314d5fef903c9e25afe3d2ffde0165e4c83fd50e7ab71e8d738d45d963e52b4c"
+  },
+  {
+    "name": "EURC",
+    "txHash": "0xffa3ed5437c5b75493c3d59ad0b21be99cd6fa84c1dafdde6848712694467964",
+    "basescanLink": "https://sepolia.basescan.org/tx/0xffa3ed5437c5b75493c3d59ad0b21be99cd6fa84c1dafdde6848712694467964"
+  },
+  {
+    "name": "cbBTC",
+    "txHash": "0x08ba598b0dc8b83509cb228110ba5975c75d3ebd9672bbe4a0895f8992610a11",
+    "basescanLink": "https://sepolia.basescan.org/tx/0x08ba598b0dc8b83509cb228110ba5975c75d3ebd9672bbe4a0895f8992610a11"
+  }
+]

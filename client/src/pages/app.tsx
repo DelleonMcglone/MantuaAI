@@ -382,7 +382,7 @@ const AssetsTable = ({ assets, theme }) => (
             </td>
             <td style={{ padding: '16px 24px', textAlign: 'right' }}>
               <span style={{ color: theme.textPrimary, fontFamily: 'SF Mono, Monaco, monospace', fontSize: '14px', fontWeight: '500' }}>
-                {(isNaN(asset.balance) ? 0 : asset.balance).toLocaleString(undefined, { minimumFractionDigits: asset.symbol === 'ETH' ? 4 : 2, maximumFractionDigits: asset.symbol === 'ETH' ? 4 : 2 })}
+                {(isNaN(asset.balance) ? 0 : asset.balance).toLocaleString(undefined, { minimumFractionDigits: asset.symbol === 'ETH' ? 4 : asset.symbol === 'cbBTC' ? 6 : 2, maximumFractionDigits: asset.symbol === 'ETH' ? 4 : asset.symbol === 'cbBTC' ? 6 : 2 })}
               </span>
             </td>
             <td style={{ padding: '16px 24px', textAlign: 'right' }}>

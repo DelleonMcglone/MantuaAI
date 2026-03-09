@@ -76,7 +76,24 @@
       "Bash(npm info @coinbase/cdp-sdk version)",
       "Bash(npm info @coinbase/agentkit version)",
       "Bash(npm info @coinbase/agentkit versions --json)",
-      "Bash(npm info @coinbase/agentkit@0.10.4 exports)"
+      "Bash(npm info @coinbase/agentkit@0.10.4 exports)",
+      "Bash(cast block-number --rpc-url https://sepolia.base.org)",
+      "Bash(cast balance 0xbaacDCFfA93B984C914014F83Ee28B68dF88DC87 --rpc-url https://sepolia.base.org --ether)",
+      "Bash(/home/runner/workspace/docs/e2e-test-results.md:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(npm list solc)",
+      "Bash(npx solc --version)",
+      "Bash(gh api repos/DelleonMcglone/stableprotection-hook/contents/src/StableProtectionHook.sol --jq '.content')",
+      "Bash(gh api repos/DelleonMcglone/stableprotection-hook/contents/src/libraries/PegMonitor.sol --jq '.content')",
+      "Bash(gh api repos/DelleonMcglone/stableprotection-hook/contents/src/libraries/StableSwapMath.sol --jq '.content')",
+      "Bash(gh api repos/DelleonMcglone/stableprotection-hook/contents/remappings.txt --jq '.content')",
+      "Bash(npm show @uniswap/v4-core)",
+      "Bash(npm show @uniswap/v4-periphery)",
+      "Bash(mkdir -p /tmp/hook-compile)",
+      "Read(//tmp/**)",
+      "Bash(npm init -y --quiet)",
+      "Bash(/home/runner/workspace/node_modules/.bin/solcjs --version)"
     ]
   }
 }

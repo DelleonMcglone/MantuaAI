@@ -8,6 +8,7 @@ export type IntentType =
   | "create-wallet"
   | "get-funds"
   | "create-pool"
+  | "swap-stable-pool"
   | "swap"
   | "send"
   | "query"
@@ -15,6 +16,9 @@ export type IntentType =
 
 export interface DetectedIntent {
   type: IntentType;
+  fromToken?: "USDC" | "EURC";
+  toToken?: "USDC" | "EURC";
+  amount?: string;
 }
 
 const PATTERNS: Array<{ type: IntentType; patterns: RegExp[] }> = [
@@ -41,12 +45,26 @@ const PATTERNS: Array<{ type: IntentType; patterns: RegExp[] }> = [
     ],
   },
   {
+    // MUST come before create-pool to avoid "stable protection pool" in swap messages
+    // matching the create-pool pattern
+    type: "swap-stable-pool",
+    patterns: [
+      /\bswap\b.*\bstable\s+protection\b/i,
+      /\bswap\b.*\bstable\s+pool\b/i,
+      /\bswap\b.*\bhook\s+pool\b/i,
+      /\bstable\s+protection\b.*\bswap\b/i,
+      /swap\s+(?:\d+(?:\.\d+)?\s+)?(?:usdc|eurc)\s+(?:for|to|→)\s+(?:eurc|usdc)\s+(?:from|via|using|through|stable|hook)/i,
+      /swap\s+(?:\d+(?:\.\d+)?\s+)?(?:usdc|eurc)\s+(?:for|to)\s+(?:eurc|usdc)\s+(?:stable|hook)/i,
+    ],
+  },
+  {
     type: "create-pool",
     patterns: [
-      /create\s+(?:a\s+)?pool/i,
-      /new\s+pool/i,
-      /stable\s+protection/i,
-      /initialize\s+pool/i,
+      /create\s+(?:a\s+)?(?:usdc[\s/]+eurc|eurc[\s/]+usdc)?\s*pool/i,
+      /new\s+(?:usdc[\s/]+eurc|eurc[\s/]+usdc)?\s*pool/i,
+      /create\s+.*stable\s+protection/i,
+      /stable\s+protection\s+pool/i,
+      /initialize\s+(?:a\s+)?pool/i,
       /deploy\s+pool/i,
     ],
   },
@@ -78,9 +96,31 @@ const PATTERNS: Array<{ type: IntentType; patterns: RegExp[] }> = [
   },
 ];
 
+function parseSwapParams(message: string): Partial<DetectedIntent> {
+  const usdcFirst = /swap\s+([\d.]+)\s+usdc\s+(?:for|to|→)\s+eurc/i.exec(message);
+  if (usdcFirst) return { fromToken: "USDC", toToken: "EURC", amount: usdcFirst[1] };
+
+  const eurcFirst = /swap\s+([\d.]+)\s+eurc\s+(?:for|to|→)\s+usdc/i.exec(message);
+  if (eurcFirst) return { fromToken: "EURC", toToken: "USDC", amount: eurcFirst[1] };
+
+  const anyAmount = /([\d.]+)\s+(?:usdc|eurc)/i.exec(message);
+  const fromToken = /\beurc\b.*(?:for|to)/i.test(message) ? "EURC" : "USDC";
+  return {
+    fromToken,
+    toToken: fromToken === "USDC" ? "EURC" : "USDC",
+    amount: anyAmount ? anyAmount[1] : "1",
+  };
+}
+
 export function detectIntent(message: string): DetectedIntent {
   for (const { type, patterns } of PATTERNS) {
-    if (patterns.some(p => p.test(message))) return { type };
+    if (patterns.some(p => p.test(message))) {
+      const intent: DetectedIntent = { type };
+      if (type === "swap-stable-pool") {
+        Object.assign(intent, parseSwapParams(message));
+      }
+      return intent;
+    }
   }
   return { type: "unknown" };
 }

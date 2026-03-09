@@ -192,8 +192,8 @@ export function registerAgentRoutes(app: Express): void {
       try {
         const { CdpClient } = await import('@coinbase/cdp-sdk');
         const cdp = new CdpClient({
-          apiKeyId: process.env.CDP_API_KEY_NAME!,
-          apiKeySecret: process.env.CDP_API_KEY_PRIVATE_KEY!,
+          apiKeyId: process.env.CDP_API_KEY_ID!,
+          apiKeySecret: process.env.CDP_API_KEY_SECRET!,
         });
         const wallet = await cdp.evm.createAccount({});
         address = wallet.address;
@@ -265,8 +265,8 @@ export function registerAgentRoutes(app: Express): void {
           // Try CDP SDK faucet
           const { CdpClient } = await import('@coinbase/cdp-sdk');
           const cdp = new CdpClient({
-            apiKeyId: process.env.CDP_API_KEY_NAME!,
-            apiKeySecret: process.env.CDP_API_KEY_PRIVATE_KEY!,
+            apiKeyId: process.env.CDP_API_KEY_ID!,
+            apiKeySecret: process.env.CDP_API_KEY_SECRET!,
           });
 
           const faucetResult = await cdp.evm.requestFaucet({

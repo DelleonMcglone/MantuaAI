@@ -1,0 +1,26 @@
+{
+  "address": "0xB84eC39a7D4DB793A93F3cFb50ea88D648007134",
+  "basescanLink": "https://sepolia.basescan.org/address/0xB84eC39a7D4DB793A93F3cFb50ea88D648007134",
+  "faucetResults": [
+    {
+      "token": "ETH",
+      "txHash": "0x034b58bdea99c7b2761da48ad464b033742b641b2ff5e77c3619368b8777fed5",
+      "basescanLink": "https://sepolia.basescan.org/tx/0x034b58bdea99c7b2761da48ad464b033742b641b2ff5e77c3619368b8777fed5"
+    },
+    {
+      "token": "USDC",
+      "txHash": "0xa0782b36e148d533ec3317e470348fdd405b47e1c9b1efeb348f3a58595ad063",
+      "basescanLink": "https://sepolia.basescan.org/tx/0xa0782b36e148d533ec3317e470348fdd405b47e1c9b1efeb348f3a58595ad063"
+    },
+    {
+      "token": "EURC",
+      "txHash": "0x768b6bd54a61118a376c151277c28a76f30470f6cb4d2e08bfde32d008477266",
+      "basescanLink": "https://sepolia.basescan.org/tx/0x768b6bd54a61118a376c151277c28a76f30470f6cb4d2e08bfde32d008477266"
+    },
+    {
+      "token": "cbBTC",
+      "txHash": "0x378013f195f23de6a040ed7776cf4779f2a38a1eab00fac8da93313457da606e",
+      "basescanLink": "https://sepolia.basescan.org/tx/0x378013f195f23de6a040ed7776cf4779f2a38a1eab00fac8da93313457da606e"
+    }
+  ]
+}
