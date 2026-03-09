@@ -730,24 +730,27 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
   const [txns, setTxns] = useState<Array<{type:string;tx_hash:string;token_in?:string;token_out?:string;amount_in?:string;amount_out?:string;timestamp:string;base_scan_url:string}>>([]);
   const [agentWallet, setAgentWallet] = useState<{address:string;wallet_id:string;id?:string} | null>(null);
   const [agentTxns, setAgentTxns] = useState<Array<{type:string;tx_hash:string;token_in?:string;token_out?:string;base_scan_url:string;timestamp:string}>>([]);
-  const [positions, setPositions] = useState<Array<{id:string;token0:string;token1:string;liquidity:string;amount0:string;amount1:string;fee_tier:number;status:string}>>([]);
+  const [positions, setPositions] = useState<Array<{id:string;token0:string;token1:string;liquidity:string;amount0:string;amount1:string;fee_tier:number;status:string;hook_address?:string}>>([]);
   const [hideSmall, setHideSmall] = useState(false);
   const isAgentView = type === 'Agent';
 
-  const { address } = useAccount();
+  // Use wagmi's own isConnected — the prop can be stale and prevents balance fetches
+  const { address, isConnected: walletConnected } = useAccount();
   const chainId = useChainId();
-  const { data: liveEthBalance } = useBalance({ address, chainId, query: { enabled: !!address && isConnected, refetchInterval: 30_000 } });
+  const { data: liveEthBalance } = useBalance({ address, chainId, query: { enabled: !!address && walletConnected, refetchInterval: 30_000 } });
   const { balancesBySymbol } = useTokenBalances();
-  const { price: ethPriceUSD } = useLivePriceUSD('ETH');
+  const { price: ethPriceUSD }   = useLivePriceUSD('ETH');
+  const { price: eurcPriceUSD }  = useLivePriceUSD('EURC');
+  const { price: cbbtcPriceUSD } = useLivePriceUSD('cbBTC');
 
   const ethBalanceNum = liveEthBalance ? (parseFloat(liveEthBalance.formatted) || 0) : 0;
-  const ethPrice = (ethPriceUSD != null && !isNaN(ethPriceUSD)) ? ethPriceUSD : TESTNET_PRICES.ETH;
+  const ethPrice   = (ethPriceUSD   != null && !isNaN(ethPriceUSD))   ? ethPriceUSD   : TESTNET_PRICES.ETH;
+  const eurcPrice  = (eurcPriceUSD  != null && !isNaN(eurcPriceUSD))  ? eurcPriceUSD  : TESTNET_PRICES.EURC;
+  const cbbtcPrice = (cbbtcPriceUSD != null && !isNaN(cbbtcPriceUSD)) ? cbbtcPriceUSD : TESTNET_PRICES.cbBTC;
   const ethValueUSD = ethBalanceNum * ethPrice;
-  const usdcBalance = parseFloat(balancesBySymbol['USDC']?.formatted ?? '0') || 0;
-  const eurcBalance = parseFloat(balancesBySymbol['EURC']?.formatted ?? '0') || 0;
+  const usdcBalance  = parseFloat(balancesBySymbol['USDC']?.formatted  ?? '0') || 0;
+  const eurcBalance  = parseFloat(balancesBySymbol['EURC']?.formatted  ?? '0') || 0;
   const cbbtcBalance = parseFloat(balancesBySymbol['cbBTC']?.formatted ?? '0') || 0;
-  const eurcPrice = TESTNET_PRICES.EURC;
-  const cbbtcPrice = TESTNET_PRICES.cbBTC;
   const totalValue = (isNaN(ethValueUSD) ? 0 : ethValueUSD) + usdcBalance + (eurcBalance * eurcPrice) + (cbbtcBalance * cbbtcPrice);
   const safeTotal = isNaN(totalValue) ? 0 : totalValue;
 
@@ -756,12 +759,12 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
   const explorerLabel = chainId === 1301 ? 'Uniscan' : 'BaseScan';
 
   useEffect(() => {
-    if (!address || !isConnected) return;
+    if (!address || !walletConnected) return;
     fetch(`/api/portfolio/transactions?walletAddress=${address}`)
       .then(r => r.ok ? r.json() : [])
       .then(rows => setTxns(rows ?? []))
       .catch(() => {});
-  }, [address, isConnected]);
+  }, [address, walletConnected]);
 
   useEffect(() => {
     if (!address) return;
@@ -780,10 +783,31 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
 
   useEffect(() => {
     if (!address) return;
-    fetch(`/api/portfolio/positions?walletAddress=${address}&chainId=${chainId}`)
-      .then(r => r.ok ? r.json() : [])
-      .then(rows => setPositions(rows ?? []))
-      .catch(() => {});
+    // Fetch saved positions AND pools created by this wallet — combine as LP positions
+    Promise.all([
+      fetch(`/api/portfolio/positions?walletAddress=${address}&chainId=${chainId}`)
+        .then(r => r.ok ? r.json() : []).catch(() => []),
+      fetch(`/api/portfolio?chainId=${chainId}`)
+        .then(r => r.ok ? r.json() : []).catch(() => []),
+    ]).then(([posRows, poolRows]) => {
+      const savedPositions = (posRows ?? []) as typeof positions;
+      // Derive positions from pools created by this user that have no matching saved position
+      const positionPairs = new Set(savedPositions.map((p: any) => `${p.token0}-${p.token1}`));
+      const poolDerived = (poolRows ?? [])
+        .filter((p: any) => p.creator_address?.toLowerCase() === address?.toLowerCase() && !positionPairs.has(`${p.token0}-${p.token1}`))
+        .map((p: any) => ({
+          id: p.id,
+          token0: p.token0,
+          token1: p.token1,
+          liquidity: '1',
+          amount0: '0',
+          amount1: '0',
+          fee_tier: p.fee_tier,
+          status: 'active',
+          hook_address: p.hook_address,
+        }));
+      setPositions([...savedPositions, ...poolDerived]);
+    });
   }, [address, chainId]);
 
   const tokenRows = [
