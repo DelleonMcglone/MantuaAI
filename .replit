@@ -116,3 +116,10 @@ waitForPort = 5000
 [agent]
 mockupState = "FULLSTACK"
 integrations = ["javascript_openai_ai_integrations:2.0.0"]
+
+[userenv]
+
+[userenv.shared]
+CDP_API_KEY_ID = "a84fe446-5289-480f-9b54-6317b370da31"
+CDP_API_KEY_SECRET = "S6Fduh2AdRTJaoy76EjCGtFuFxB2UeiU"
+CDP_WALLET_SECRET = "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgPSXqjVYFV+b7W5L7D/R/GRyrTBTB0KLsR4c0TDpGHFmhRANCAAR/3Az5P/YHA0XCWofCk/P9NGbOlFh5bPb1nqep1WwpTWiClM+k07us8G0lKXaDoaTeb+ZL/o0st9yEQAbYOZuD"
