@@ -92,6 +92,9 @@ export async function getAgent() {
     model: "gpt-4o-mini",
     temperature: 0,
     apiKey: process.env.OPENAI_API_KEY,
+    configuration: process.env.OPENAI_BASE_URL
+      ? { baseURL: process.env.OPENAI_BASE_URL }
+      : undefined,
   });
 
   _agent = createReactAgent({

@@ -100,7 +100,10 @@
       "Bash(psql -c \"SELECT id, token0, token1, fee_tier, wallet_address, status FROM positions;\")",
       "Bash(psql -c \"SELECT COUNT\\(*\\) as pools FROM pools; SELECT COUNT\\(*\\) as positions FROM positions;\")",
       "Bash(psql -c \"SELECT token0, token1, fee_tier, chain_id, hook_address FROM pools;\")",
-      "Bash(psql -c \"SELECT COUNT\\(*\\) as pools FROM pools;\")"
+      "Bash(psql -c \"SELECT COUNT\\(*\\) as pools FROM pools;\")",
+      "Bash(grep '\"\"version\"\"')",
+      "Bash(fuser 5000/tcp)",
+      "Bash(ss -tlnp)"
     ]
   }
 }
