@@ -150,7 +150,7 @@ export default function MantuaLanding() {
         <p style={{ fontSize: 18, color: theme.textSecondary, marginBottom: 48, letterSpacing: '0.02em' }}>Hooks for logic. Agents for action. AI for intelligence.</p>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
           <button onClick={() => window.location.href = '/app'} style={{ background: 'linear-gradient(135deg, #a855f7, #9333ea)', border: 'none', borderRadius: 12, padding: '16px 32px', color: '#fff', fontFamily: '"DM Sans", sans-serif', fontSize: 16, fontWeight: 600, cursor: 'pointer' }}>Launch App</button>
-          <button style={{ background: 'transparent', border: `1px solid ${theme.border}`, borderRadius: 12, padding: '16px 32px', color: theme.textPrimary, fontFamily: '"DM Sans", sans-serif', fontSize: 16, fontWeight: 500, cursor: 'pointer' }}>Learn More</button>
+          <button style={{ background: 'transparent', border: `1px solid ${theme.border}`, borderRadius: 12, padding: '16px 32px', color: theme.textPrimary, fontFamily: '"DM Sans", sans-serif', fontSize: 16, fontWeight: 500, cursor: 'pointer' }}>Docs</button>
         </div>
         
         {/* Video Demo Placeholder */}
