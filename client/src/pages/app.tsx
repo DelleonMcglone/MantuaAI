@@ -1382,7 +1382,7 @@ const TokenSelectModal = ({ isOpen, onClose, onSelect, theme, isDark, getTokenBa
   );
 };
 
-const TokenSelect = ({ token, tokenData, balance, usdValue, side, amount, theme, onTokenClick, onAmountChange, livePrice, isPriceLoading, onPercentClick }) => {
+const TokenSelect = ({ token, tokenData, balance, usdValue, side, amount, theme, onTokenClick, onAmountChange, livePrice, isPriceLoading, onPercentClick, selectedPct = null }) => {
   // Use tokenData if available, otherwise fall back to string-based logic
   const tokenSymbol = tokenData?.symbol || token;
   const tokenLogoURI = tokenData?.logoURI;
@@ -1403,7 +1403,7 @@ const TokenSelect = ({ token, tokenData, balance, usdValue, side, amount, theme,
       {/* Percentage shortcut buttons — Sell side only */}
       {onPercentClick && (
         <div style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
-          {[25, 50, 75].map(pct => (
+          {[25, 50, 75, 100].map(pct => (
             <button
               key={pct}
               onClick={() => onPercentClick(pct / 100)}
@@ -1411,35 +1411,24 @@ const TokenSelect = ({ token, tokenData, balance, usdValue, side, amount, theme,
                 flex: 1,
                 padding: '4px 0',
                 borderRadius: '6px',
-                border: `1px solid ${theme?.border || 'rgba(139,92,246,0.2)'}`,
-                background: 'transparent',
-                color: theme?.textSecondary || '#9ca3af',
+                border: selectedPct === pct
+                  ? `1px solid ${theme?.accent || '#8b5cf6'}`
+                  : `1px solid ${theme?.border || 'rgba(139,92,246,0.2)'}`,
+                background: selectedPct === pct
+                  ? `${theme?.accent || '#8b5cf6'}15`
+                  : 'transparent',
+                color: selectedPct === pct
+                  ? (theme?.accent || '#8b5cf6')
+                  : (theme?.textSecondary || '#9ca3af'),
                 fontSize: '11px',
-                fontWeight: '600',
+                fontWeight: selectedPct === pct ? '700' : '600',
                 cursor: 'pointer',
                 transition: 'all 0.15s',
               }}
             >
-              {pct}%
+              {pct === 100 ? 'Max' : `${pct}%`}
             </button>
           ))}
-          <button
-            onClick={() => onPercentClick(1)}
-            style={{
-              flex: 1,
-              padding: '4px 0',
-              borderRadius: '6px',
-              border: `1px solid ${theme?.accent || '#8b5cf6'}`,
-              background: `${theme?.accent || '#8b5cf6'}15`,
-              color: theme?.accent || '#8b5cf6',
-              fontSize: '11px',
-              fontWeight: '700',
-              cursor: 'pointer',
-              transition: 'all 0.15s',
-            }}
-          >
-            Max
-          </button>
         </div>
       )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1555,9 +1544,6 @@ const TokenSelect = ({ token, tokenData, balance, usdValue, side, amount, theme,
 
 // Hook Selector Modal
 const HookSelectorModal = ({ isOpen, onClose, hooks, selectedHook, onSelect, theme, isDark }) => {
-  const [customAddress, setCustomAddress] = useState('');
-  const [showCustomInput, setShowCustomInput] = useState(false);
-
   if (!isOpen) return null;
 
   return (
@@ -1692,157 +1678,6 @@ const HookSelectorModal = ({ isOpen, onClose, hooks, selectedHook, onSelect, the
             ))}
           </div>
           
-          {/* Custom Hook Section */}
-          <div style={{ marginTop: '20px' }}>
-            <button 
-              onClick={() => setShowCustomInput(!showCustomInput)}
-              style={{ 
-                width: '100%',
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
-                padding: '16px',
-                borderRadius: '12px',
-                border: showCustomInput 
-                  ? '2px solid #8b5cf6'
-                  : `1px solid ${theme.border}`,
-                background: showCustomInput 
-                  ? (isDark ? 'rgba(139, 92, 246, 0.1)' : 'rgba(139, 92, 246, 0.05)') 
-                  : 'transparent',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                color: theme.textPrimary
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '10px',
-                  background: showCustomInput ? 'rgba(139, 92, 246, 0.2)' : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'),
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: showCustomInput ? '#8b5cf6' : theme.textSecondary,
-                }}>
-                  <CodeIcon />
-                </div>
-                <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontWeight: '600', fontSize: '15px', color: theme.textPrimary }}>Custom Hook Address</div>
-                  <div style={{ fontSize: '13px', color: theme.textSecondary }}>Use your own deployed hook contract</div>
-                </div>
-              </div>
-              {showCustomInput ? <ChevronUpIcon /> : <ChevronDownIcon />}
-            </button>
-
-            {showCustomInput && (
-              <div style={{ 
-                marginTop: '12px', 
-                padding: '20px', 
-                background: theme.bgCard,
-                border: `1px solid ${theme.border}`,
-                borderRadius: '12px',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.05)'
-              }}>
-                <input 
-                  type="text" 
-                  placeholder="Enter hook contract address (0x...)"
-                  value={customAddress}
-                  onChange={(e) => setCustomAddress(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '14px',
-                    borderRadius: '10px',
-                    border: `1px solid ${theme.border}`,
-                    background: theme.bgSecondary,
-                    color: theme.textPrimary,
-                    fontSize: '14px',
-                    fontFamily: 'SF Mono, Monaco, monospace',
-                    marginBottom: '12px',
-                    outline: 'none'
-                  }}
-                />
-                
-                <button style={{
-                  width: '100%',
-                  padding: '12px',
-                  borderRadius: '10px',
-                  background: theme.bgSecondary,
-                  border: 'none',
-                  color: theme.textSecondary,
-                  fontWeight: '600',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  marginBottom: '20px'
-                }}>
-                  Validate Address
-                </button>
-
-                <div style={{ fontSize: '11px', color: theme.textSecondary, fontWeight: '600', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.5px' }}>
-                  Recent Custom Hooks
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
-                  <div style={{ 
-                    padding: '12px', 
-                    borderRadius: '10px', 
-                    border: `1px solid ${theme.border}`, 
-                    background: theme.bgCard,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    cursor: 'pointer'
-                  }}>
-                    <div>
-                      <div style={{ fontSize: '14px', fontWeight: '500', color: theme.textPrimary }}>No Hook</div>
-                      <div style={{ fontSize: '12px', color: theme.textSecondary, fontFamily: 'monospace' }}>0x1234...5678</div>
-                    </div>
-                    <div style={{ fontSize: '12px', color: theme.textMuted }}>2 days ago</div>
-                  </div>
-                  
-                  <div style={{ 
-                    padding: '12px', 
-                    borderRadius: '10px', 
-                    border: `1px solid ${theme.border}`, 
-                    background: theme.bgCard,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    cursor: 'pointer'
-                  }}>
-                    <div>
-                      <div style={{ fontSize: '14px', fontWeight: '500', color: theme.textPrimary }}>Custom Fee Hook</div>
-                      <div style={{ fontSize: '12px', color: theme.textSecondary, fontFamily: 'monospace' }}>0xabcd...efgh</div>
-                    </div>
-                    <div style={{ fontSize: '12px', color: theme.textMuted }}>1 week ago</div>
-                  </div>
-                </div>
-
-                <button 
-                  onClick={() => {
-                    if (customAddress) {
-                      onSelect('custom');
-                      onClose();
-                    }
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '14px',
-                    borderRadius: '12px',
-                    background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
-                    border: 'none',
-                    color: 'white',
-                    fontWeight: '600',
-                    fontSize: '15px',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)'
-                  }}
-                >
-                  Apply Hook Selection
-                </button>
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </div>
@@ -1876,6 +1711,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
   const [toToken, setToToken] = useState(swapDetails?.toToken || "USDC");
   const [fromAmount, setFromAmount] = useState(swapDetails?.fromAmount || "");
   const [toAmount, setToAmount] = useState(swapDetails?.toAmount || "");
+  const [selectedPct, setSelectedPct] = useState<number | null>(null);
 
   // Chain-aware token lookup — must use the correct contract addresses for the connected chain
   const chainTokens = useMemo(() => getTokensForChain(currentChainId), [currentChainId]);
@@ -1937,9 +1773,10 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
   // Token balances hook (for ERC-20 tokens)
   const { balancesBySymbol, refetch: refetchTokenBalances } = useTokenBalances();
 
-  // Native ETH balance hook
+  // Native ETH balance hook — pass chainId so it reads from the correct RPC
   const { data: ethBalance, refetch: refetchEthBalance } = useBalance({
     address: address,
+    chainId: currentChainId,
     query: {
       enabled: !!address,
       staleTime: 10_000, // 10 seconds
@@ -1947,14 +1784,25 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
     },
   });
 
+  // Format balance for display: show up to 6 significant decimal digits
+  const formatBalance = (raw: string): string => {
+    const n = parseFloat(raw);
+    if (isNaN(n) || n === 0) return '0.00';
+    if (n >= 1000) return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    if (n >= 1) return n.toFixed(4);
+    // Small balances: show up to 6 decimals
+    return n.toFixed(6).replace(/0+$/, '').replace(/\.$/, '.00');
+  };
+
   // Helper function to get balance for any token
   const getTokenBalance = (tokenSymbol: string, tokenData: any) => {
     // Check if it's native ETH
     if (tokenSymbol === 'ETH' || isNativeEth(tokenData.address)) {
-      return ethBalance?.formatted || '0.00';
+      return formatBalance(ethBalance?.formatted || '0');
     }
     // Otherwise lookup in ERC-20 balances
-    return balancesBySymbol[tokenSymbol]?.formatted || balancesBySymbol[tokenData.symbol]?.formatted || '0.00';
+    const raw = balancesBySymbol[tokenSymbol]?.formatted || balancesBySymbol[tokenData.symbol]?.formatted || '0';
+    return formatBalance(raw);
   };
 
   // Helper function to calculate USD value using centralized price service
@@ -2067,6 +1915,8 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
     const fracStr = fracPart.toString().padStart(decimals, '0').slice(0, maxDecimals).replace(/0+$/, '');
     const result = fracStr ? `${wholePart}.${fracStr}` : `${wholePart}`;
     setFromAmount(result || '0');
+    // Track which % button was clicked (map fraction back to integer)
+    setSelectedPct(Math.round(pct * 100));
   };
 
   // Swap the from/to tokens and amounts
@@ -2077,6 +1927,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
     setToToken(tmpToken);
     setFromAmount(toAmount);
     setToAmount(tmpAmount);
+    setSelectedPct(null);
   };
 
   const handleTokenSelect = (tokenSymbol) => {
@@ -2084,6 +1935,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
         setFromToken(tokenSymbol);
         setFromAmount('');
         setToAmount('');
+        setSelectedPct(null);
     } else {
         setToToken(tokenSymbol);
         // Keep fromAmount so quote can recalculate with new token
@@ -2104,18 +1956,12 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
 
   useEffect(() => {
     if (swapDetails?.hook) {
-        // Find if hook name matches
         const hookId = hooks.find(h => h.name.toLowerCase().includes(swapDetails.hook.toLowerCase()) || h.id.toLowerCase() === swapDetails.hook.toLowerCase())?.id;
         if (hookId) setSelectedHook(hookId);
-        else if (swapDetails.hook.toLowerCase().includes('custom')) setSelectedHook('custom');
     }
   }, [swapDetails]);
 
-  const getSelectedHookObj = () => {
-    return hooks.find(h => h.id === selectedHook) || hooks[1]; // Default to No Hook if not found
-  };
-
-  const selectedHookObj = getSelectedHookObj();
+  const selectedHookObj = hooks.find(h => h.id === selectedHook) || hooks[0];
 
   return (
     <div style={{
@@ -2252,10 +2098,11 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
               amount={fromAmount}
               theme={theme}
               onTokenClick={() => openTokenSelector('from')}
-              onAmountChange={(val) => setFromAmount(val)}
+              onAmountChange={(val) => { setFromAmount(val); setSelectedPct(null); }}
               livePrice={fromTokenLivePrice}
               isPriceLoading={fromPriceLoading}
               onPercentClick={handlePercentage}
+              selectedPct={selectedPct}
             />
             
             <div style={{
@@ -2305,7 +2152,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
               <span style={{ color: theme.textSecondary, fontSize: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Swap Hook</span>
             </div>
 
-            <button 
+            <button
               onClick={() => setIsHookModalOpen(true)}
               style={{
                 display: 'flex',
@@ -3774,7 +3621,7 @@ const ChainSelector = ({ selectedChain, chains, onSelect, theme, isDark }) => {
                   color: theme.textMuted,
                   fontSize: '12px',
                 }}>
-                  Testnet
+                  {chain.name}
                 </div>
               </div>
               {selectedChain === chainId && (

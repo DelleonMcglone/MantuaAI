@@ -103,7 +103,8 @@
       "Bash(psql -c \"SELECT COUNT\\(*\\) as pools FROM pools;\")",
       "Bash(grep '\"\"version\"\"')",
       "Bash(fuser 5000/tcp)",
-      "Bash(ss -tlnp)"
+      "Bash(ss -tlnp)",
+      "Bash(npm list:*)"
     ]
   }
 }

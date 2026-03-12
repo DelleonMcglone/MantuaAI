@@ -27,7 +27,7 @@ export class DuneService {
   private apiKey: string;
 
   constructor() {
-    const key = process.env.DUNE_API_KEY || 'gKezRWgqcIZKII5VMDZ5ItBb9SoDGy1G';
+    const key = process.env.DUNE_API_KEY ?? '';
     this.apiKey = key;
   }
 

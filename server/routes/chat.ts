@@ -10,7 +10,7 @@ const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
-const DUNE_API_KEY = process.env.DUNE_API_KEY || 'gKezRWgqcIZKII5VMDZ5ItBb9SoDGy1G';
+const DUNE_API_KEY = process.env.DUNE_API_KEY ?? '';
 const DUNE_BASE_URL = 'https://api.dune.com/api/v1';
 
 async function fetchDuneResults(queryId: number): Promise<string> {

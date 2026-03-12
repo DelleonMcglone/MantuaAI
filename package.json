@@ -21,6 +21,7 @@
     "@ethersproject/providers": "^5.8.0",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
+    "@langchain/anthropic": "^0.3.34",
     "@langchain/core": "^0.3.26",
     "@langchain/langgraph": "^0.2.36",
     "@langchain/openai": "^0.3.14",

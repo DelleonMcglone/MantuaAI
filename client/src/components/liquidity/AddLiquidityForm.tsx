@@ -10,6 +10,8 @@ import { usePoolState } from '../../hooks/usePoolState';
 import { createPoolKey, getHookAddress, isNativeEth } from '../../lib/swap-utils';
 import { LiquidityTokenInput } from './LiquidityTokenInput';
 import { getExplorerTxUrl } from '../../config/contracts';
+import { isStablePair, CHAIN_NAMES } from '../../config/stablePairs';
+import { useWalletBalances } from '../../hooks/useWalletBalances';
 
 type RangeType = 'Full Range' | 'Wide' | 'Narrow' | 'Custom';
 const RANGE_TICKS: Record<RangeType, { tickLower: number; tickUpper: number }> = {
@@ -49,11 +51,17 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
   const [range, setRange] = useState<RangeType>('Full Range');
   const { isConnected, address } = useAccount();
   const chainId = useChainId();
+  const { getBalance } = useWalletBalances(address as `0x${string}` | undefined);
   const { addLiquidity, isPending, isConfirming, step, totalSteps, stepLabel, isSuccess, error, hash, reset } = useAddLiquidity();
   const hookAddr = getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none');
   // Stable Protection hook requires DYNAMIC_FEE_FLAG (0x800000) and tickSpacing=1
   const poolFee = selectedHook === 'stable-protection' ? 0x800000 : 500;
   const poolState = usePoolState(tokenA?.address, tokenB?.address, poolFee, hookAddr);
+
+  // Stable pair validation
+  const hookIsStableProtection = selectedHook === 'stable-protection';
+  const pairIsStable = tokenA && tokenB ? isStablePair(chainId, tokenA.symbol, tokenB.symbol) : false;
+  const showStableWarning = hookIsStableProtection && tokenA && tokenB && !pairIsStable;
 
   const { price: priceALive } = useLivePriceUSD(tokenA?.symbol ?? '');
   const { price: priceBLive } = useLivePriceUSD(tokenB?.symbol ?? '');
@@ -62,6 +70,23 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
 
   const parsedAmount0 = parseFloat(amount0) || 0;
   const parsedAmount1 = parseFloat(amount1) || 0;
+
+  // Format balances for display in token inputs
+  const balanceA = useMemo(() => {
+    if (!tokenA) return '0.00';
+    const bal = getBalance(tokenA.symbol);
+    if (!bal) return '0.00';
+    const num = parseFloat(bal.formatted);
+    return isNaN(num) ? '0.00' : num.toFixed(4);
+  }, [tokenA, getBalance]);
+
+  const balanceB = useMemo(() => {
+    if (!tokenB) return '0.00';
+    const bal = getBalance(tokenB.symbol);
+    if (!bal) return '0.00';
+    const num = parseFloat(bal.formatted);
+    return isNaN(num) ? '0.00' : num.toFixed(4);
+  }, [tokenB, getBalance]);
 
   const rawAmount0 = useMemo(() => {
     if (!tokenA || parsedAmount0 <= 0) return BigInt(0);
@@ -88,7 +113,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
       setAmount0((parseFloat(val) * priceB / priceA).toFixed(6));
   };
 
-  const canSubmit = isConnected && !!tokenA && !!tokenB && parsedAmount0 > 0 && parsedAmount1 > 0;
+  const canSubmit = isConnected && !!tokenA && !!tokenB && parsedAmount0 > 0 && parsedAmount1 > 0 && !showStableWarning;
 
   const buildPoolParams = () => {
     if (!tokenA || !tokenB) return null;
@@ -192,13 +217,13 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
       </div>
 
       <div style={{ position: 'relative', marginBottom: '12px' }}>
-        <LiquidityTokenInput token={tokenA} amount={amount0} onAmountChange={handleAmount0Change} onTokenClick={onTokenAClick} priceUsd={priceA} side="Token A" theme={theme} isDark={isDark} />
+        <LiquidityTokenInput token={tokenA} amount={amount0} onAmountChange={handleAmount0Change} onTokenClick={onTokenAClick} priceUsd={priceA} balance={balanceA} side="Token A" theme={theme} isDark={isDark} />
         <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 10 }}>
           <div style={{ width: '36px', height: '36px', borderRadius: '10px', border: `4px solid ${theme.bgCard}`, background: theme.bgSecondary, color: theme.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
             <ArrowLeftRightIcon />
           </div>
         </div>
-        <LiquidityTokenInput token={tokenB} amount={amount1} onAmountChange={handleAmount1Change} onTokenClick={onTokenBClick} priceUsd={priceB} side="Token B" theme={theme} isDark={isDark} />
+        <LiquidityTokenInput token={tokenB} amount={amount1} onAmountChange={handleAmount1Change} onTokenClick={onTokenBClick} priceUsd={priceB} balance={balanceB} side="Token B" theme={theme} isDark={isDark} />
       </div>
 
       <div style={{ marginBottom: '12px' }}>
@@ -248,8 +273,26 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
         </div>
       )}
 
+      {/* Stable pair warning — shown when hook is stable-protection but pair is not stable */}
+      {showStableWarning && (
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '12px', borderRadius: '12px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', marginBottom: '12px' }}>
+          <span style={{ color: '#f59e0b', fontSize: '14px', marginTop: '1px' }}>&#9888;&#65039;</span>
+          <div>
+            <div style={{ fontSize: '13px', fontWeight: '600', color: '#f59e0b' }}>Not a stable pair</div>
+            <div style={{ fontSize: '12px', color: '#d97706', marginTop: '2px', lineHeight: '1.4' }}>
+              The Stable Protection Hook is designed for stable pairs only.{' '}
+              {tokenA?.symbol}/{tokenB?.symbol} is not a recognized stable pair on{' '}
+              {CHAIN_NAMES[chainId] ?? 'this network'}.
+              {chainId === 84532
+                ? ' Valid pairs on Base Sepolia: USDC/EURC, USDC/USDT, EURC/USDT.'
+                : ' Valid pairs on Unichain Sepolia: USDC/USDT.'}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Stable Protection Hook Panel — shown when stable hook is selected */}
-      {selectedHook === 'stable-protection' && (
+      {selectedHook === 'stable-protection' && !showStableWarning && (
         <div style={{ marginBottom: '12px', padding: '12px 16px', borderRadius: '12px', background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             <span style={{ color: '#10b981', fontWeight: '700', fontSize: '13px' }}>Stable Protection Hook</span>

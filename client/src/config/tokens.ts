@@ -46,6 +46,16 @@ export const BASE_SEPOLIA_ERC20_TOKENS: Token[] = [
     isNative: false,
   },
   {
+    symbol: 'USDT',
+    name: 'Tether USD',
+    address: '0xb38e0ba5aea889652b64ad38d624848896dcb089',
+    decimals: 6,
+    chainId: 84532,
+    logoURI: 'https://assets.coingecko.com/coins/images/325/small/Tether.png',
+    coingeckoId: 'tether',
+    isNative: false,
+  },
+  {
     symbol: 'EURC',
     name: 'Euro Coin',
     // Verified: https://base-sepolia.blockscout.com/token/0x808456652fdb597867f38412077A9182bf77359F
@@ -87,9 +97,16 @@ export const UNICHAIN_SEPOLIA_ERC20_TOKENS: Token[] = [
     coingeckoId: 'usd-coin',
     isNative: false,
   },
-  // Note: EURC on Unichain Sepolia — address unconfirmed via on-chain verification.
-  // If you receive EURC from https://faucet.circle.com on Unichain Sepolia,
-  // check your wallet's token list for the contract address and update here.
+  {
+    symbol: 'USDT',
+    name: 'Tether USD',
+    address: '0xb38e0ba5aea889652b64ad38d624848896dcb089',
+    decimals: 6,
+    chainId: 1301,
+    logoURI: 'https://assets.coingecko.com/coins/images/325/small/Tether.png',
+    coingeckoId: 'tether',
+    isNative: false,
+  },
 ];
 
 // ─── Chain-aware token helpers ──────────────────────────────────────────────
@@ -139,12 +156,12 @@ export const MOCK_TOKENS: Token[] = SUPPORTED_TOKENS;
 export const ALL_TOKENS: Token[] = SUPPORTED_TOKENS;
 export const POPULAR_TOKENS: Token[] = SUPPORTED_TOKENS;
 export const STABLECOINS: Token[] = BASE_SEPOLIA_ERC20_TOKENS.filter(
-  t => t.symbol === 'USDC' || t.symbol === 'EURC'
+  t => t.symbol === 'USDC' || t.symbol === 'USDT' || t.symbol === 'EURC'
 );
 
 export const MOCK_TOKEN_FACTORY: `0x${string}` = '0x0000000000000000000000000000000000000000';
 
-export type TokenSymbol = 'ETH' | 'cbBTC' | 'USDC' | 'EURC';
+export type TokenSymbol = 'ETH' | 'cbBTC' | 'USDC' | 'USDT' | 'EURC';
 
 export const TOKEN_BY_SYMBOL: Record<string, Token> = Object.fromEntries(
   SUPPORTED_TOKENS.map(t => [t.symbol, t])

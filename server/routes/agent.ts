@@ -13,7 +13,7 @@ const createWalletSchema = z.object({
 
 const faucetSchema = z.object({
   address: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
-  tokens: z.array(z.enum(['eth', 'usdc', 'cbbtc', 'eurc'])).min(1),
+  tokens: z.array(z.enum(['eth', 'usdc', 'usdt', 'cbbtc', 'eurc'])).min(1),
 });
 
 const querySchema = z.object({
@@ -29,7 +29,7 @@ const duneSchema = z.object({
 const sendSchema = z.object({
   walletId: z.string().min(1),
   to: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
-  token: z.enum(['ETH', 'USDC', 'cbBTC', 'EURC']),
+  token: z.enum(['ETH', 'USDC', 'USDT', 'cbBTC', 'EURC']),
   amount: z.string().min(1),
 });
 
@@ -71,7 +71,7 @@ async function fetchCoinGeckoPrice(id: string): Promise<number> {
   }
 }
 
-const DUNE_API_KEY = process.env.DUNE_API_KEY || 'gKezRWgqcIZKII5VMDZ5ItBb9SoDGy1G';
+const DUNE_API_KEY = process.env.DUNE_API_KEY ?? '';
 const DUNE_BASE = 'https://api.dune.com/api/v1';
 
 // Curated Dune query IDs — public queries that work on the free tier
@@ -146,10 +146,12 @@ function matchDuneQuery(text: string): { queryId: number; label: string } | null
 const COINGECKO_IDS: Record<string, string> = {
   eth:   'ethereum',
   usdc:  'usd-coin',
+  usdt:  'tether',
   cbbtc: 'coinbase-wrapped-btc',
   eurc:  'euro-coin',
   ETH:   'ethereum',
   USDC:  'usd-coin',
+  USDT:  'tether',
   cbBTC: 'coinbase-wrapped-btc',
   EURC:  'euro-coin',
 };

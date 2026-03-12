@@ -35,6 +35,7 @@ const TOKEN_GRAD_MAP: Record<string, string> = {
   ETH:   'linear-gradient(135deg, #627EEA 0%, #8B9FFF 100%)',
   cbBTC: 'linear-gradient(135deg, #F7931A 0%, #FFB347 100%)',
   USDC:  'linear-gradient(135deg, #2775CA 0%, #4A9FE8 100%)',
+  USDT:  'linear-gradient(135deg, #26A17B 0%, #3DC68D 100%)',
   EURC:  'linear-gradient(135deg, #0052B4 0%, #2E86AB 100%)',
 };
 const tokenGrad = (s?: string) => !s ? 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)' : TOKEN_GRAD_MAP[s] || 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)';
@@ -43,6 +44,7 @@ const tokenGlyph = (s?: string) => {
   if (s === 'ETH') return 'Ξ';
   if (s === 'cbBTC') return '₿';
   if (s === 'USDC') return '$';
+  if (s === 'USDT') return '₮';
   if (s === 'EURC') return '€';
   return s.charAt(0);
 };
@@ -88,6 +90,7 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
   const [tokenA, setTokenA] = useState<Token | null>(null);
   const [tokenB, setTokenB] = useState<Token | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [chartTab, setChartTab] = useState<'Volume' | 'TVL'>('Volume');
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 900);
@@ -170,8 +173,8 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px' }}>
                     <span style={{ color: '#10b981', fontSize: '13px', fontWeight: '600' }}>↗ 0.029% Fee</span>
-                    <span style={{ color: theme.textSecondary, fontSize: '13px' }}>TVL <span style={{ color: '#9ca3af', fontWeight: '600' }}>—</span> <span style={{ background: 'rgba(107,114,128,0.2)', color: '#9ca3af', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, verticalAlign: 'middle' }}>Testnet</span></span>
-                    <span style={{ color: theme.textSecondary, fontSize: '13px' }}>APY <span style={{ color: '#9ca3af', fontWeight: '600' }}>—</span> <span style={{ background: 'rgba(107,114,128,0.2)', color: '#9ca3af', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, verticalAlign: 'middle' }}>Testnet</span></span>
+                    <span style={{ color: theme.textSecondary, fontSize: '13px' }}>TVL <span style={{ color: '#9ca3af', fontWeight: '600' }}>—</span></span>
+                    <span style={{ color: theme.textSecondary, fontSize: '13px' }}>APY <span style={{ color: '#9ca3af', fontWeight: '600' }}>—</span></span>
                   </div>
                 </div>
               </div>
@@ -180,12 +183,12 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
 
           <div style={{ flex: 1, padding: '24px', display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', gap: '4px', marginBottom: '20px' }}>
-              {['Volume', 'TVL'].map((tab, i) => (
-                <button key={tab} style={{ padding: '6px 12px', borderRadius: '8px', background: i === 0 ? theme.bgSecondary : 'transparent', color: i === 0 ? theme.textPrimary : theme.textSecondary, border: 'none', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>{tab}</button>
+              {(['Volume', 'TVL'] as const).map((tab) => (
+                <button key={tab} onClick={() => setChartTab(tab)} style={{ padding: '6px 12px', borderRadius: '8px', background: chartTab === tab ? theme.bgSecondary : 'transparent', color: chartTab === tab ? theme.textPrimary : theme.textSecondary, border: 'none', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>{tab}</button>
               ))}
             </div>
             <div style={{ flex: 1, minHeight: '250px' }}>
-              <PoolActivityChart theme={theme} isDark={isDark} tokenA={displayA} tokenB={displayB} />
+              <PoolActivityChart theme={theme} isDark={isDark} tokenA={displayA} tokenB={displayB} chartMode={chartTab.toLowerCase() as 'volume' | 'tvl'} />
             </div>
           </div>
         </div>

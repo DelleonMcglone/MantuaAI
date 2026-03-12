@@ -348,7 +348,7 @@ export function ConnectButton({
                         <div style={{ color: isActive ? chain.color : '#e5e7eb', fontSize: 13, fontWeight: 600 }}>
                           {chain.name}
                         </div>
-                        <div style={{ color: '#6b7280', fontSize: 11 }}>Testnet</div>
+                        <div style={{ color: '#6b7280', fontSize: 11 }}>{chain.name}</div>
                       </div>
                       {isActive && (
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={chain.color} strokeWidth="2.5">
