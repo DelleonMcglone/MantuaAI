@@ -16,7 +16,7 @@ export type IntentType =
   | "query"
   | "unknown";
 
-type TokenSymbol = "USDC" | "USDT" | "EURC" | "ETH" | "cbBTC";
+type TokenSymbol = "USDC" | "EURC" | "ETH" | "cbBTC" | "tUSDT" | "LINK";
 
 export interface DetectedIntent {
   type: IntentType;
@@ -53,15 +53,23 @@ function detectChain(message: string): number | undefined {
 }
 
 // ── Token extraction ────────────────────────────────────────────────────────
-const TOKEN_RE = /\b(USDC|USDT|EURC|ETH|cbBTC)\b/gi;
+const TOKEN_RE = /\b(USDC|t?USDT|EURC|ETH|cbBTC|LINK)\b/gi;
+
+function normalizeSymbol(raw: string): TokenSymbol {
+  const upper = raw.toUpperCase();
+  // Normalize bare "USDT" to "tUSDT" (testnet Tether on Unichain)
+  if (upper === 'USDT') return 'tUSDT';
+  if (upper === 'TUSDT') return 'tUSDT';
+  return upper as TokenSymbol;
+}
 
 function extractTokens(message: string): TokenSymbol[] {
   const matches = message.match(TOKEN_RE) ?? [];
-  return [...new Set(matches.map(t => t.toUpperCase() as TokenSymbol))];
+  return [...new Set(matches.map(normalizeSymbol))];
 }
 
 // ── Amount extraction ───────────────────────────────────────────────────────
-const AMOUNT_RE = /(\d+\.?\d*)\s*(?:USDC|USDT|EURC|ETH|cbBTC)/i;
+const AMOUNT_RE = /(\d+\.?\d*)\s*(?:USDC|t?USDT|EURC|ETH|cbBTC|LINK)/i;
 
 function extractAmount(message: string): string | undefined {
   const match = AMOUNT_RE.exec(message);
@@ -104,7 +112,7 @@ const PATTERNS: Array<{ type: IntentType; patterns: RegExp[] }> = [
       /\b(?:swap|convert|trade|exchange)\b.*\bstable\s+(?:pool|hook)\b/i,
       /\b(?:swap|convert|trade|exchange)\b.*\bhook\s+pool\b/i,
       /\bstable\s+protection\b.*\b(?:swap|convert|trade|exchange)\b/i,
-      /\b(?:swap|convert|trade|exchange)\b\s+(?:\d+(?:\.\d+)?\s+)?(?:usdc|usdt|eurc)\s+(?:for|to|→|into)\s+(?:eurc|usdc|usdt)\s+(?:from|via|using|through|with|stable|hook)/i,
+      /\b(?:swap|convert|trade|exchange)\b\s+(?:\d+(?:\.\d+)?\s+)?(?:usdc|t?usdt|eurc)\s+(?:for|to|→|into)\s+(?:eurc|usdc|t?usdt)\s+(?:from|via|using|through|with|stable|hook)/i,
     ],
   },
   {
@@ -144,14 +152,14 @@ const PATTERNS: Array<{ type: IntentType; patterns: RegExp[] }> = [
       /\bexchange\b\s+[\d.]+/i,
       /\btrade\b\s+[\d.]+/i,
       /\bconvert\b\s+[\d.]+/i,
-      /\bswap\b\s+(?:USDC|USDT|EURC|ETH|cbBTC)\b/i,
-      /\bbuy\b\s+(?:USDC|USDT|EURC|ETH|cbBTC)\s+with\b/i,
-      /\bsell\b\s+[\d.]+\s+(?:USDC|USDT|EURC|ETH|cbBTC)\b/i,
+      /\bswap\b\s+(?:USDC|t?USDT|EURC|ETH|cbBTC|LINK)\b/i,
+      /\bbuy\b\s+(?:USDC|t?USDT|EURC|ETH|cbBTC|LINK)\s+with\b/i,
+      /\bsell\b\s+[\d.]+\s+(?:USDC|t?USDT|EURC|ETH|cbBTC|LINK)\b/i,
       /I\s+want\s+to\s+swap/i,
-      /\bget\b\s+(?:USDC|USDT|EURC|ETH|cbBTC)\s+for\s+(?:my\s+)?(?:USDC|USDT|EURC|ETH|cbBTC)\b/i,
-      /\bconvert\b\s+(?:USDC|USDT|EURC|ETH|cbBTC)\b/i,
-      /\bexchange\b\s+(?:USDC|USDT|EURC|ETH|cbBTC)\b/i,
-      /\btrade\b\s+(?:USDC|USDT|EURC|ETH|cbBTC)\b/i,
+      /\bget\b\s+(?:USDC|t?USDT|EURC|ETH|cbBTC|LINK)\s+for\s+(?:my\s+)?(?:USDC|t?USDT|EURC|ETH|cbBTC|LINK)\b/i,
+      /\bconvert\b\s+(?:USDC|t?USDT|EURC|ETH|cbBTC|LINK)\b/i,
+      /\bexchange\b\s+(?:USDC|t?USDT|EURC|ETH|cbBTC|LINK)\b/i,
+      /\btrade\b\s+(?:USDC|t?USDT|EURC|ETH|cbBTC|LINK)\b/i,
     ],
   },
   {
@@ -181,45 +189,45 @@ function parseSwapParams(message: string): Partial<DetectedIntent> {
   const amount = extractAmount(message);
 
   // Try explicit "X for Y" pattern
-  const forPattern = /(\d+\.?\d*)?\s*(USDC|USDT|EURC|ETH|cbBTC)\s+(?:for|to|→|into)\s+(USDC|USDT|EURC|ETH|cbBTC)/i;
+  const forPattern = /(\d+\.?\d*)?\s*(USDC|t?USDT|EURC|ETH|cbBTC|LINK)\s+(?:for|to|→|into)\s+(USDC|t?USDT|EURC|ETH|cbBTC|LINK)/i;
   const forMatch = forPattern.exec(message);
   if (forMatch) {
     return {
-      fromToken: forMatch[2].toUpperCase() as TokenSymbol,
-      toToken: forMatch[3].toUpperCase() as TokenSymbol,
+      fromToken: normalizeSymbol(forMatch[2]),
+      toToken: normalizeSymbol(forMatch[3]),
       amount: forMatch[1] || amount || "1",
     };
   }
 
   // "buy X with Y" pattern
-  const buyPattern = /buy\s+(USDC|USDT|EURC|ETH|cbBTC)\s+with\s+(?:(\d+\.?\d*)\s+)?(USDC|USDT|EURC|ETH|cbBTC)/i;
+  const buyPattern = /buy\s+(USDC|t?USDT|EURC|ETH|cbBTC|LINK)\s+with\s+(?:(\d+\.?\d*)\s+)?(USDC|t?USDT|EURC|ETH|cbBTC|LINK)/i;
   const buyMatch = buyPattern.exec(message);
   if (buyMatch) {
     return {
-      fromToken: buyMatch[3].toUpperCase() as TokenSymbol,
-      toToken: buyMatch[1].toUpperCase() as TokenSymbol,
+      fromToken: normalizeSymbol(buyMatch[3]),
+      toToken: normalizeSymbol(buyMatch[1]),
       amount: buyMatch[2] || amount || "1",
     };
   }
 
   // "sell X for Y" pattern
-  const sellPattern = /sell\s+(?:(\d+\.?\d*)\s+)?(USDC|USDT|EURC|ETH|cbBTC)\s+(?:for|to)\s+(USDC|USDT|EURC|ETH|cbBTC)/i;
+  const sellPattern = /sell\s+(?:(\d+\.?\d*)\s+)?(USDC|t?USDT|EURC|ETH|cbBTC|LINK)\s+(?:for|to)\s+(USDC|t?USDT|EURC|ETH|cbBTC|LINK)/i;
   const sellMatch = sellPattern.exec(message);
   if (sellMatch) {
     return {
-      fromToken: sellMatch[2].toUpperCase() as TokenSymbol,
-      toToken: sellMatch[3].toUpperCase() as TokenSymbol,
+      fromToken: normalizeSymbol(sellMatch[2]),
+      toToken: normalizeSymbol(sellMatch[3]),
       amount: sellMatch[1] || amount || "1",
     };
   }
 
   // "get X for my Y" pattern
-  const getPattern = /get\s+(USDC|USDT|EURC|ETH|cbBTC)\s+for\s+(?:my\s+)?(USDC|USDT|EURC|ETH|cbBTC)/i;
+  const getPattern = /get\s+(USDC|t?USDT|EURC|ETH|cbBTC|LINK)\s+for\s+(?:my\s+)?(USDC|t?USDT|EURC|ETH|cbBTC|LINK)/i;
   const getMatch = getPattern.exec(message);
   if (getMatch) {
     return {
-      fromToken: getMatch[2].toUpperCase() as TokenSymbol,
-      toToken: getMatch[1].toUpperCase() as TokenSymbol,
+      fromToken: normalizeSymbol(getMatch[2]),
+      toToken: normalizeSymbol(getMatch[1]),
       amount: amount || "1",
     };
   }
@@ -242,11 +250,11 @@ function parseLiquidityParams(message: string): Partial<DetectedIntent> {
   const chainHint = detectChain(message);
 
   // Try pair pattern "USDC/USDT", "USDC USDT", or "USDC, USDT"
-  const pairMatch = /\b(USDC|USDT|EURC|ETH|cbBTC)\s*[/\-,\s]\s*(USDC|USDT|EURC|ETH|cbBTC)\b/i.exec(message);
+  const pairMatch = /\b(USDC|t?USDT|EURC|ETH|cbBTC|LINK)\s*[/\-,\s]\s*(USDC|t?USDT|EURC|ETH|cbBTC|LINK)\b/i.exec(message);
   if (pairMatch) {
     return {
-      fromToken: pairMatch[1].toUpperCase() as TokenSymbol,
-      toToken: pairMatch[2].toUpperCase() as TokenSymbol,
+      fromToken: normalizeSymbol(pairMatch[1]),
+      toToken: normalizeSymbol(pairMatch[2]),
       useStableHook,
       chainHint,
     };

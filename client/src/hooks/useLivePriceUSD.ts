@@ -26,8 +26,8 @@ export const priceCache = new Map<string, CacheEntry>();
 
 // ── Stablecoins — always $1.00, no API call needed ─────────────────────────
 
-// USDC is the only pure-stable — EURC has real price fluctuation
-const STABLECOINS = new Set(['USDC']);
+// USDC and tUSDT are pegged stables — EURC has real price fluctuation
+const STABLECOINS = new Set(['USDC', 'tUSDT']);
 
 // ── Fetch helper ──────────────────────────────────────────────────────────
 

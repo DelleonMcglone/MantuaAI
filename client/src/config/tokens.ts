@@ -26,9 +26,7 @@ export const BASE_SEPOLIA_ERC20_TOKENS: Token[] = [
   {
     symbol: 'cbBTC',
     name: 'Coinbase Wrapped BTC',
-    // Verified: https://sepolia.basescan.org/tx/0x2a0c23fe06fee9b8e93a8fb0988f0c31b4c09b5127e477677e2eed8cc067553f
-    // Base Sepolia testnet address (different from mainnet 0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf)
-    address: '0xcbb7c0006f23900c38eb856149f799620fcb8a4a',
+    address: '0xcbB7C0006F23900c38EB856149F799620fcb8A4a',
     decimals: 8,
     chainId: 84532,
     logoURI: 'https://assets.coingecko.com/coins/images/40143/small/cbbtc.webp',
@@ -43,16 +41,6 @@ export const BASE_SEPOLIA_ERC20_TOKENS: Token[] = [
     chainId: 84532,
     logoURI: 'https://assets.coingecko.com/coins/images/6319/small/usdc.png',
     coingeckoId: 'usd-coin',
-    isNative: false,
-  },
-  {
-    symbol: 'USDT',
-    name: 'Tether USD',
-    address: '0xb38e0ba5aea889652b64ad38d624848896dcb089',
-    decimals: 6,
-    chainId: 84532,
-    logoURI: 'https://assets.coingecko.com/coins/images/325/small/Tether.png',
-    coingeckoId: 'tether',
     isNative: false,
   },
   {
@@ -98,13 +86,25 @@ export const UNICHAIN_SEPOLIA_ERC20_TOKENS: Token[] = [
     isNative: false,
   },
   {
-    symbol: 'USDT',
-    name: 'Tether USD',
-    address: '0xb38e0ba5aea889652b64ad38d624848896dcb089',
+    symbol: 'tUSDT',
+    name: 'Testnet Tether USD',
+    // Source: https://developer.bitaps.com/faucet
+    address: '0xEa3B5B015a5289bE6fFa7196aF5386A86E50a8c2',
     decimals: 6,
     chainId: 1301,
     logoURI: 'https://assets.coingecko.com/coins/images/325/small/Tether.png',
     coingeckoId: 'tether',
+    isNative: false,
+  },
+  {
+    symbol: 'LINK',
+    name: 'Chainlink',
+    // Faucet: https://faucets.chain.link/
+    address: '0xda40816f278Cd049c137F6612822D181065EBfB4',
+    decimals: 18,
+    chainId: 1301,
+    logoURI: 'https://assets.coingecko.com/coins/images/877/small/chainlink-new-logo.png',
+    coingeckoId: 'chainlink',
     isNative: false,
   },
 ];
@@ -156,12 +156,12 @@ export const MOCK_TOKENS: Token[] = SUPPORTED_TOKENS;
 export const ALL_TOKENS: Token[] = SUPPORTED_TOKENS;
 export const POPULAR_TOKENS: Token[] = SUPPORTED_TOKENS;
 export const STABLECOINS: Token[] = BASE_SEPOLIA_ERC20_TOKENS.filter(
-  t => t.symbol === 'USDC' || t.symbol === 'USDT' || t.symbol === 'EURC'
+  t => t.symbol === 'USDC' || t.symbol === 'EURC'
 );
 
 export const MOCK_TOKEN_FACTORY: `0x${string}` = '0x0000000000000000000000000000000000000000';
 
-export type TokenSymbol = 'ETH' | 'cbBTC' | 'USDC' | 'USDT' | 'EURC';
+export type TokenSymbol = 'ETH' | 'cbBTC' | 'USDC' | 'EURC' | 'tUSDT' | 'LINK';
 
 export const TOKEN_BY_SYMBOL: Record<string, Token> = Object.fromEntries(
   SUPPORTED_TOKENS.map(t => [t.symbol, t])

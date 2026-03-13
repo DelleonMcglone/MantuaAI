@@ -6,24 +6,27 @@ export const TOKEN_COLORS: Record<string, string> = {
   ETH:   '#627EEA',
   cbBTC: '#F7931A',
   USDC:  '#2775CA',
-  USDT:  '#26A17B',
   EURC:  '#0052B4',
+  tUSDT: '#26A17B',
+  LINK:  '#2A5ADA',
 };
 
 export const TOKEN_ICONS: Record<string, string> = {
   ETH:   'Ξ',
   cbBTC: '₿',
   USDC:  '$',
-  USDT:  '₮',
   EURC:  '€',
+  tUSDT: '₮',
+  LINK:  '⬡',
 };
 
 export const COINGECKO_IDS: Record<string, string> = {
   ETH:   'ethereum',
   cbBTC: 'coinbase-wrapped-btc',
   USDC:  'usd-coin',
-  USDT:  'tether',
   EURC:  'euro-coin',
+  tUSDT: 'tether',
+  LINK:  'chainlink',
 };
 
 export const COINGECKO_DAYS: Record<string, string> = {
@@ -42,7 +45,7 @@ export function getTokenIcon(symbol: string): string {
   return TOKEN_ICONS[symbol] ?? symbol.charAt(0);
 }
 
-export const SUPPORTED_TOKEN_SYMBOLS = ['ETH', 'cbBTC', 'USDC', 'USDT', 'EURC'] as const;
+export const SUPPORTED_TOKEN_SYMBOLS = ['ETH', 'cbBTC', 'USDC', 'EURC', 'tUSDT', 'LINK'] as const;
 
 export function getCoingeckoId(symbol: string): string | undefined {
   return COINGECKO_IDS[symbol];

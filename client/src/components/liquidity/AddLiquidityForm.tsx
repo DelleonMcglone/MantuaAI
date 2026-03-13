@@ -284,8 +284,8 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
               {tokenA?.symbol}/{tokenB?.symbol} is not a recognized stable pair on{' '}
               {CHAIN_NAMES[chainId] ?? 'this network'}.
               {chainId === 84532
-                ? ' Valid pairs on Base Sepolia: USDC/EURC, USDC/USDT, EURC/USDT.'
-                : ' Valid pairs on Unichain Sepolia: USDC/USDT.'}
+                ? ' Valid pairs on Base Sepolia: USDC/EURC.'
+                : ' Valid pairs on Unichain Sepolia: USDC/tUSDT.'}
             </div>
           </div>
         </div>

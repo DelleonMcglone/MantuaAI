@@ -148,16 +148,24 @@ export function ConnectButton({
     {
       symbol: 'ETH',
       balance: ethBalance ? parseFloat(formatUnits(ethBalance.value, 18)) : 0,
-      decimals: 4,
+      displayDecimals: 4,
     },
     ...erc20Tokens.map((token, i) => ({
       symbol: token.symbol,
       balance: erc20Data?.[i]?.result
         ? parseFloat(formatUnits(erc20Data[i].result as bigint, token.decimals))
         : 0,
-      decimals: token.decimals <= 8 ? 6 : 4,
+      displayDecimals: token.symbol === 'cbBTC' ? 6 : 4,
     })),
   ], [ethBalance, erc20Data, erc20Tokens]);
+
+  // Format balance for display — handles very large numbers gracefully
+  const fmtBalance = (balance: number, decimals: number) => {
+    if (balance >= 1e9) return `${(balance / 1e9).toFixed(2)}B`;
+    if (balance >= 1e6) return `${(balance / 1e6).toFixed(2)}M`;
+    if (balance >= 1e4) return balance.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    return balance.toFixed(decimals);
+  };
 
   const totalUsd = tokenRows.reduce((sum, row) => {
     const price = getPriceBySymbol(row.symbol) || (row.symbol === 'USDC' || row.symbol === 'EURC' ? 1 : 0);
@@ -367,18 +375,18 @@ export function ConnectButton({
 
           {/* Token balances */}
           {tokenRows.map(row => {
-            const price = getPriceBySymbol(row.symbol) || (row.symbol === 'USDC' || row.symbol === 'EURC' ? 1 : 0);
+            const price = getPriceBySymbol(row.symbol) || (['USDC', 'EURC', 'tUSDT'].includes(row.symbol) ? 1 : 0);
             const usdValue = row.balance * price;
             return (
               <div key={row.symbol} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <span style={{ color: '#9ca3af', fontSize: 13 }}>{row.symbol}</span>
                 <div style={{ textAlign: 'right' }}>
                   <span style={{ color: '#e5e7eb', fontSize: 13, fontWeight: 500 }}>
-                    {row.balance.toFixed(row.decimals)}
+                    {fmtBalance(row.balance, row.displayDecimals)}
                   </span>
                   {usdValue > 0.001 && (
                     <span style={{ color: '#6b7280', fontSize: 11, marginLeft: 6 }}>
-                      (${usdValue.toFixed(2)})
+                      (${usdValue >= 1e6 ? `${(usdValue / 1e6).toFixed(2)}M` : usdValue.toFixed(2)})
                     </span>
                   )}
                 </div>

@@ -261,7 +261,7 @@ export function formatTokenAmount(amount: bigint, decimals: number, isStablecoin
 }
 
 export function formatDisplayAmount(value: number, symbol: string): string {
-  const stableSymbols = new Set(['USDC', 'USDT', 'EURC']);
+  const stableSymbols = new Set(['USDC', 'EURC', 'tUSDT']);
   const isStable = stableSymbols.has(symbol);
   
   if (isStable) {

@@ -5,15 +5,13 @@
  */
 
 export const STABLE_PAIRS: Record<number, [string, string][]> = {
-  // Base Sepolia — 3 stable pairs
+  // Base Sepolia — 1 stable pair
   84532: [
     ['USDC', 'EURC'],
-    ['USDC', 'USDT'],
-    ['EURC', 'USDT'],
   ],
   // Unichain Sepolia — 1 stable pair
   1301: [
-    ['USDC', 'USDT'],
+    ['USDC', 'tUSDT'],
   ],
 };
 
