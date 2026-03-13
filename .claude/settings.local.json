@@ -104,7 +104,9 @@
       "Bash(grep '\"\"version\"\"')",
       "Bash(fuser 5000/tcp)",
       "Bash(ss -tlnp)",
-      "Bash(npm list:*)"
+      "Bash(npm list:*)",
+      "Bash(find /Users/delleonmcglone/MantuaAI -maxdepth 2 -type f \\\\\\(-name *.config.* -o -name mcp* -o -name .clauderc* -o -name *mcp*.ts -o -name *mcp*.js \\\\\\))",
+      "WebFetch(domain:www.npmjs.com)"
     ]
   }
 }

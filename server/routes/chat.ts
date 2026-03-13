@@ -4,62 +4,64 @@ import { z } from "zod";
 import OpenAI from "openai";
 import { storage } from "../storage";
 import { parseVoiceCommand } from "../../shared/voiceCommandParser";
+import { duneService } from "../services/duneService";
+import { matchDuneQuery, matchSQLTemplate, fillTemplateParams, getAllQueries, getAllSQLTemplates } from "../services/duneQueries";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
-const DUNE_API_KEY = process.env.DUNE_API_KEY ?? '';
-const DUNE_BASE_URL = 'https://api.dune.com/api/v1';
+// ── Dune CLI tool handlers (used by AI chat) ──────────────────────────────
 
 async function fetchDuneResults(queryId: number): Promise<string> {
   try {
-    const headers = { 'X-DUNE-API-KEY': DUNE_API_KEY, 'Content-Type': 'application/json' };
-
-    // Execute
-    const execRes = await fetch(`${DUNE_BASE_URL}/query/${queryId}/execute`, {
-      method: 'POST', headers, body: JSON.stringify({}),
-    });
-    if (!execRes.ok) return `Dune execute error: ${execRes.status}`;
-    const { execution_id } = await execRes.json() as { execution_id: string };
-
-    // Poll
-    let state = 'PENDING';
-    for (let i = 0; i < 5 && !state.includes('COMPLETED') && !state.includes('FAILED'); i++) {
-      await new Promise(r => setTimeout(r, 2000));
-      const s = await fetch(`${DUNE_BASE_URL}/execution/${execution_id}/status`, { headers });
-      if (s.ok) { state = ((await s.json()) as { state: string }).state; }
-    }
-    if (!state.includes('COMPLETED')) return `Dune query timed out (state: ${state})`;
-
-    // Results
-    const resRes = await fetch(`${DUNE_BASE_URL}/execution/${execution_id}/results?limit=10`, { headers });
-    if (!resRes.ok) return `Dune results error: ${resRes.status}`;
-    const json = await resRes.json() as { result?: { rows: unknown[] } };
-    const rows = json.result?.rows ?? [];
+    const result = await duneService.getLatestResults(queryId);
+    const rows = result.rows ?? [];
     if (rows.length === 0) return 'No data returned from Dune query.';
-    return `Dune query ${queryId} returned ${rows.length} rows:\n${JSON.stringify(rows.slice(0, 5), null, 2)}`;
+    return `Dune query ${queryId} returned ${result.metadata.row_count} rows:\n${JSON.stringify(rows.slice(0, 10), null, 2)}`;
   } catch (err) {
     return `Failed to fetch Dune data: ${err instanceof Error ? err.message : 'Unknown error'}`;
   }
 }
 
-// Curated DeFi query IDs for Dune search fallback (public queries that work on free tier)
-const DUNE_CURATED: Array<{ id: number; name: string; keywords: string[] }> = [
-  { id: 1252207, name: 'NFT Marketplace Rankings', keywords: ['nft', 'opensea', 'blur', 'marketplace'] },
-  { id: 3374572, name: 'DEX Volume Overview', keywords: ['dex', 'volume', 'swap', 'uniswap', 'defi'] },
-  { id: 4559580, name: 'Uniswap v4 Base Activity', keywords: ['uniswap', 'v4', 'base', 'pool', 'hook'] },
-  { id: 3468667, name: 'ETH Gas Analytics', keywords: ['gas', 'gwei', 'fee', 'eth gas'] },
-];
-
 async function searchDune(query: string): Promise<string> {
-  const lower = query.toLowerCase();
-  const matches = DUNE_CURATED.filter(q => q.keywords.some(kw => lower.includes(kw)));
-  if (matches.length > 0) {
-    return matches.map(m => `- [${m.id}] ${m.name} → use query_id: ${m.id}`).join('\n');
+  // Search curated queries
+  const matched = matchDuneQuery(query);
+  if (matched) {
+    return `Found curated query: [${matched.id}] ${matched.name} — ${matched.description}. Use query_id: ${matched.id}`;
   }
-  return `No pre-configured Dune queries match "${query}". Available topics: NFT marketplaces (1252207), DEX volume (3374572), Uniswap v4 Base (4559580), ETH gas (3468667).`;
+
+  // Search SQL templates
+  const template = matchSQLTemplate(query);
+  if (template) {
+    return `Found SQL template: "${template.name}" — ${template.description}. This can be run with dune_run_sql.`;
+  }
+
+  const all = getAllQueries();
+  const templates = getAllSQLTemplates();
+  return `No match for "${query}". Available curated queries:\n${all.map(q => `- [${q.id}] ${q.name}`).join('\n')}\n\nSQL templates:\n${templates.map(t => `- ${t.name}: ${t.description}`).join('\n')}`;
+}
+
+async function runDuneSQL(sql: string): Promise<string> {
+  try {
+    const result = await duneService.runSQL(sql);
+    const rows = result.rows ?? [];
+    if (rows.length === 0) return 'SQL query returned no rows.';
+    return `SQL returned ${result.metadata.row_count} rows:\n${JSON.stringify(rows.slice(0, 10), null, 2)}`;
+  } catch (err) {
+    return `SQL execution failed: ${err instanceof Error ? err.message : 'Unknown error'}`;
+  }
+}
+
+async function searchDuneTables(keyword: string, chain?: string): Promise<string> {
+  try {
+    const tables = await duneService.searchTables(keyword, { chain, limit: 10 });
+    if (tables.length === 0) return `No tables found for "${keyword}".`;
+    return `Found ${tables.length} tables:\n${tables.map(t => `- ${t.full_name}${t.description ? ` — ${t.description}` : ''}`).join('\n')}`;
+  } catch (err) {
+    return `Table search failed: ${err instanceof Error ? err.message : 'Unknown error'}`;
+  }
 }
 
 const createSessionSchema = z.object({
@@ -275,13 +277,13 @@ const DUNE_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'dune_get_query_results',
-      description: 'Fetch on-chain analytics data from a Dune Analytics query. Use when the user asks about blockchain data, DeFi metrics, TVL, volume, wallet activity, protocol analytics, gas fees, token transfers, or any on-chain statistics.',
+      description: 'Fetch on-chain analytics data from a saved Dune Analytics query by ID. Use when the user asks about blockchain data, DeFi metrics, TVL, volume, wallet activity, protocol analytics, gas fees, token transfers, or any on-chain statistics.',
       parameters: {
         type: 'object',
         properties: {
           query_id: {
             type: 'number',
-            description: 'The Dune query ID to fetch results from. Use well-known DeFi query IDs.',
+            description: 'The Dune query ID to fetch results from. Known IDs: 1252207 (NFT rankings), 3374572 (DEX volume), 4559580 (Uniswap v4 Base), 3468667 (ETH gas).',
           },
         },
         required: ['query_id'],
@@ -292,16 +294,54 @@ const DUNE_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'dune_search_queries',
-      description: 'Search Dune Analytics for queries related to a topic. Use to discover relevant on-chain data queries when you don\'t know a specific query ID.',
+      description: 'Search for relevant Dune queries and SQL templates by topic. Use to discover what data is available before querying.',
       parameters: {
         type: 'object',
         properties: {
           search_term: {
             type: 'string',
-            description: 'The search term to find relevant Dune queries (e.g. "Uniswap v4 Base", "ETH gas", "USDC transfers")',
+            description: 'The search term (e.g. "Uniswap v4 Base", "ETH gas", "stablecoin volume", "wallet activity")',
           },
         },
         required: ['search_term'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'dune_run_sql',
+      description: 'Execute arbitrary DuneSQL to query blockchain data directly. Use when pre-built queries don\'t cover the user\'s question. Supports all DuneSQL syntax including JOINs, aggregations, and cross-chain queries. Tables include: ethereum.transactions, dex.trades, dex.pools, prices.usd, tokens.transfers, etc.',
+      parameters: {
+        type: 'object',
+        properties: {
+          sql: {
+            type: 'string',
+            description: 'The DuneSQL query to execute. Keep queries efficient with LIMIT and partition filters (e.g. WHERE block_time > NOW() - INTERVAL \'7\' DAY).',
+          },
+        },
+        required: ['sql'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'dune_search_tables',
+      description: 'Search for blockchain data tables in Dune by keyword and optionally filter by chain. Use to discover which tables and schemas contain the data you need.',
+      parameters: {
+        type: 'object',
+        properties: {
+          keyword: {
+            type: 'string',
+            description: 'Table search keyword (e.g. "uniswap", "erc20", "nft", "lending")',
+          },
+          chain: {
+            type: 'string',
+            description: 'Optional blockchain filter (e.g. "ethereum", "base", "arbitrum", "polygon")',
+          },
+        },
+        required: ['keyword'],
       },
     },
   },
@@ -349,6 +389,10 @@ async function generateResponse(
           toolResult = await fetchDuneResults(args.query_id as number);
         } else if (toolCall.function.name === 'dune_search_queries') {
           toolResult = await searchDune(args.search_term as string);
+        } else if (toolCall.function.name === 'dune_run_sql') {
+          toolResult = await runDuneSQL(args.sql as string);
+        } else if (toolCall.function.name === 'dune_search_tables') {
+          toolResult = await searchDuneTables(args.keyword as string, args.chain as string | undefined);
         } else {
           toolResult = 'Unknown tool';
         }
