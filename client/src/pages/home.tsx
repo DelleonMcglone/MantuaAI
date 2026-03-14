@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect } from 'react';
-import { Moon, Sun, ChevronDown, Zap, Bot, Brain, Shield, Coins, BarChart3, Lock } from 'lucide-react';
+import { Moon, Sun, ChevronDown, Zap, Bot, Shield, Coins, BarChart3, Lock } from 'lucide-react';
 import logoWhite from '@assets/Mantua_logo_white_1768946648374.png';
 import logoBlack from '@assets/Mantua_logo_black_1768946648374.png';
 
@@ -37,21 +37,20 @@ const themes = {
 };
 
 const FEATURES = [
-  { icon: Zap, title: 'Uniswap v4 Hooks', description: 'Dynamic Uniswap v4 hooks that protect LPs and improve swap execution through directional fees, JIT liquidity rebalancing, and MEV-resistant ordering.', status: 'Live', statusColor: '#22c55e' },
+  { icon: Shield, title: 'Stable Protection Hook', description: 'A Uniswap v4 hook that dynamically adjusts swap fees across five depeg zones to protect stablecoin LPs from adverse selection. Fees scale from 0.05% in healthy conditions to 1% during severe depeg, with a circuit breaker for extreme events.', status: 'Live', statusColor: '#22c55e' },
   { icon: Bot, title: 'AI Agents', description: 'Autonomous AI agents that manage trading and liquidity strategies collaboratively or independently, executing on-chain actions through natural-language commands.', status: 'Live', statusColor: '#22c55e' },
-  { icon: Shield, title: 'Hook Verification', description: 'Trustless hook verification that ensures deployed Uniswap v4 hooks are audited, permissioned, and behaving exactly as intended before liquidity or volume flows through them.', status: 'Live', statusColor: '#22c55e' },
+  { icon: Zap, title: 'Hook Verification', description: 'Trustless hook verification that ensures deployed Uniswap v4 hooks are audited, permissioned, and behaving exactly as intended before liquidity or volume flows through them.', status: 'Live', statusColor: '#22c55e' },
   { icon: Coins, title: 'Portfolio Management', description: 'Unified portfolio tracking and analytics for users and agents, with real-time performance insights and on-chain position management.', status: 'Live', statusColor: '#22c55e' },
   { icon: BarChart3, title: 'Analytics', description: 'Real-time on-chain analytics delivering actionable blockchain insights across markets and liquidity.', status: 'Live', statusColor: '#22c55e' },
   { icon: Lock, title: 'Secure by Design', description: 'Security-first architecture built on battle-tested Uniswap infrastructure, with audited contracts and transparent on-chain operations.', status: 'Live', statusColor: '#22c55e' },
-  { icon: Brain, title: 'Voice Text', description: 'Voice-powered trading and liquidity management that lets you execute on-chain actions using natural language.', status: 'Beta', statusColor: '#a855f7' },
 ];
 
 const FAQ_DATA = [
-  { q: 'What is Mantua.AI?', a: 'Mantua.AI is a natural language DeFi platform that lets anyone interact with crypto markets by simply typing what they want. It combines Uniswap v4 hooks, autonomous AI agents, and real-time blockchain access into a single programmable liquidity layer.' },
-  { q: 'What problem does Mantua solve?', a: 'DeFi is powerful, but it is too complex for most users; navigating wallets, contracts, and protocols requires a deep understanding of technical knowledge. Mantua solves this by transforming natural language into on-chain actions, combining AI-assisted execution with Uniswap v4 hook–based logic to simplify trading, liquidity management, hook deployment, and contract exploration, all without requiring users to code or manage complex interfaces.' },
-  { q: 'How do Uniswap v4 hooks work?', a: 'Hooks are smart contracts that execute custom logic at specific points during a swap lifecycle. We implement Nezlobin\'s Directional Increase for dynamic fees, JiT Rebalancing for concentrated liquidity, and Async/MEV Protection against sandwich attacks.' },
+  { q: 'What is Mantua.AI?', a: 'Mantua.AI is an agent-driven liquidity protocol for stablecoins that allows users and institutions to manage stablecoin positions, deploy liquidity, and execute automated rebalancing strategies through natural language. It combines Uniswap v4 hooks, autonomous AI agents, and real-time onchain execution to transform user intent into automated liquidity actions. The result is a programmable liquidity layer optimized for stablecoins, RWAs, and yield-bearing dollar assets.' },
+  { q: 'What problem does Mantua solve?', a: 'Managing stablecoin liquidity today is operationally manual, interface-fragmented, strategy-dependent, and exposed to peg risk across pools, venues, and market conditions. Mantua.AI enables liquidity providers, stablecoin issuers, fintech platforms, and RWA protocols to deploy peg-aware liquidity, automated rebalancing strategies, and yield-seeking routing logic directly from natural-language instructions, executed onchain via agent-managed Uniswap v4 hook strategies.' },
+  { q: 'How does the Stable Protection Hook work?', a: <>The Stable Protection Hook is a Uniswap v4 hook that dynamically adjusts swap fees based on how far a stablecoin pair has drifted from its peg. It defines five depeg zones — Healthy, Minor, Moderate, Severe, and Critical — each with progressively higher fees to discourage arbitrage during volatility and protect LPs from adverse selection. When the peg is healthy, fees stay low (0.05%). As deviation increases, fees scale up automatically to as high as 1%, and a circuit breaker can pause swaps entirely during extreme depeg events. View the source code on <a href="https://github.com/DelleonMcglone/stableprotection-hook" target="_blank" rel="noopener noreferrer" style={{ color: '#a855f7', textDecoration: 'underline' }}>GitHub</a>.</> },
   { q: 'What chains does Mantua.AI support?', a: 'We are currently deployed on Base Sepolia. Mainnet deployment on Base is planned after thorough testing and audits.' },
-  { q: 'How can I provide liquidity?', a: 'You can provide liquidity directly through Mantua by connecting your wallet and depositing tokens into a hook-enabled pool. These pools use Uniswap v4 hooks to add programmable logic—such as dynamic fees, JIT rebalancing, and MEV protection—directly into how liquidity is managed and trades are executed.' },
+  { q: 'How can I provide liquidity?', a: <>Connect your wallet in the app and navigate to the Liquidity tab to create a pool or add to an existing one. To get testnet tokens on Base Sepolia, visit these faucets:<br /><br />• <a href="https://portal.cdp.coinbase.com/products/faucet" target="_blank" rel="noopener noreferrer" style={{ color: '#a855f7', textDecoration: 'underline' }}>Coinbase CDP Faucet</a> — ETH, USDC, cbBTC, and EURC<br />• <a href="https://console.optimism.io/faucet" target="_blank" rel="noopener noreferrer" style={{ color: '#a855f7', textDecoration: 'underline' }}>Optimism Faucet</a> — ETH<br />• <a href="https://faucet.circle.com/" target="_blank" rel="noopener noreferrer" style={{ color: '#a855f7', textDecoration: 'underline' }}>Circle Faucet</a> — USDC and EURC<br /><br />Once you have tokens, select your pair, choose a hook strategy (like Stable Protection for stablecoin pairs), enter your amounts, and confirm the transaction.</> },
   { q: 'Is Mantua.AI safe to use?', a: 'Yes. Mantua.AI is designed with safety and transparency in mind: it is built on audited, battle-tested Uniswap infrastructure; uses permissioned, verifiable hooks; and operates with transparent on-chain execution so users retain control of their assets at all times. Smart contracts have undergone security reviews, and Mantua\'s systems are architected to minimize risks common in DeFi such as sandwich attacks, adverse selection, and misconfigured liquidity positions. However, as with any blockchain protocol, users should exercise standard precautions (e.g., reviewing permissions, understanding fees and risks) and may choose to start with modest amounts when trying new features.' },
 ];
 
@@ -92,8 +91,8 @@ function FAQItem({ item, theme, isOpen, onClick }) {
         <span style={{ fontFamily: '"Outfit", sans-serif', fontSize: 16, fontWeight: 500, color: theme.textPrimary }}>{item.q}</span>
         <ChevronDown size={20} style={{ color: theme.textMuted, transition: 'transform 0.3s ease', transform: isOpen ? 'rotate(180deg)' : 'rotate(0)' }} />
       </button>
-      <div style={{ overflow: 'hidden', maxHeight: isOpen ? 200 : 0, transition: 'max-height 0.3s ease' }}>
-        <p style={{ paddingBottom: 20, fontSize: 14, lineHeight: 1.7, color: theme.textSecondary }}>{item.a}</p>
+      <div style={{ overflow: 'hidden', maxHeight: isOpen ? 500 : 0, transition: 'max-height 0.3s ease' }}>
+        <div style={{ paddingBottom: 20, fontSize: 14, lineHeight: 1.7, color: theme.textSecondary }}>{item.a}</div>
       </div>
     </div>
   );
@@ -150,7 +149,6 @@ export default function MantuaLanding() {
         <p style={{ fontSize: 18, color: theme.textSecondary, marginBottom: 48, letterSpacing: '0.02em' }}>Hooks for logic. Agents for action. AI for intelligence.</p>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
           <button onClick={() => window.location.href = '/app'} style={{ background: 'linear-gradient(135deg, #a855f7, #9333ea)', border: 'none', borderRadius: 12, padding: '16px 32px', color: '#fff', fontFamily: '"DM Sans", sans-serif', fontSize: 16, fontWeight: 600, cursor: 'pointer' }}>Launch App</button>
-          <button style={{ background: 'transparent', border: `1px solid ${theme.border}`, borderRadius: 12, padding: '16px 32px', color: theme.textPrimary, fontFamily: '"DM Sans", sans-serif', fontSize: 16, fontWeight: 500, cursor: 'pointer' }}>Docs</button>
         </div>
         
         {/* Video Demo Placeholder */}
