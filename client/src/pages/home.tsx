@@ -145,7 +145,7 @@ export default function MantuaLanding() {
         <img src={logo} alt="" style={{ width: 120, marginBottom: 32, animation: 'float 4s ease-in-out infinite' }} />
         <h1 style={{ fontFamily: '"Outfit", sans-serif', fontSize: 'clamp(40px, 6vw, 72px)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', marginBottom: 24, maxWidth: 800 }}>
           <span style={{ background: 'linear-gradient(135deg, #a855f7 0%, #22c55e 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Mantua.AI</span>
-          <br />programmable liquidity for DeFi
+          <br />Agent driven liquidity for Stablecoins
         </h1>
         <p style={{ fontSize: 18, color: theme.textSecondary, marginBottom: 48, letterSpacing: '0.02em' }}>Hooks for logic. Agents for action. AI for intelligence.</p>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>

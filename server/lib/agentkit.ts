@@ -152,13 +152,6 @@ Base Sepolia (chainId 84532):
 - EURC: 0x808456652fdb597867f38412077A9182bf77359F
 - Faucet: 0xaa0D98c815C3003d35E571fD51C65d7F92391883
 
-Unichain Sepolia (chainId 1301):
-- PoolManager: 0x00b036b58a818b1bc34d502d3fe730db729e62ac
-- StableProtectionHook: 0x1510926ba6986cb3c93BFFF25839C0ef740820c0
-- USDC: 0x31d0220469e10c4E71834a79b1f276d740d3768F
-- tUSDT: 0xEa3B5B015a5289bE6fFa7196aF5386A86E50a8c2
-- LINK: 0xda40816f278Cd049c137F6612822D181065EBfB4
-
 Stable Protection Hook behavior:
 - 5-zone peg monitoring: HEALTHY → MINOR → MODERATE → SEVERE → CRITICAL
 - Dynamic fees: 0.5x for peg-restoring swaps, 3x for peg-worsening swaps
@@ -170,11 +163,6 @@ Base Sepolia:
 - ETH, USDC, cbBTC, EURC: https://portal.cdp.coinbase.com/products/faucet
 - ETH: https://console.optimism.io/faucet
 - USDC & EURC: https://faucet.circle.com/
-Unichain Sepolia:
-- ETH: https://console.optimism.io/faucet
-- ETH & LINK: https://faucets.chain.link/
-- USDC: https://faucet.circle.com/
-- tUSDT: https://developer.bitaps.com/faucet
 
 Always:
 - Show the full BaseScan link after every transaction: https://sepolia.basescan.org/tx/{hash}

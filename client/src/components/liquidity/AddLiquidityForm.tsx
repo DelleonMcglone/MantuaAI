@@ -146,7 +146,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
     const sym0 = isCurrency0A ? tokenA.symbol : tokenB.symbol;
     const sym1 = isCurrency0A ? tokenB.symbol : tokenA.symbol;
     const hookAddress = getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none', chainId);
-    const chainName = chainId === 1301 ? 'Unichain Sepolia' : 'Base Sepolia';
+    const chainName = 'Base Sepolia';
     const actionLabel = mode === 'create'
       ? `Created ${sym0}/${sym1} pool on ${chainName}`
       : `Added liquidity to ${sym0}/${sym1}`;
@@ -306,11 +306,8 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
             <div style={{ fontSize: '13px', fontWeight: '600', color: '#f59e0b' }}>Not a stable pair</div>
             <div style={{ fontSize: '12px', color: '#d97706', marginTop: '2px', lineHeight: '1.4' }}>
               The Stable Protection Hook is designed for stable pairs only.{' '}
-              {tokenA?.symbol}/{tokenB?.symbol} is not a recognized stable pair on{' '}
-              {CHAIN_NAMES[chainId] ?? 'this network'}.
-              {chainId === 84532
-                ? ' Valid pairs on Base Sepolia: USDC/EURC.'
-                : ' Valid pairs on Unichain Sepolia: USDC/tUSDT.'}
+              {tokenA?.symbol}/{tokenB?.symbol} is not a recognized stable pair on Base Sepolia.
+              {' '}Valid pairs on Base Sepolia: USDC/EURC.
             </div>
           </div>
         </div>

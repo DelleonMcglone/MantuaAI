@@ -15,10 +15,10 @@ import assert from 'node:assert/strict';
 // ============ INLINE PARSER (mirrors server/services/voiceCommandParser.ts) ============
 
 const TOKEN_ALIASES = {
-  ether: 'ETH', ethereum: 'ETH', eth: 'ETH', meth: 'mETH',
-  usdc: 'USDC', musdc: 'mUSDC', usdt: 'USDT', musdt: 'mUSDT',
-  tether: 'USDT', dai: 'DAI', mdai: 'mDAI', bitcoin: 'BTC', btc: 'BTC',
-  wbtc: 'WBTC', weth: 'WETH', link: 'LINK', uni: 'UNI', aave: 'AAVE',
+  ether: 'ETH', ethereum: 'ETH', eth: 'ETH',
+  usdc: 'USDC',
+  eurc: 'EURC', euro: 'EURC',
+  bitcoin: 'cbBTC', btc: 'cbBTC', cbbtc: 'cbBTC',
 };
 
 function normalizeToken(raw) {
@@ -157,11 +157,11 @@ test('trade with ether alias: Trade 0.5 ether to USDC', () => {
   assert.equal(cmd?.amount, '0.5');
 });
 
-test('exchange with hook: Exchange 50 mUSDC for mETH using Stable Protection hook', () => {
-  const cmd = parseVoiceCommand('Exchange 50 mUSDC for mETH using Stable Protection hook');
+test('exchange with hook: Exchange 50 USDC for EURC using Stable Protection hook', () => {
+  const cmd = parseVoiceCommand('Exchange 50 USDC for EURC using Stable Protection hook');
   assert.equal(cmd?.type, 'swap');
-  assert.equal(cmd?.fromToken, 'mUSDC');
-  assert.equal(cmd?.toToken, 'mETH');
+  assert.equal(cmd?.fromToken, 'USDC');
+  assert.equal(cmd?.toToken, 'EURC');
   assert.equal(cmd?.amount, '50');
   assert.equal(cmd?.hook, 'stable-protection');
 });
@@ -174,11 +174,11 @@ test('buy pattern: Buy ETH with 200 USDC', () => {
   assert.equal(cmd?.amount, '200');
 });
 
-test('convert with mev hook: Convert 1000 USDT to DAI with MEV protection', () => {
-  const cmd = parseVoiceCommand('Convert 1000 USDT to DAI with MEV protection');
+test('convert with mev hook: Convert 1000 USDC to cbBTC with MEV protection', () => {
+  const cmd = parseVoiceCommand('Convert 1000 USDC to cbBTC with MEV protection');
   assert.equal(cmd?.type, 'swap');
-  assert.equal(cmd?.fromToken, 'USDT');
-  assert.equal(cmd?.toToken, 'DAI');
+  assert.equal(cmd?.fromToken, 'USDC');
+  assert.equal(cmd?.toToken, 'cbBTC');
   assert.equal(cmd?.amount, '1000');
   assert.equal(cmd?.hook, 'mev-protection');
 });
@@ -203,20 +203,20 @@ test('provide with amounts: Provide 100 USDC and 0.05 ETH liquidity', () => {
   assert.equal(cmd?.token1, 'ETH');
 });
 
-test('remove liquidity: Remove liquidity from mETH/mUSDC', () => {
-  const cmd = parseVoiceCommand('Remove liquidity from mETH/mUSDC');
+test('remove liquidity: Remove liquidity from ETH/USDC', () => {
+  const cmd = parseVoiceCommand('Remove liquidity from ETH/USDC');
   assert.equal(cmd?.type, 'liquidity');
   assert.equal(cmd?.action, 'remove');
-  assert.equal(cmd?.token0, 'mETH');
-  assert.equal(cmd?.token1, 'mUSDC');
+  assert.equal(cmd?.token0, 'ETH');
+  assert.equal(cmd?.token1, 'USDC');
 });
 
-test('add liquidity with hook: Add liquidity to ETH/mUSDC pool use Stable Protection', () => {
-  const cmd = parseVoiceCommand('Add liquidity to ETH/mUSDC pool use Stable Protection');
+test('add liquidity with hook: Add liquidity to ETH/USDC pool use Stable Protection', () => {
+  const cmd = parseVoiceCommand('Add liquidity to ETH/USDC pool use Stable Protection');
   assert.equal(cmd?.type, 'liquidity');
   assert.equal(cmd?.action, 'add');
   assert.equal(cmd?.token0, 'ETH');
-  assert.equal(cmd?.token1, 'mUSDC');
+  assert.equal(cmd?.token1, 'USDC');
   assert.equal(cmd?.hook, 'stable-protection');
 });
 

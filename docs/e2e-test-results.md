@@ -63,7 +63,7 @@ Note: Stable Protection Hook requires forge to deploy on Base Sepolia (not avail
 - [x] Agent wallet TX (cbBTC): https://sepolia.basescan.org/tx/0x378013f195f23de6a040ed7776cf4779f2a38a1eab00fac8da93313457da606e
 
 ## Phase 6: Agent LP Creation (USDC/EURC + Stable Protection badge)
-Note: Stable Protection Hook is deployed on Unichain Sepolia (1301) only — not available on Base Sepolia without forge. Agent LP creation used the existing fee=500 USDC/EURC pool (no hook). UI badge requires hook deployment.
+Note: Stable Protection Hook is deployed on Base Sepolia (84532). Agent LP creation used the existing fee=500 USDC/EURC pool (no hook). UI badge requires hook deployment.
 - [~] SKIPPED — Stable Protection Hook not deployable without forge; standard pool used instead
 
 ## Phase 7: Agent Token Transfer to 0xbaac...DC87
@@ -114,7 +114,7 @@ All core on-chain operations completed successfully on Base Sepolia with verifie
 | 10 | Pool state queried | ✅ | StateView data |
 
 ### Known Limitations
-- **Phase 6**: Stable Protection Hook requires `forge` to deploy; not available in this environment. Hook is on Unichain Sepolia only.
+- **Phase 6**: Stable Protection Hook requires `forge` to deploy; not available in this environment. Hook is on Base Sepolia only.
 - **Phase 9b**: ETH/cbBTC swap impossible — no LP liquidity in any testnet pool for this pair.
 - **Phase 8 LP positions**: Agent had insufficient ETH for LP after gas costs; pool initialized but no positions added.
 

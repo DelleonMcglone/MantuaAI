@@ -13,7 +13,7 @@ const createWalletSchema = z.object({
 
 const faucetSchema = z.object({
   address: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
-  tokens: z.array(z.enum(['eth', 'usdc', 'cbbtc', 'eurc', 'tusdt', 'link'])).min(1),
+  tokens: z.array(z.enum(['eth', 'usdc', 'cbbtc', 'eurc'])).min(1),
 });
 
 const querySchema = z.object({
@@ -29,7 +29,7 @@ const duneSchema = z.object({
 const sendSchema = z.object({
   walletId: z.string().min(1),
   to: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
-  token: z.enum(['ETH', 'USDC', 'cbBTC', 'EURC', 'tUSDT', 'LINK']),
+  token: z.enum(['ETH', 'USDC', 'cbBTC', 'EURC']),
   amount: z.string().min(1),
 });
 
@@ -37,7 +37,6 @@ const sendSchema = z.object({
 
 const EXPLORERS: Record<number, string> = {
   84532: 'https://sepolia.basescan.org',
-  1301:  'https://sepolia.uniscan.xyz',
 };
 
 function getExplorerBase(chainId?: number): string {
@@ -148,14 +147,10 @@ const COINGECKO_IDS: Record<string, string> = {
   usdc:  'usd-coin',
   cbbtc: 'coinbase-wrapped-btc',
   eurc:  'euro-coin',
-  tusdt: 'tether',
-  link:  'chainlink',
   ETH:   'ethereum',
   USDC:  'usd-coin',
   cbBTC: 'coinbase-wrapped-btc',
   EURC:  'euro-coin',
-  tUSDT: 'tether',
-  LINK:  'chainlink',
 };
 
 // ─── Route Registration ───────────────────────────────────────────────────────
@@ -342,7 +337,7 @@ export function registerAgentRoutes(app: Express): void {
           return res.json({
             type: 'pools',
             data: rows.map(p => {
-              const network = p.chain_id === 1301 ? 'Unichain Sepolia' : 'Base Sepolia';
+              const network = 'Base Sepolia';
               return {
                 pair: `${p.token0}/${p.token1}`,
                 feeTier: `${(p.fee_tier / 10000).toFixed(2)}%`,

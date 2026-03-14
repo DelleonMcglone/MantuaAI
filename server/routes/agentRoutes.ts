@@ -7,7 +7,7 @@
  *   GET  /api/agent/wallet          — get agent wallet address + balance (AgentKit)
  *   POST /api/agent/chat            — send a message to the ReAct agent (chat mode)
  *   POST /api/agent/autonomous      — send a message, agent detects intent and acts
- *   POST /api/agent/create-pool     — create Stable Protection pool on Unichain Sepolia
+ *   POST /api/agent/create-pool     — create Stable Protection pool on Base Sepolia
  */
 
 import { Router } from "express";
@@ -202,7 +202,7 @@ router.post("/autonomous", async (req, res) => {
 });
 
 // ── POST /api/agent/create-pool ───────────────────────────────────────────────
-// Creates USDC/EURC pool with Stable Protection Hook on Unichain Sepolia.
+// Creates USDC/EURC pool with Stable Protection Hook on Base Sepolia.
 router.post("/create-pool", async (req, res) => {
   try {
     const result = await createStableProtectionPool();

@@ -709,7 +709,7 @@ const ActivityFeed = ({ activities, filter, setFilter, theme }) => {
 };
 
 // ============ PORTFOLIO INTERFACE (Hyperliquid-inspired) ============
-const TESTNET_PRICES: Record<string, number> = { ETH: 2000, USDC: 1, EURC: 1.06, cbBTC: 50000, tUSDT: 1, LINK: 15 };
+const TESTNET_PRICES: Record<string, number> = { ETH: 2000, USDC: 1, EURC: 1.06, cbBTC: 50000 };
 
 const ZoneBadge = ({ zone }) => {
   const cfg = {
@@ -743,25 +743,21 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
   const { price: ethPriceUSD }   = useLivePriceUSD('ETH');
   const { price: eurcPriceUSD }  = useLivePriceUSD('EURC');
   const { price: cbbtcPriceUSD } = useLivePriceUSD('cbBTC');
-  const { price: linkPriceUSD }  = useLivePriceUSD('LINK');
 
   const ethBalanceNum = liveEthBalance ? (parseFloat(liveEthBalance.formatted) || 0) : 0;
   const ethPrice   = (ethPriceUSD   != null && !isNaN(ethPriceUSD))   ? ethPriceUSD   : TESTNET_PRICES.ETH;
   const eurcPrice  = (eurcPriceUSD  != null && !isNaN(eurcPriceUSD))  ? eurcPriceUSD  : TESTNET_PRICES.EURC;
   const cbbtcPrice = (cbbtcPriceUSD != null && !isNaN(cbbtcPriceUSD)) ? cbbtcPriceUSD : TESTNET_PRICES.cbBTC;
-  const linkPrice  = (linkPriceUSD  != null && !isNaN(linkPriceUSD))  ? linkPriceUSD  : TESTNET_PRICES.LINK;
   const ethValueUSD = ethBalanceNum * ethPrice;
   const usdcBalance  = parseFloat(balancesBySymbol['USDC']?.formatted  ?? '0') || 0;
   const eurcBalance  = parseFloat(balancesBySymbol['EURC']?.formatted  ?? '0') || 0;
   const cbbtcBalance = parseFloat(balancesBySymbol['cbBTC']?.formatted ?? '0') || 0;
-  const tusdtBalance = parseFloat(balancesBySymbol['tUSDT']?.formatted ?? '0') || 0;
-  const linkBalance  = parseFloat(balancesBySymbol['LINK']?.formatted  ?? '0') || 0;
-  const totalValue = (isNaN(ethValueUSD) ? 0 : ethValueUSD) + usdcBalance + (eurcBalance * eurcPrice) + (cbbtcBalance * cbbtcPrice) + tusdtBalance + (linkBalance * linkPrice);
+  const totalValue = (isNaN(ethValueUSD) ? 0 : ethValueUSD) + usdcBalance + (eurcBalance * eurcPrice) + (cbbtcBalance * cbbtcPrice);
   const safeTotal = isNaN(totalValue) ? 0 : totalValue;
 
   // Explorer URL based on chain
-  const explorerBase = chainId === 1301 ? 'https://sepolia.uniscan.xyz' : 'https://sepolia.basescan.org';
-  const explorerLabel = chainId === 1301 ? 'Uniscan' : 'BaseScan';
+  const explorerBase = 'https://sepolia.basescan.org';
+  const explorerLabel = 'BaseScan';
 
   useEffect(() => {
     if (!address || !walletConnected) return;
@@ -818,13 +814,8 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
   const tokenRows = [
     { symbol: 'ETH', name: 'Ethereum', balance: ethBalanceNum, usdValue: isNaN(ethValueUSD) ? 0 : ethValueUSD, price: ethPrice },
     { symbol: 'USDC', name: 'USD Coin', balance: usdcBalance, usdValue: usdcBalance, price: 1 },
-    ...(chainId === 84532 ? [
-      { symbol: 'EURC', name: 'Euro Coin', balance: eurcBalance, usdValue: eurcBalance * eurcPrice, price: eurcPrice },
-      { symbol: 'cbBTC', name: 'Coinbase BTC', balance: cbbtcBalance, usdValue: cbbtcBalance * cbbtcPrice, price: cbbtcPrice },
-    ] : [
-      { symbol: 'tUSDT', name: 'Testnet Tether', balance: tusdtBalance, usdValue: tusdtBalance, price: 1 },
-      { symbol: 'LINK', name: 'Chainlink', balance: linkBalance, usdValue: linkBalance * linkPrice, price: linkPrice },
-    ]),
+    { symbol: 'EURC', name: 'Euro Coin', balance: eurcBalance, usdValue: eurcBalance * eurcPrice, price: eurcPrice },
+    { symbol: 'cbBTC', name: 'Coinbase BTC', balance: cbbtcBalance, usdValue: cbbtcBalance * cbbtcPrice, price: cbbtcPrice },
   ].filter(t => !hideSmall || t.usdValue >= 1);
 
   const fmtUSD = (v: number) => `$${(isNaN(v) ? 0 : v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -2227,7 +2218,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
             const fmtImpact = (v) => v < 0.01 ? `${v.toFixed(4)}%` : `${v.toFixed(2)}%`;
 
             // Pool routing label based on token pair + hook
-            const STABLES = ['USDC', 'EURC', 'tUSDT'];
+            const STABLES = ['USDC', 'EURC'];
             const normA = fromToken.replace(/^m/, '').toUpperCase();
             const normB = toToken.replace(/^m/, '').toUpperCase();
             const aIsStable = STABLES.includes(normA);
@@ -2518,16 +2509,12 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
   const [expandedPool, setExpandedPool] = useState<number | null>(null);
   const currentChainId = useChainId();
 
-  const [basePools, setBasePools] = React.useState([]);
-  const [unichainPools, setUnichainPools] = React.useState([]);
+  const [poolsRaw, setPoolsRaw] = React.useState([]);
   React.useEffect(() => {
-    Promise.all([
-      fetch(`/api/portfolio?chainId=84532`).then(r => r.ok ? r.json() : []).catch(() => []),
-      fetch(`/api/portfolio?chainId=1301`).then(r => r.ok ? r.json() : []).catch(() => []),
-    ]).then(([base, uni]) => {
-      setBasePools(base ?? []);
-      setUnichainPools(uni ?? []);
-    });
+    fetch(`/api/portfolio?chainId=84532`)
+      .then(r => (r.ok ? r.json() : []))
+      .then(base => setPoolsRaw(base ?? []))
+      .catch(() => setPoolsRaw([]));
   }, [refreshKey]);
 
   // Generate deterministic simulated stats per pool (testnet has no real indexer)
@@ -2554,9 +2541,7 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
       chainId: p.chain_id ?? 84532,
     };
   });
-  const basePoolsMapped = mapPools(basePools);
-  const unichainPoolsMapped = mapPools(unichainPools);
-  const pools = [...basePoolsMapped, ...unichainPoolsMapped];
+  const pools = mapPools(poolsRaw);
 
   const hookOptions = ['All', 'None', 'Stable Protection'];
   const typeOptions = ['All', 'Standard', 'Stable'];
@@ -2682,7 +2667,7 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
         </div>
         <div style={{ flex: 1 }}>
           <span style={{ color: theme.textSecondary, fontSize: '14px', lineHeight: '1.5' }}>
-            <span style={{ color: theme.accent, fontWeight: '600' }}>{filteredPools.length > 0 ? `${filteredPools.length} pools across ${[basePoolsMapped.length > 0 && 'Base', unichainPoolsMapped.length > 0 && 'Unichain'].filter(Boolean).join(' & ')}` : 'No pools yet — create your first pool'}</span>
+            <span style={{ color: theme.accent, fontWeight: '600' }}>{filteredPools.length > 0 ? `${filteredPools.length} pools live on Base Sepolia` : 'No pools yet — create your first pool'}</span>
             {' '}• Uniswap v4 with hooks.
           </span>
         </div>
@@ -2745,10 +2730,7 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
           ) : (
             <>
               {/* Render each chain section */}
-              {[
-                { label: 'Base', icon: '🔵', chainId: 84532, pools: filteredPools.filter(p => p.chainId === 84532) },
-                { label: 'Unichain', icon: '🦄', chainId: 1301, pools: filteredPools.filter(p => p.chainId === 1301) },
-              ].filter(section => section.pools.length > 0).map(section => (
+              {[{ label: 'Base', icon: '🔵', chainId: 84532, pools: filteredPools.filter(p => p.chainId === 84532) }].filter(section => section.pools.length > 0).map(section => (
                 <div key={section.chainId}>
                   {/* Chain header */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 16px', background: theme.bgSecondary, borderBottom: `1px solid ${theme.border}` }}>
@@ -3260,13 +3242,13 @@ const AgentFaucetPanel = ({ theme, isDark }) => {
 // ─── Agent v2: Autonomous Mode ────────────────────────────────────────────────
 // Helper: render agent text with clickable BaseScan / Uniscan tx links
 const renderAgentText = (text: string) => {
-  const urlPattern = /(https:\/\/sepolia\.(basescan\.org|uniscan\.xyz)\/tx\/0x[a-fA-F0-9]+)/g;
+  const urlPattern = /(https:\/\/sepolia\.basescan\.org\/tx\/0x[a-fA-F0-9]+)/g;
   const parts = text.split(urlPattern);
   if (parts.length === 1) return <>{text}</>;
   return (
     <>
       {parts.map((part, i) => {
-        if (/^https:\/\/sepolia\.(basescan\.org|uniscan\.xyz)\/tx\/0x[a-fA-F0-9]+$/.test(part)) {
+        if (/^https:\/\/sepolia\.basescan\.org\/tx\/0x[a-fA-F0-9]+$/.test(part)) {
           return (
             <a key={i} href={part} target="_blank" rel="noopener noreferrer"
               style={{ color: '#10b981', textDecoration: 'underline', wordBreak: 'break-all' }}>
@@ -3286,7 +3268,7 @@ const CHAT_ACTION_STARTERS: Record<string, { message: string; action: string }> 
   'faucet':    { action: 'get-funds',     message: 'Request testnet ETH from the faucet for my wallet. Show the transaction hash and BaseScan link.' },
   'swap':      { action: 'swap',          message: 'I want to swap tokens. Ask me which tokens and how much.' },
   'transfer':  { action: 'send',          message: 'I want to send tokens. Ask me the recipient address, token, and amount.' },
-  'liquidity': { action: 'create-pool',   message: 'Create a USDC/EURC pool with the Stable Protection Hook on Unichain Sepolia.' },
+  'liquidity': { action: 'create-pool',   message: 'Create a USDC/EURC pool with the Stable Protection Hook on Base Sepolia.' },
   'query':     { action: 'query',         message: "I want to query on-chain data. Ask me what I'd like to know." },
 };
 
@@ -3741,7 +3723,7 @@ export default function MantuaApp() {
     document.documentElement.classList.toggle('dark', isDark);
   }, [isDark]);
 
-  // Chain configuration — Base Sepolia + Unichain Sepolia
+  // Chain configuration — Base Sepolia only
   const SUPPORTED_CHAINS = {
     'base-sepolia': {
       id: 84532,
@@ -3751,15 +3733,6 @@ export default function MantuaApp() {
       color: '#3b82f6',
       rpcUrl: 'https://sepolia.base.org',
       blockExplorer: 'https://sepolia.basescan.org',
-    },
-    'unichain-sepolia': {
-      id: 1301,
-      name: 'Unichain Sepolia',
-      shortName: 'Unichain',
-      icon: '🦄',
-      color: '#f472b6',
-      rpcUrl: 'https://sepolia.unichain.org',
-      blockExplorer: 'https://sepolia.uniscan.xyz',
     },
   };
 
@@ -4065,7 +4038,7 @@ export default function MantuaApp() {
        sendMessage(inputValue);
        const tokenA = command.params?.tokenA || '';
        const tokenB = command.params?.tokenB || '';
-       const chainName = currentChainId === 1301 ? 'Unichain Sepolia' : 'Base Sepolia';
+       const chainName = 'Base Sepolia';
        updateSessionTitle(tokenA && tokenB ? `Add liquidity to ${tokenA}/${tokenB} on ${chainName}` : `Add liquidity on ${chainName}`);
        loadRecentChats();
        return;
@@ -4145,22 +4118,13 @@ export default function MantuaApp() {
 
     if (command.type === 'faucet') {
         resetModals();
-        const isUnichain = currentChainId === 1301;
-        const chainName = isUnichain ? 'Unichain Sepolia' : 'Base Sepolia';
-        const faucetLines = isUnichain
-          ? [
-              `Here's where to get testnet tokens on **${chainName}**:\n`,
-              `**ETH** — https://console.optimism.io/faucet`,
-              `**ETH & LINK** — https://faucets.chain.link/`,
-              `**USDC** — https://faucet.circle.com/`,
-              `**tUSDT** — https://developer.bitaps.com/faucet`,
-            ]
-          : [
-              `Here's where to get testnet tokens on **${chainName}**:\n`,
-              `**ETH, USDC, cbBTC, EURC** — https://portal.cdp.coinbase.com/products/faucet?projectId=a84fe446-5289-480f-9b54-6317b370da31&token=ETH&network=base-sepolia`,
-              `**ETH** — https://console.optimism.io/faucet`,
-              `**USDC & EURC** — https://faucet.circle.com/`,
-            ];
+        const chainName = 'Base Sepolia';
+        const faucetLines = [
+          `Here's where to get testnet tokens on **${chainName}**:\n`,
+          `**ETH, USDC, cbBTC, EURC** — https://portal.cdp.coinbase.com/products/faucet?projectId=a84fe446-5289-480f-9b54-6317b370da31&token=ETH&network=base-sepolia`,
+          `**ETH** — https://console.optimism.io/faucet`,
+          `**USDC & EURC** — https://faucet.circle.com/`,
+        ];
         const faucetContent = faucetLines.join('\n');
         setAnalyticsMessages(prev => [
           ...prev,

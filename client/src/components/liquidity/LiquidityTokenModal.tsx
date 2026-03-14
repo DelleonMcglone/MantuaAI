@@ -81,7 +81,7 @@ export const LiquidityTokenModal: React.FC<LiquidityTokenModalProps> = ({
 
   if (!isOpen) return null;
 
-  const STABLE_SYMBOLS = new Set(['USDC', 'EURC', 'tUSDT']);
+  const STABLE_SYMBOLS = new Set(['USDC', 'EURC']);
   const filtered = getTokensForChain(chainId).filter((t) => {
     if (excludeToken && t.address.toLowerCase() === excludeToken.address.toLowerCase()) return false;
     if (category === 'stablecoin' && !STABLE_SYMBOLS.has(t.symbol)) return false;

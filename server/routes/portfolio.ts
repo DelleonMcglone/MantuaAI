@@ -89,9 +89,7 @@ router.post('/transactions', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'walletAddress, type, txHash required' });
     }
     const networkChainId = parseInt(chainId) || 84532;
-    const baseScanUrl = networkChainId === 1301
-      ? `https://sepolia.uniscan.xyz/tx/${txHash}`
-      : `https://sepolia.basescan.org/tx/${txHash}`;
+    const baseScanUrl = `https://sepolia.basescan.org/tx/${txHash}`;
     const { rows } = await dbPool.query(
       `INSERT INTO portfolio_transactions
          (wallet_address, type, tx_hash, token_in, token_out, amount_in, amount_out, pool_id, chain_id, base_scan_url)
@@ -164,9 +162,7 @@ router.post('/agent-transactions', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'agentWalletId, type, txHash required' });
     }
     const networkChainId = parseInt(chainId) || 84532;
-    const baseScanUrl = networkChainId === 1301
-      ? `https://sepolia.uniscan.xyz/tx/${txHash}`
-      : `https://sepolia.basescan.org/tx/${txHash}`;
+    const baseScanUrl = `https://sepolia.basescan.org/tx/${txHash}`;
     const { rows } = await dbPool.query(
       `INSERT INTO agent_portfolio_transactions
          (agent_wallet_id, type, tx_hash, token_in, token_out, amount_in, amount_out, base_scan_url)

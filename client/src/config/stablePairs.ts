@@ -9,10 +9,6 @@ export const STABLE_PAIRS: Record<number, [string, string][]> = {
   84532: [
     ['USDC', 'EURC'],
   ],
-  // Unichain Sepolia — 1 stable pair
-  1301: [
-    ['USDC', 'tUSDT'],
-  ],
 };
 
 /**
@@ -36,5 +32,4 @@ export function isStablePair(
 
 export const CHAIN_NAMES: Record<number, string> = {
   84532: 'Base Sepolia',
-  1301: 'Unichain Sepolia',
 };

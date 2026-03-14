@@ -4,14 +4,14 @@
  * Initializes the AppKit instance with multi-chain support
  * and WALLET-ONLY authentication (no email/social login).
  *
- * Supported networks: Base Sepolia (default), Unichain Sepolia
+ * Supported networks: Base Sepolia (default)
  *
  * IMPORTANT: Call this OUTSIDE React components to prevent re-renders.
  */
 
 import { createAppKit } from '@reown/appkit/react';
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
-import { baseSepolia, unichainSepolia } from '@reown/appkit/networks';
+import { baseSepolia } from '@reown/appkit/networks';
 import type { AppKitNetwork } from '@reown/appkit/networks';
 import { http } from 'viem';
 
@@ -34,11 +34,8 @@ const metadata = {
   icons: ['https://mantua.ai/favicon.png'],
 };
 
-// Supported networks — Base Sepolia (default) + Unichain Sepolia
-const networks: [AppKitNetwork, ...AppKitNetwork[]] = [
-  baseSepolia,
-  unichainSepolia,
-];
+// Supported networks — Base Sepolia only
+const networks: [AppKitNetwork, ...AppKitNetwork[]] = [baseSepolia];
 
 // Initialize Wagmi adapter with explicit HTTP transports.
 // This is critical — without explicit transports, useReadContracts multicall
@@ -47,8 +44,7 @@ const wagmiAdapter = new WagmiAdapter({
   networks,
   projectId,
   transports: {
-    [baseSepolia.id]:    http('https://sepolia.base.org'),
-    [unichainSepolia.id]: http('https://sepolia.unichain.org'),
+    [baseSepolia.id]: http('https://sepolia.base.org'),
   },
 });
 
@@ -98,4 +94,4 @@ export const appKit = createAppKit({
 export const wagmiConfig = wagmiAdapter.wagmiConfig;
 
 // Export networks for use in components
-export { networks, baseSepolia, unichainSepolia };
+export { networks, baseSepolia };

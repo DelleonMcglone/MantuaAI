@@ -56,75 +56,19 @@ export const BASE_SEPOLIA_ERC20_TOKENS: Token[] = [
   },
 ];
 
-// ─── Unichain Sepolia (1301) ────────────────────────────────────────────────
-// Source: https://docs.unichain.org/docs/technical-information/contract-addresses
-// USDC: https://developers.circle.com/stablecoins/usdc-contract-addresses
-// EURC: https://developers.circle.com/stablecoins/eurc-on-test-networks
-
-export const UNICHAIN_SEPOLIA_NATIVE_ETH: Token = {
-  symbol: 'ETH',
-  name: 'Ethereum',
-  address: '0x0000000000000000000000000000000000000000',
-  decimals: 18,
-  chainId: 1301,
-  logoURI: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png',
-  coingeckoId: 'ethereum',
-  isNative: true,
-};
-
-export const UNICHAIN_SEPOLIA_ERC20_TOKENS: Token[] = [
-  {
-    symbol: 'USDC',
-    name: 'USD Coin',
-    // Verified: https://unichain-sepolia.blockscout.com/token/0x31d0220469e10c4E71834a79b1f276d740d3768F
-    // Source: https://developers.circle.com/stablecoins/usdc-contract-addresses
-    address: '0x31d0220469e10c4E71834a79b1f276d740d3768F',
-    decimals: 6,
-    chainId: 1301,
-    logoURI: 'https://assets.coingecko.com/coins/images/6319/small/usdc.png',
-    coingeckoId: 'usd-coin',
-    isNative: false,
-  },
-  {
-    symbol: 'tUSDT',
-    name: 'Testnet Tether USD',
-    // Source: https://developer.bitaps.com/faucet
-    address: '0xEa3B5B015a5289bE6fFa7196aF5386A86E50a8c2',
-    decimals: 6,
-    chainId: 1301,
-    logoURI: 'https://assets.coingecko.com/coins/images/325/small/Tether.png',
-    coingeckoId: 'tether',
-    isNative: false,
-  },
-  {
-    symbol: 'LINK',
-    name: 'Chainlink',
-    // Faucet: https://faucets.chain.link/
-    address: '0xda40816f278Cd049c137F6612822D181065EBfB4',
-    decimals: 18,
-    chainId: 1301,
-    logoURI: 'https://assets.coingecko.com/coins/images/877/small/chainlink-new-logo.png',
-    coingeckoId: 'chainlink',
-    isNative: false,
-  },
-];
-
 // ─── Chain-aware token helpers ──────────────────────────────────────────────
 
 export const CHAIN_IDS = {
   BASE_SEPOLIA: 84532,
-  UNICHAIN_SEPOLIA: 1301,
 } as const;
 
 /** Returns the native ETH token for a given chainId */
 export function getNativeToken(chainId: number): Token {
-  if (chainId === CHAIN_IDS.UNICHAIN_SEPOLIA) return UNICHAIN_SEPOLIA_NATIVE_ETH;
   return NATIVE_ETH; // default Base Sepolia
 }
 
 /** Returns ERC20 tokens for a given chainId */
 export function getERC20Tokens(chainId: number): Token[] {
-  if (chainId === CHAIN_IDS.UNICHAIN_SEPOLIA) return UNICHAIN_SEPOLIA_ERC20_TOKENS;
   return BASE_SEPOLIA_ERC20_TOKENS; // default Base Sepolia
 }
 
@@ -147,8 +91,6 @@ export const SUPPORTED_TOKENS: Token[] = [NATIVE_ETH, ...BASE_SEPOLIA_ERC20_TOKE
 export const ALL_CHAIN_TOKENS: Token[] = [
   NATIVE_ETH,
   ...BASE_SEPOLIA_ERC20_TOKENS,
-  UNICHAIN_SEPOLIA_NATIVE_ETH,
-  ...UNICHAIN_SEPOLIA_ERC20_TOKENS,
 ];
 
 // Legacy aliases — kept for backward compatibility
@@ -161,7 +103,7 @@ export const STABLECOINS: Token[] = BASE_SEPOLIA_ERC20_TOKENS.filter(
 
 export const MOCK_TOKEN_FACTORY: `0x${string}` = '0x0000000000000000000000000000000000000000';
 
-export type TokenSymbol = 'ETH' | 'cbBTC' | 'USDC' | 'EURC' | 'tUSDT' | 'LINK';
+export type TokenSymbol = 'ETH' | 'cbBTC' | 'USDC' | 'EURC';
 
 export const TOKEN_BY_SYMBOL: Record<string, Token> = Object.fromEntries(
   ALL_CHAIN_TOKENS.map(t => [t.symbol, t])

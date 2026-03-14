@@ -130,8 +130,8 @@ export const DUNE_SQL_TEMPLATES: Record<string, DuneSQLTemplate> = {
   },
   'stablecoin-volume': {
     name: 'Stablecoin Trading Volume',
-    description: 'USDC, USDT, EURC swap volume across DEXes',
-    keywords: ['stablecoin', 'usdc volume', 'usdt volume', 'eurc', 'stable volume'],
+    description: 'USDC and EURC swap volume across DEXes',
+    keywords: ['stablecoin', 'usdc volume', 'eurc', 'stable volume'],
     sql: `
       SELECT
         date_trunc('day', block_time) AS day,
@@ -140,8 +140,8 @@ export const DUNE_SQL_TEMPLATES: Record<string, DuneSQLTemplate> = {
         SUM(amount_usd) AS volume_usd,
         COUNT(*) AS trade_count
       FROM dex.trades
-      WHERE (token_bought_symbol IN ('USDC', 'USDT', 'EURC')
-          OR token_sold_symbol IN ('USDC', 'USDT', 'EURC'))
+      WHERE (token_bought_symbol IN ('USDC', 'EURC')
+          OR token_sold_symbol IN ('USDC', 'EURC'))
         AND block_time > NOW() - INTERVAL '7' DAY
       GROUP BY 1, 2, 3
       ORDER BY volume_usd DESC
@@ -208,7 +208,7 @@ export function fillTemplateParams(sql: string, message: string): string {
   }
 
   // Extract token symbol
-  const symbolMatch = /\b(ETH|BTC|USDC|USDT|EURC|LINK|UNI|AAVE|DAI|WETH|WBTC)\b/i.exec(message);
+  const symbolMatch = /\b(ETH|USDC|EURC|CBBTC)\b/i.exec(message);
   if (symbolMatch) {
     filled = filled.replace(/\{\{symbol\}\}/g, symbolMatch[1].toUpperCase());
   }

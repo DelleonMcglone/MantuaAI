@@ -3,7 +3,7 @@
  *
  * Displays "Connect Wallet" when disconnected.
  * When connected, shows truncated address and a dropdown with:
- *  - Dynamic network badge + inline network switcher (Base Sepolia ↔ Unichain Sepolia)
+ *  - Dynamic network badge + inline network switcher (Base Sepolia)
  *  - ETH + chain-specific ERC20 balances with USD values
  *  - Copy address and Disconnect buttons
  */
@@ -66,15 +66,6 @@ const CHAIN_OPTIONS = [
     color: '#60a5fa',
     bgColor: 'rgba(59,130,246,0.12)',
     icon: '🔵',
-  },
-  {
-    id: CHAIN_IDS.UNICHAIN_SEPOLIA,
-    key: 'unichain-sepolia',
-    name: 'Unichain Sepolia',
-    shortName: 'Unichain',
-    color: '#f472b6',
-    bgColor: 'rgba(244,114,182,0.12)',
-    icon: '🦄',
   },
 ];
 
@@ -168,7 +159,7 @@ export function ConnectButton({
   };
 
   const totalUsd = tokenRows.reduce((sum, row) => {
-    const price = getPriceBySymbol(row.symbol) || (row.symbol === 'USDC' || row.symbol === 'EURC' ? 1 : 0);
+    const price = getPriceBySymbol(row.symbol) || (row.symbol === 'USDC' ? 1 : 0);
     return sum + row.balance * price;
   }, 0);
 
@@ -375,7 +366,7 @@ export function ConnectButton({
 
           {/* Token balances */}
           {tokenRows.map(row => {
-            const price = getPriceBySymbol(row.symbol) || (['USDC', 'EURC', 'tUSDT'].includes(row.symbol) ? 1 : 0);
+    const price = getPriceBySymbol(row.symbol) || (row.symbol === 'USDC' ? 1 : 0);
             const usdValue = row.balance * price;
             return (
               <div key={row.symbol} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>

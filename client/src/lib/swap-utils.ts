@@ -52,7 +52,7 @@ export const HOOK_ADDRESSES: { [hookId: string]: Address } = {
   'df': '0x0000000000000000000000000000000000000000' as Address,   // Dynamic Fee
   'twamm': '0x0000000000000000000000000000000000000000' as Address, // TWAMM Rebalance
   'ym': '0x0000000000000000000000000000000000000000' as Address,   // Yield Maximizer
-  'stable-protection': '0x1510926ba6986cb3c93BFFF25839C0ef740820c0' as Address, // Stable Protection Hook (Unichain Sepolia)
+  'stable-protection': '0x1510926ba6986cb3c93BFFF25839C0ef740820c0' as Address, // Stable Protection Hook placeholder (Base Sepolia)
   'none': '0x0000000000000000000000000000000000000000' as Address,  // No hook (standard swap)
 };
 
@@ -269,7 +269,7 @@ export function formatTokenAmount(amount: bigint, decimals: number, isStablecoin
 }
 
 export function formatDisplayAmount(value: number, symbol: string): string {
-  const stableSymbols = new Set(['USDC', 'EURC', 'tUSDT']);
+  const stableSymbols = new Set(['USDC', 'EURC']);
   const isStable = stableSymbols.has(symbol);
   
   if (isStable) {

@@ -7,8 +7,6 @@ const TOKEN_GRADIENT_MAP: Record<string, string> = {
   cbBTC: 'linear-gradient(135deg, #F7931A 0%, #FFB347 100%)',
   USDC:  'linear-gradient(135deg, #2775CA 0%, #4A9FE8 100%)',
   EURC:  'linear-gradient(135deg, #0052B4 0%, #2E86AB 100%)',
-  tUSDT: 'linear-gradient(135deg, #26A17B 0%, #3DC68D 100%)',
-  LINK:  'linear-gradient(135deg, #2A5ADA 0%, #5A8AF2 100%)',
 };
 function getTokenGradient(symbol: string): string {
   return TOKEN_GRADIENT_MAP[symbol] || 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)';
@@ -17,9 +15,7 @@ function getTokenGlyph(symbol: string): string {
   if (symbol === 'ETH')   return 'Ξ';
   if (symbol === 'cbBTC') return '₿';
   if (symbol === 'USDC')  return '$';
-  if (symbol === 'tUSDT') return '₮';
   if (symbol === 'EURC')  return '€';
-  if (symbol === 'LINK')  return '⬡';
   return symbol.charAt(0);
 }
 

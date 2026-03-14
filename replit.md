@@ -2,13 +2,12 @@
 
 ## Overview
 
-Mantua.AI is a chat-native DeFi platform that combines natural language interactions with Uniswap v4 hooks and autonomous AI agents. Users interact with DeFi features (swaps, liquidity, vaults, portfolios) through a persistent chat interface, with modals rendered above the chatbot rather than page navigation. The platform supports both light and dark themes and targets Base Sepolia and Unichain Sepolia testnets for Web3 operations.
+Mantua.AI is a chat-native DeFi platform that combines natural language interactions with Uniswap v4 hooks and autonomous AI agents. Users interact with DeFi features (swaps, liquidity, vaults, portfolios) through a persistent chat interface, with modals rendered above the chatbot rather than page navigation. The platform supports both light and dark themes and targets Base Sepolia for Web3 operations.
 
 ### Multi-Chain Support
 - **Base Sepolia** (Chain ID: 84532) — primary chain
-- **Unichain Sepolia** (Chain ID: 1301) — secondary chain
 - Pools, positions, and activity are filtered by the currently connected chain
-- Explorer links use chain-specific URLs: `sepolia.basescan.org` or `sepolia.uniscan.xyz`
+- Explorer links use Base Sepolia URLs: `https://sepolia.basescan.org`
 
 ### Stable Protection Hook
 - Custom Uniswap v4 hook for stablecoin pools (USDC/EURC)
@@ -30,7 +29,6 @@ Mantua.AI is a chat-native DeFi platform that combines natural language interact
 - **EURC** (`0x808456652fdb597867f38412077A9182bf77359F`, 6 decimals)
 - **cbBTC** (`0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf`, 8 decimals)
 
-**Unichain Sepolia (1301):**
 - **ETH** (native, 18 decimals)
 - **USDC** (`0x31d0220469e10c4E71834a79b1f276d740d3768F`, 6 decimals)
 
@@ -91,7 +89,7 @@ Preferred communication style: Simple, everyday language.
 - **Migrations**: Generated to `./migrations` directory using `drizzle-kit push`
 
 ### On-Chain Analytics (The Graph)
-- **Subgraph Schemas**: Dual-chain GraphQL subgraphs for Base Sepolia and Unichain Sepolia (`subgraph/base-sepolia/`, `subgraph/unichain-sepolia/`)
+- **Subgraph Schemas**: Base Sepolia GraphQL subgraph (`subgraph/base-sepolia/`)
 - **18 Entity Types**: Pool, Swap, Token, Position, Vault, VaultDeposit, VaultWithdrawal, VaultDayData, SwapHourData, PredictionMarket, PredictionBet, PredictionClaim, Protocol, ProtocolDayData
 - **GraphQL Client**: `client/src/lib/graphql.ts` — multi-chain federated query client with auto-merge
 - **Query Hooks**: `client/src/hooks/useSubgraphData.ts` — 8 pre-built hooks (useProtocolStats, useSwapVolume, usePoolTvl, usePoolLeaderboard, useUserPositions, usePredictionMarkets, useRecentSwaps, useVaultTvl)
@@ -99,7 +97,7 @@ Preferred communication style: Simple, everyday language.
 - **Data Normalizer**: `client/src/lib/normalizeSubgraphData.ts` — transforms raw subgraph results into chart-ready arrays
 - **Chart Components**: `client/src/components/analytics/ChartMessage.tsx` (line/bar/pie/table/stat) + `QueryLibrary.tsx` (quick-query chips)
 - **Subgraph Deployment**: Placeholder contract addresses in subgraph.yaml; replace after deploying contracts. Deploy with: `graph auth --studio <KEY>`, `graph codegen`, `graph build`, `graph deploy --studio`
-- **Environment Variables**: Set `VITE_SUBGRAPH_BASE_SEPOLIA` and `VITE_SUBGRAPH_UNICHAIN` after subgraph deployment
+- **Environment Variables**: Set `VITE_SUBGRAPH_BASE_SEPOLIA` after subgraph deployment
 
 ### Key Design Patterns
 - **Chat-First UX**: The chatbot is always visible; DeFi modals layer on top without unmounting chat

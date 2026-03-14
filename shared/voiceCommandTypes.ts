@@ -36,10 +36,8 @@ export interface VaultCommand {
 export const TOKEN_ALIASES: Record<string, string> = {
   ether: 'ETH', ethereum: 'ETH', eth: 'ETH',
   usdc: 'USDC', 'usd coin': 'USDC',
-  tusdt: 'tUSDT', tether: 'tUSDT', 'tether usd': 'tUSDT', usdt: 'tUSDT',
   eurc: 'EURC', euro: 'EURC', 'euro coin': 'EURC',
   cbbtc: 'cbBTC', bitcoin: 'cbBTC', btc: 'cbBTC', 'coinbase btc': 'cbBTC',
-  link: 'LINK', chainlink: 'LINK',
 };
 
 export function normalizeToken(raw: string): string {

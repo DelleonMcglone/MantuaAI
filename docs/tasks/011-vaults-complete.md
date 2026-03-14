@@ -19,7 +19,6 @@ with distinct risk profiles and APYs.
 - `contracts/vaults/foundry.toml`
 - `contracts/vaults/test/MantuaVault.t.sol` — 9 tests covering deposit, withdraw, yield, pause
 - `contracts/vaults/script/DeployBaseSepolia.s.sol`
-- `contracts/vaults/script/DeployUnichainSepolia.s.sol`
 
 ### P1-061 — ABI + contracts config
 - `client/src/abis/MantuaVault.json`
@@ -67,9 +66,9 @@ with distinct risk profiles and APYs.
 
 | Name                         | Strategy  | APY   | Risk   |
 |------------------------------|-----------|-------|--------|
-| ETH/mUSDC LP Vault           | lp        | 12.4% | medium |
-| mUSDC/mUSDT Stable Vault     | stable    | 8.1%  | low    |
-| ETH/mBTC LP Vault            | lp        | 18.7% | high   |
+| ETH/USDC LP Vault            | lp        | 12.4% | medium |
+| USDC/EURC Stable Vault       | stable    | 8.1%  | low    |
+| ETH/cbBTC LP Vault           | lp        | 18.7% | high   |
 | AI-Managed Multi-Strategy    | multi     | 24.2% | high   |
 
 ---

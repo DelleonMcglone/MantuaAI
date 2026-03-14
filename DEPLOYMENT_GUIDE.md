@@ -42,7 +42,7 @@ forge script contracts/script/DeployMockTokens.s.sol:DeployMockTokens \
 
 This will:
 - Deploy the MockTokenFactory contract
-- Deploy all 7 mock tokens (mUSDC, mETH, mDAI, mBTC, mLINK, mUSDT, mUSDE)
+- Deploy the supported mock tokens (mUSDC, mEURC, mcbBTC, mETH)
 - Verify contracts on BaseScan
 - Output all token addresses
 
@@ -53,12 +53,9 @@ Copy the deployed addresses from the console output and update [client/src/confi
 ```typescript
 export const MOCK_TOKEN_ADDRESSES = {
   mUSDC: "0x...",  // Copy from deployment output
+  mEURC: "0x...",
+  mcbBTC: "0x...",
   mETH: "0x...",
-  mDAI: "0x...",
-  mBTC: "0x...",
-  mLINK: "0x...",
-  mUSDT: "0x...",
-  mUSDE: "0x...",
 };
 
 export const MOCK_TOKEN_FACTORY = "0x..."; // Factory address
@@ -82,12 +79,9 @@ forge script contracts/script/DeployMockTokens.s.sol:SeedLiquidity \
 
 This will mint initial liquidity:
 - 1M mUSDC
-- 1M mDAI
-- 1M mUSDT
-- 1M mUSDE
+- 1M mEURC
+- 10K mcbBTC
 - 1K mETH
-- 100 mBTC
-- 10K mLINK
 
 ## Deployed Contracts
 
@@ -154,12 +148,9 @@ forge verify-contract \
 | Token | Symbol | Decimals | Faucet Amount | Icon |
 |-------|--------|----------|---------------|------|
 | Mantua USDC | mUSDC | 6 | 10,000 | USDC |
+| Mantua EURC | mEURC | 6 | 10,000 | EURC |
+| Mantua cbBTC | mcbBTC | 8 | 1 | cbBTC |
 | Mantua ETH | mETH | 18 | 10 | ETH |
-| Mantua DAI | mDAI | 18 | 10,000 | DAI |
-| Mantua BTC | mBTC | 8 | 1 | BTC |
-| Mantua LINK | mLINK | 18 | 100 | LINK |
-| Mantua USDT | mUSDT | 6 | 10,000 | USDT |
-| Mantua USDe | mUSDE | 18 | 10,000 | USDe |
 
 ## Troubleshooting
 

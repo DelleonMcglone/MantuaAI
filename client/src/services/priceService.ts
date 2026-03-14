@@ -16,8 +16,6 @@ const REFERENCE_PRICES: Record<string, number> = {
   'cbBTC': 85000,
   'USDC':  1.00,
   'EURC':  1.10,
-  'tUSDT': 1.00,
-  'LINK':  15.00,
 };
 
 export function getPriceBySymbol(symbol: string): number {
