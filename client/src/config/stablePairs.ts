@@ -27,7 +27,11 @@ export function isStablePair(
   const pairs = STABLE_PAIRS[chainId] ?? [];
   const a = symbolA.toUpperCase();
   const b = symbolB.toUpperCase();
-  return pairs.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
+  return pairs.some(([x, y]) => {
+    const xu = x.toUpperCase();
+    const yu = y.toUpperCase();
+    return (xu === a && yu === b) || (xu === b && yu === a);
+  });
 }
 
 export const CHAIN_NAMES: Record<number, string> = {

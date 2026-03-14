@@ -18,6 +18,8 @@ const normalizeTokenSymbol = (sym: string): string => {
   if (upper === 'ETH' || upper === 'WETH') return 'ETH';
   if (upper === 'USDC' || upper === 'USD') return 'USDC';
   if (upper === 'EURC' || upper === 'EUR') return 'EURC';
+  if (upper === 'TUSDT' || upper === 'USDT' || upper === 'TETHER') return 'tUSDT';
+  if (upper === 'LINK' || upper === 'CHAINLINK') return 'LINK';
   return upper;
 };
 
@@ -27,7 +29,7 @@ const extractHookFromMessage = (msg: string): string => {
   return '';
 };
 
-const KNOWN_TOKENS_LOWER = ['eth', 'usdc', 'eurc', 'cbbtc', 'btc', 'wbtc', 'weth', 'usd', 'eur'];
+const KNOWN_TOKENS_LOWER = ['eth', 'usdc', 'eurc', 'cbbtc', 'btc', 'wbtc', 'weth', 'usd', 'eur', 'tusdt', 'usdt', 'link'];
 
 const extractPoolFromMessage = (msg: string) => {
   const poolMatch = msg.match(/([a-zA-Z0-9]+)\/([a-zA-Z0-9]+)/);
@@ -238,6 +240,8 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
     'usdc': 'USDC',
     'eurc': 'EURC', 'euro': 'EURC',
     'cbbtc': 'cbBTC', 'btc': 'cbBTC', 'bitcoin': 'cbBTC',
+    'tusdt': 'tUSDT', 'usdt': 'tUSDT', 'tether': 'tUSDT',
+    'link': 'LINK', 'chainlink': 'LINK',
   };
 
   for (const [key, value] of Object.entries(assetsMap)) {

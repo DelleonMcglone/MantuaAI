@@ -3801,7 +3801,7 @@ export default function MantuaApp() {
   const [voiceParsedCommand, setVoiceParsedCommand] = useState(null);
   const isVoiceSubmitRef = useRef(false);
   // Persistent chat state from useChat hook — pass chainId for context-aware AI responses
-  const { messages: chatMessages, sendMessage, updateSessionTitle, startNewSession, isSending, isLoading: chatIsLoading, userId: chatUserId } = useChat({ chainId: currentChainId });
+  const { messages: chatMessages, sendMessage, persistLocalExchange, updateSessionTitle, startNewSession, isSending, isLoading: chatIsLoading, userId: chatUserId } = useChat({ chainId: currentChainId });
   const [analyticsMessages, setAnalyticsMessages] = useState<any[]>([]);
   const allMessages = useMemo(() => {
     const combined = [...chatMessages, ...analyticsMessages];
@@ -4109,7 +4109,7 @@ export default function MantuaApp() {
           },
         ]);
         setHasInteracted(true);
-        sendMessage(inputValue);
+        persistLocalExchange(inputValue, balanceSummary);
         updateSessionTitle('Check wallet balance');
         loadRecentChats();
         return;
@@ -4133,13 +4133,14 @@ export default function MantuaApp() {
               `**ETH** — https://console.optimism.io/faucet`,
               `**USDC & EURC** — https://faucet.circle.com/`,
             ];
+        const faucetContent = faucetLines.join('\n');
         setAnalyticsMessages(prev => [
           ...prev,
           { id: 'user-faucet-' + Date.now(), sessionId: '', role: 'user' as const, content: inputValue, createdAt: new Date().toISOString() },
-          { id: 'asst-faucet-' + Date.now(), sessionId: '', role: 'assistant' as const, content: faucetLines.join('\n'), createdAt: new Date().toISOString() },
+          { id: 'asst-faucet-' + Date.now(), sessionId: '', role: 'assistant' as const, content: faucetContent, createdAt: new Date().toISOString() },
         ]);
         setHasInteracted(true);
-        sendMessage(inputValue);
+        persistLocalExchange(inputValue, faucetContent);
         updateSessionTitle(`Testnet faucets — ${chainName}`);
         loadRecentChats();
         return;

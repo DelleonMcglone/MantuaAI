@@ -380,6 +380,13 @@ export function useAddLiquidity() {
     const amount1Max  = (amount1Desired * 105n) / 100n;
     const nowSecs     = Math.floor(Date.now() / 1000);
 
+    // Track nonce explicitly to avoid "nonce too low" errors when sending
+    // multiple sequential transactions (approvals + liquidity)
+    let nonce = await publicClient.getTransactionCount({
+      address: userAddress,
+      blockTag: 'pending',
+    });
+
     // ── Pre-check allowances to know exactly how many steps are needed ────────
     const needsErc20Approval: boolean[] = [];
     const needsPermit2Approval: boolean[] = [];
@@ -416,8 +423,10 @@ export function useAddLiquidity() {
         const tx = await writeContractAsync({
           address: tokenAddr, abi: erc20Abi, functionName: 'approve',
           args: [permit2Addr, maxUint256],
+          nonce,
         });
         await publicClient.waitForTransactionReceipt({ hash: tx });
+        nonce++;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         setSetupError(new Error(`Token approval failed: ${decodeV4Error(msg) || msg.slice(0, 150)}`));
@@ -435,8 +444,10 @@ export function useAddLiquidity() {
         const tx = await writeContractAsync({
           address: permit2Addr, abi: PERMIT2_ABI, functionName: 'approve',
           args: [tokenAddr, positionManagerAddr, amount * 10n, nowSecs + 3600],
+          nonce,
         });
         await publicClient.waitForTransactionReceipt({ hash: tx });
+        nonce++;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         setSetupError(new Error(`Permit2 approval failed: ${decodeV4Error(msg) || msg.slice(0, 150)}`));
@@ -497,6 +508,7 @@ export function useAddLiquidity() {
           functionName: 'multicall',
           args: [[initData, modifyData]],
           value: ethValue,
+          nonce,
         });
         // Set the final hash *before* the finally block so isSuccess fires correctly
         setFinalHash(modifyTx);
@@ -509,6 +521,7 @@ export function useAddLiquidity() {
           functionName: 'modifyLiquidities',
           args: [unlockData, deadline],
           value: ethValue,
+          nonce,
         });
         setFinalHash(modifyTx);
       }

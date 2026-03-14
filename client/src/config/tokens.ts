@@ -164,15 +164,15 @@ export const MOCK_TOKEN_FACTORY: `0x${string}` = '0x0000000000000000000000000000
 export type TokenSymbol = 'ETH' | 'cbBTC' | 'USDC' | 'EURC' | 'tUSDT' | 'LINK';
 
 export const TOKEN_BY_SYMBOL: Record<string, Token> = Object.fromEntries(
-  SUPPORTED_TOKENS.map(t => [t.symbol, t])
+  ALL_CHAIN_TOKENS.map(t => [t.symbol, t])
 );
 
 export const TOKEN_BY_ADDRESS: Record<string, Token> = Object.fromEntries(
-  SUPPORTED_TOKENS.map(t => [t.address.toLowerCase(), t])
+  ALL_CHAIN_TOKENS.map(t => [t.address.toLowerCase(), t])
 );
 
 export function getTokenBySymbol(symbol: string): Token | undefined {
-  return TOKEN_BY_SYMBOL[symbol] ?? SUPPORTED_TOKENS.find(
+  return TOKEN_BY_SYMBOL[symbol] ?? ALL_CHAIN_TOKENS.find(
     t => t.symbol.toLowerCase() === symbol.toLowerCase()
   );
 }
