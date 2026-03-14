@@ -141,8 +141,9 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
     if (!isSuccess || !hash || !address || !tokenA || !tokenB) return;
     const params = buildPoolParams();
     if (!params) return;
-    const sym0 = params.poolKey.currency0 === tokenA.address.toLowerCase() ? tokenA.symbol : tokenB.symbol;
-    const sym1 = params.poolKey.currency0 === tokenA.address.toLowerCase() ? tokenB.symbol : tokenA.symbol;
+    const isCurrency0A = params.poolKey.currency0.toLowerCase() === tokenA.address.toLowerCase();
+    const sym0 = isCurrency0A ? tokenA.symbol : tokenB.symbol;
+    const sym1 = isCurrency0A ? tokenB.symbol : tokenA.symbol;
     const hookAddress = getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none');
     const chainName = chainId === 1301 ? 'Unichain Sepolia' : 'Base Sepolia';
     const actionLabel = mode === 'create'
@@ -151,15 +152,30 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
 
     (async () => {
       // Await pool save so the list is ready before navigation
-      await fetch('/api/portfolio', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token0: sym0, token1: sym1, feeTier: poolFee,
-          creatorAddress: address, txHash: hash, chainId, hookAddress,
-        }),
-      }).catch(() => {});
-      // Fire-and-forget secondary records
+      try {
+        const poolRes = await fetch('/api/portfolio', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token0: sym0, token1: sym1, feeTier: poolFee,
+            creatorAddress: address, txHash: hash, chainId, hookAddress,
+          }),
+        });
+        if (!poolRes.ok) console.error('[save-pool]', await poolRes.text());
+      } catch (err) { console.error('[save-pool]', err); }
+      // Save position and transaction records
+      try {
+        const posRes = await fetch('/api/portfolio/positions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            walletAddress: address, token0: sym0, token1: sym1,
+            liquidity: '1', amount0: amount0, amount1: amount1,
+            feeTier: poolFee, chainId,
+          }),
+        });
+        if (!posRes.ok) console.error('[save-position]', await posRes.text());
+      } catch (err) { console.error('[save-position]', err); }
       fetch('/api/portfolio/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -168,16 +184,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
           tokenIn: tokenA.symbol, tokenOut: tokenB.symbol,
           amountIn: amount0, amountOut: amount1, chainId,
         }),
-      }).catch(() => {});
-      fetch('/api/portfolio/positions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          walletAddress: address, token0: sym0, token1: sym1,
-          liquidity: '1', amount0: amount0, amount1: amount1,
-          feeTier: poolFee, chainId,
-        }),
-      }).catch(() => {});
+      }).catch(err => console.error('[save-tx]', err));
       onActionComplete?.(actionLabel);
     })();
   }, [isSuccess, hash]);

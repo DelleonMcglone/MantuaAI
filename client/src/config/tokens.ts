@@ -171,10 +171,15 @@ export const TOKEN_BY_ADDRESS: Record<string, Token> = Object.fromEntries(
   ALL_CHAIN_TOKENS.map(t => [t.address.toLowerCase(), t])
 );
 
-export function getTokenBySymbol(symbol: string): Token | undefined {
-  return TOKEN_BY_SYMBOL[symbol] ?? ALL_CHAIN_TOKENS.find(
-    t => t.symbol.toLowerCase() === symbol.toLowerCase()
-  );
+/**
+ * Look up a token by symbol, optionally scoped to a specific chain.
+ * When chainId is provided, returns the token for that chain (critical for
+ * tokens like USDC/ETH that exist on multiple chains with different addresses).
+ * Without chainId, returns the first match across all chains.
+ */
+export function getTokenBySymbol(symbol: string, chainId?: number): Token | undefined {
+  const pool = chainId ? getTokensForChain(chainId) : ALL_CHAIN_TOKENS;
+  return pool.find(t => t.symbol.toLowerCase() === symbol.toLowerCase());
 }
 
 export function getTokenByAddress(address: `0x${string}`): Token | undefined {

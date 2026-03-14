@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useChainId } from 'wagmi';
 import { SwapIcon, ShieldIcon } from '../icons';
 import { getTokenBySymbol, type Token } from '../../config/tokens';
 import PoolActivityChart from './PoolActivityChart';
@@ -86,6 +87,7 @@ const PairTokenIcon = ({ token, size = 36 }: { token: Token | null; size?: numbe
 const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
   onClose, theme, isDark, pool, mode = 'add', initialTokenA, initialTokenB, initialHook, onActionComplete,
 }) => {
+  const chainId = useChainId();
   const [selectedHook, setSelectedHook] = useState('none');
   const [isHookModalOpen, setIsHookModalOpen] = useState(false);
   const [tokenSelectorTarget, setTokenSelectorTarget] = useState<'A' | 'B' | null>(null);
@@ -103,15 +105,15 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
 
   useEffect(() => {
     if ((mode === 'add' || mode === 'remove') && pool) {
-      setTokenA(getTokenBySymbol(pool.token1) ?? null);
-      setTokenB(getTokenBySymbol(pool.token2) ?? null);
+      setTokenA(getTokenBySymbol(pool.token1, chainId) ?? null);
+      setTokenB(getTokenBySymbol(pool.token2, chainId) ?? null);
       if (pool.hook && pool.hook !== 'None') {
         const matched = HOOKS.find(h => h.name.toLowerCase().includes(pool.hook!.toLowerCase()));
         if (matched) setSelectedHook(matched.id);
       }
     } else if (initialTokenA || initialTokenB) {
-      if (initialTokenA) setTokenA(getTokenBySymbol(initialTokenA) ?? null);
-      if (initialTokenB) setTokenB(getTokenBySymbol(initialTokenB) ?? null);
+      if (initialTokenA) setTokenA(getTokenBySymbol(initialTokenA, chainId) ?? null);
+      if (initialTokenB) setTokenB(getTokenBySymbol(initialTokenB, chainId) ?? null);
     } else {
       setTokenA(null);
       setTokenB(null);
@@ -124,7 +126,7 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
       );
       if (matched) setSelectedHook(matched.id);
     }
-  }, [pool, mode, initialTokenA, initialTokenB, initialHook]);
+  }, [pool, mode, initialTokenA, initialTokenB, initialHook, chainId]);
 
   const hookObj = HOOKS.find((h) => h.id === selectedHook) ?? HOOKS[0];
   const hookColor = hookObj.color;
