@@ -119,6 +119,7 @@ CREATE TABLE IF NOT EXISTS positions (
   tick_upper       INTEGER DEFAULT 0,
   status           TEXT DEFAULT 'active',
   chain_id         INTEGER NOT NULL DEFAULT 84532,
+  hook_address     VARCHAR(42) DEFAULT '0x0000000000000000000000000000000000000000',
   created_at       TIMESTAMP DEFAULT NOW(),
   updated_at       TIMESTAMP DEFAULT NOW()
 );

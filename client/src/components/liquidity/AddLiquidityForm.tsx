@@ -171,7 +171,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
           body: JSON.stringify({
             walletAddress: address, token0: sym0, token1: sym1,
             liquidity: '1', amount0: amount0, amount1: amount1,
-            feeTier: poolFee, chainId,
+            feeTier: poolFee, chainId, hookAddress,
           }),
         });
         if (!posRes.ok) console.error('[save-position]', await posRes.text());

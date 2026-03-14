@@ -209,19 +209,20 @@ router.get('/positions', async (req: Request, res: Response) => {
 
 router.post('/positions', async (req: Request, res: Response) => {
   try {
-    const { walletAddress, poolId, positionTokenId, token0, token1, liquidity, amount0, amount1, feeTier, chainId } = req.body;
+    const { walletAddress, poolId, positionTokenId, token0, token1, liquidity, amount0, amount1, feeTier, chainId, hookAddress } = req.body;
     if (!walletAddress || !token0 || !token1 || !liquidity) {
       return res.status(400).json({ error: 'walletAddress, token0, token1, liquidity required' });
     }
     const networkChainId = parseInt(chainId) || 84532;
+    const resolvedHookAddress = hookAddress || '0x0000000000000000000000000000000000000000';
     const { rows } = await dbPool.query(
       `INSERT INTO positions
          (wallet_address, pool_id, position_token_id, token0, token1, liquidity, amount0, amount1,
-          fee_tier, pool_address, tick_lower, tick_upper, status, chain_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'0x0000000000000000000000000000000000000000',0,0,'active',$10)
+          fee_tier, pool_address, tick_lower, tick_upper, status, chain_id, hook_address)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'0x0000000000000000000000000000000000000000',0,0,'active',$10,$11)
        RETURNING *`,
       [walletAddress.toLowerCase(), poolId || null, positionTokenId || null,
-       token0, token1, liquidity, amount0 || 0, amount1 || 0, feeTier || 3000, networkChainId]
+       token0, token1, liquidity, amount0 || 0, amount1 || 0, feeTier || 3000, networkChainId, resolvedHookAddress]
     );
     res.status(201).json(rows[0]);
   } catch (err: unknown) {
