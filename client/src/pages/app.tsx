@@ -32,7 +32,8 @@ import { useSwapQuote, getPriceImpactSeverity } from '../hooks/useSwapQuote';
 import { useSwapExecution, getExplorerLink } from '../hooks/useSwapExecution';
 import { useTokenBalances } from '../hooks/useTokenBalances';
 import { PriceImpact, SwapButton, SwapButtonStyles, SwapConfirmation, SwapPriceChart } from '../components/swap';
-import { parseTokenAmount, formatTokenAmount, isNativeEth, getZeroAddress, getHookAddress } from '../lib/swap-utils';
+import { parseTokenAmount, formatTokenAmount, isNativeEth, getZeroAddress, getHookAddress, createPoolKey, getPoolId } from '../lib/swap-utils';
+import { usePoolState } from '../hooks/usePoolState';
 import { ALL_TOKENS, ALL_CHAIN_TOKENS, NATIVE_ETH, getTokenBySymbol, getTokensForChain } from '../config/tokens';
 import { calculateUsdValue as calcUsdValue, getPriceBySymbol } from '../services/priceService';
 import { useLivePriceUSD, useLivePairRate } from '../hooks/useLivePriceUSD';
@@ -1766,6 +1767,18 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
     enabled: parsedAmount > BigInt(0),
   });
 
+  // Check if pool exists on-chain for the selected pair
+  const swapHookAddr = getHookAddress(selectedHook, currentChainId);
+  const swapFeeTier = selectedHook === 'stable-protection' ? 0x800000 : 500;
+  const swapPoolState = usePoolState(
+    fromTokenData.address as `0x${string}`,
+    toTokenData.address as `0x${string}`,
+    swapFeeTier,
+    swapHookAddr,
+  );
+  const noPoolExists = !swapPoolState.isLoading && !swapPoolState.isInitialized
+    && !!fromToken && !!toToken && fromToken !== toToken;
+
   // Swap execution hook
   const {
     status: swapStatus,
@@ -2323,16 +2336,31 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
               onConnect={openModal}
               onApprove={handleSwap}
               onSwap={handleSwap}
-              disabled={isExecuting || !quote || (approvalStatus === 'approving')}
+              disabled={isExecuting || !quote || noPoolExists || (approvalStatus === 'approving')}
               theme={theme}
               isDark={isDark}
             />
           </div>
 
+          {/* No pool exists warning */}
+          {noPoolExists && parsedAmount > BigInt(0) && (
+            <div style={{
+              marginTop: '8px',
+              padding: '10px 12px',
+              borderRadius: '10px',
+              background: 'rgba(245, 158, 11, 0.08)',
+              border: '1px solid rgba(245, 158, 11, 0.2)',
+              color: '#f59e0b',
+              fontSize: '13px',
+            }}>
+              No pool exists for {fromToken}/{toToken}. Create one in the Liquidity tab first.
+            </div>
+          )}
+
           {/* Approval/Error Status */}
           {approvalError && (
-            <div style={{ 
-              marginTop: '8px', 
+            <div style={{
+              marginTop: '8px',
               padding: '10px 12px', 
               borderRadius: '10px',
               background: 'rgba(239, 68, 68, 0.1)',
