@@ -12,6 +12,7 @@ import { LiquidityTokenInput } from './LiquidityTokenInput';
 import { getExplorerTxUrl } from '../../config/contracts';
 import { isStablePair, CHAIN_NAMES } from '../../config/stablePairs';
 import { useWalletBalances } from '../../hooks/useWalletBalances';
+import { toast } from 'sonner';
 
 type RangeType = 'Full Range' | 'Wide' | 'Narrow' | 'Custom';
 const RANGE_TICKS: Record<RangeType, { tickLower: number; tickUpper: number }> = {
@@ -151,6 +152,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
       : `Added liquidity to ${sym0}/${sym1}`;
 
     (async () => {
+      let poolSaved = false;
       // Await pool save so the list is ready before navigation
       try {
         const poolRes = await fetch('/api/portfolio', {
@@ -161,8 +163,17 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
             creatorAddress: address, txHash: hash, chainId, hookAddress,
           }),
         });
-        if (!poolRes.ok) console.error('[save-pool]', await poolRes.text());
-      } catch (err) { console.error('[save-pool]', err); }
+        if (!poolRes.ok) {
+          const errText = await poolRes.text();
+          console.error('[save-pool]', errText);
+          toast.error('Pool record failed to save', { description: errText.slice(0, 120), duration: 8000 });
+        } else {
+          poolSaved = true;
+        }
+      } catch (err) {
+        console.error('[save-pool]', err);
+        toast.error('Pool record failed to save', { description: 'Network error — check server logs', duration: 8000 });
+      }
       // Save position and transaction records
       try {
         const posRes = await fetch('/api/portfolio/positions', {
@@ -185,6 +196,13 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
           amountIn: amount0, amountOut: amount1, chainId,
         }),
       }).catch(err => console.error('[save-tx]', err));
+      // Show success toast with explorer link
+      const explorerUrl = getExplorerTxUrl(hash, chainId);
+      toast.success(poolSaved ? actionLabel : 'Liquidity confirmed on-chain', {
+        description: poolSaved ? 'Pool is now visible in your liquidity list.' : 'On-chain tx succeeded but pool record may not appear in list.',
+        action: { label: 'View Tx', onClick: () => window.open(explorerUrl, '_blank') },
+        duration: 6000,
+      });
       onActionComplete?.(actionLabel);
     })();
   }, [isSuccess, hash]);

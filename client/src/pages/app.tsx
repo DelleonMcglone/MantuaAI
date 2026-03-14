@@ -4499,16 +4499,16 @@ export default function MantuaApp() {
                         initialTokenA={liquidityInitialTokens?.tokenA}
                         initialTokenB={liquidityInitialTokens?.tokenB}
                         initialHook={liquidityInitialHook}
-                        onActionComplete={async (title) => {
-                          await updateSessionTitle(title);
-                          loadRecentChats();
-                          // Navigate back to pool list and refresh it
+                        onActionComplete={(title) => {
+                          // Navigate back to pool list and refresh it FIRST (synchronous)
                           setShowAddLiquidityModal(false);
                           setSelectedPool(null);
                           setLiquidityInitialTokens(null);
                           setLiquidityInitialHook('');
                           setLiquidityRefreshKey(k => k + 1);
                           setShowLiquidity(true);
+                          // Update session title in background (non-blocking)
+                          updateSessionTitle(title).then(() => loadRecentChats()).catch(() => {});
                         }}
                       />
                     </div>

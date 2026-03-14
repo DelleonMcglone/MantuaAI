@@ -94,10 +94,10 @@ router.post('/transactions', async (req: Request, res: Response) => {
       : `https://sepolia.basescan.org/tx/${txHash}`;
     const { rows } = await dbPool.query(
       `INSERT INTO portfolio_transactions
-         (wallet_address, type, tx_hash, token_in, token_out, amount_in, amount_out, pool_id, base_scan_url)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+         (wallet_address, type, tx_hash, token_in, token_out, amount_in, amount_out, pool_id, chain_id, base_scan_url)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        ON CONFLICT (tx_hash) DO NOTHING RETURNING *`,
-      [walletAddress.toLowerCase(), type, txHash, tokenIn, tokenOut, amountIn, amountOut, poolId || null, baseScanUrl]
+      [walletAddress.toLowerCase(), type, txHash, tokenIn, tokenOut, amountIn, amountOut, poolId || null, networkChainId, baseScanUrl]
     );
     res.status(201).json(rows[0] ?? { skipped: true });
   } catch (err: unknown) {
