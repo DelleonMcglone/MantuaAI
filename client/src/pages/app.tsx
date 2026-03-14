@@ -4109,6 +4109,39 @@ export default function MantuaApp() {
           },
         ]);
         setHasInteracted(true);
+        sendMessage(inputValue);
+        updateSessionTitle('Check wallet balance');
+        loadRecentChats();
+        return;
+    }
+
+    if (command.type === 'faucet') {
+        resetModals();
+        const isUnichain = currentChainId === 1301;
+        const chainName = isUnichain ? 'Unichain Sepolia' : 'Base Sepolia';
+        const faucetLines = isUnichain
+          ? [
+              `Here's where to get testnet tokens on **${chainName}**:\n`,
+              `**ETH** — https://console.optimism.io/faucet`,
+              `**ETH & LINK** — https://faucets.chain.link/`,
+              `**USDC** — https://faucet.circle.com/`,
+              `**tUSDT** — https://developer.bitaps.com/faucet`,
+            ]
+          : [
+              `Here's where to get testnet tokens on **${chainName}**:\n`,
+              `**ETH, USDC, cbBTC, EURC** — https://portal.cdp.coinbase.com/products/faucet?projectId=a84fe446-5289-480f-9b54-6317b370da31&token=ETH&network=base-sepolia`,
+              `**ETH** — https://console.optimism.io/faucet`,
+              `**USDC & EURC** — https://faucet.circle.com/`,
+            ];
+        setAnalyticsMessages(prev => [
+          ...prev,
+          { id: 'user-faucet-' + Date.now(), sessionId: '', role: 'user' as const, content: inputValue, createdAt: new Date().toISOString() },
+          { id: 'asst-faucet-' + Date.now(), sessionId: '', role: 'assistant' as const, content: faucetLines.join('\n'), createdAt: new Date().toISOString() },
+        ]);
+        setHasInteracted(true);
+        sendMessage(inputValue);
+        updateSessionTitle(`Testnet faucets — ${chainName}`);
+        loadRecentChats();
         return;
     }
 

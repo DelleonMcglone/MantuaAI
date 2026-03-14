@@ -252,21 +252,26 @@ function buildSystemPrompt(chainId?: number): string {
 
   if (isUnichain) {
     prompt +=
-      `\n\nUnichain-specific context:\n` +
+      `\n\nUnichain Sepolia context:\n` +
       `- Unichain Sepolia (Chain ID 1301) is Uniswap Labs' own L2 chain.\n` +
-      `- Use the Uniswap Trading API (https://api-docs.uniswap.org) for swap quotes and routing on Unichain.\n` +
-      `- Supported tokens on Unichain Sepolia: ETH (native), USDC (0x31d0220469e10c4E71834a79b1f276d740d3768F), EURC (0x18fB358Bc74054B0c2530C48eF23f8A8D464cb18).\n` +
+      `- Supported tokens: ETH (native), USDC (0x31d0220469e10c4E71834a79b1f276d740d3768F), tUSDT (0xEa3B5B015a5289bE6fFa7196aF5386A86E50a8c2), LINK (0xda40816f278Cd049c137F6612822D181065EBfB4).\n` +
       `- Uniswap v4 PoolManager on Unichain Sepolia: 0x00b036b58a818b1bc34d502d3fe730db729e62ac\n` +
       `- Block explorer: https://sepolia.uniscan.xyz\n` +
-      `- ETH faucet: https://console.optimism.io/faucet\n` +
-      `- USDC/EURC faucet: https://faucet.circle.com/`;
+      `- Testnet faucets:\n` +
+      `  • ETH: https://console.optimism.io/faucet\n` +
+      `  • ETH & LINK: https://faucets.chain.link/\n` +
+      `  • USDC: https://faucet.circle.com/\n` +
+      `  • tUSDT: https://developer.bitaps.com/faucet`;
   } else {
     prompt +=
       `\n\nBase Sepolia context:\n` +
-      `- Supported tokens: ETH, cbBTC (0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf), USDC (0x036CbD53842c5426634e7929541eC2318f3dCF7e), EURC (0x808456652fdb597867f38412077A9182bf77359).\n` +
+      `- Supported tokens: ETH, cbBTC (0xcbB7C0006F23900c38EB856149F799620fcb8A4a), USDC (0x036CbD53842c5426634e7929541eC2318f3dCF7e), EURC (0x808456652fdb597867f38412077A9182bf77359F).\n` +
       `- Uniswap v4 PoolManager on Base Sepolia: 0x05e73354cfdd6745c338b50bcfdfa3aa6fa03408\n` +
       `- Block explorer: https://sepolia.basescan.org\n` +
-      `- ETH+token faucet: https://portal.cdp.coinbase.com/products/faucet`;
+      `- Testnet faucets:\n` +
+      `  • ETH, USDC, cbBTC, EURC: https://portal.cdp.coinbase.com/products/faucet?projectId=a84fe446-5289-480f-9b54-6317b370da31&token=ETH&network=base-sepolia\n` +
+      `  • ETH: https://console.optimism.io/faucet\n` +
+      `  • USDC & EURC: https://faucet.circle.com/`;
   }
 
   return prompt;

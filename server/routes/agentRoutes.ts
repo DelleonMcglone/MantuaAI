@@ -178,8 +178,10 @@ router.post("/autonomous", async (req, res) => {
       break;
     case "get-funds":
       enrichedMessage =
-        "Request testnet ETH from the faucet for my wallet. " +
-        "Show the transaction hash and the full BaseScan link.";
+        "The user is asking about getting testnet tokens. " +
+        "Try to request testnet ETH from the faucet for my wallet using request_faucet_funds. " +
+        "Also show the user all available faucet links for the current chain. " +
+        "Show the transaction hash and the full BaseScan link if successful.";
       break;
     case "swap":
     case "send":

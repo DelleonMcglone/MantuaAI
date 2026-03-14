@@ -184,7 +184,21 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
   if (
     msg === 'faucet' ||
     msg.match(/^(get|request)\s*(test)?\s*tokens?/) ||
-    msg.includes('testnet tokens')
+    msg.includes('testnet tokens') ||
+    msg.includes('testnet funds') ||
+    msg.includes('test tokens') ||
+    msg.includes('get tokens') ||
+    msg.includes('get funds') ||
+    msg.includes('get eth') ||
+    msg.includes('free tokens') ||
+    msg.includes('free eth') ||
+    msg.match(/where\s+(?:can|do)\s+(?:i|we)\s+get\s+(?:testnet\s+)?(?:tokens|funds|eth)/) ||
+    msg.match(/how\s+(?:can|do|to)\s+(?:i|we)\s+get\s+(?:testnet\s+)?(?:tokens|funds|eth)/) ||
+    msg.match(/(?:need|want)\s+(?:testnet\s+)?(?:tokens|funds|eth)/) ||
+    msg.match(/claim\s+(?:testnet\s+)?(?:tokens|funds|eth)/) ||
+    msg.match(/(?:where|how)\s+.*faucet/) ||
+    msg.match(/fund\s+(?:my\s+)?wallet/) ||
+    msg.match(/(?:get|claim|request)\s+(?:some\s+)?(?:usdc|eurc|link|cbbtc|tusdt|eth)/)
   ) {
     result.type = 'faucet';
     return result;

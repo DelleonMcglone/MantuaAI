@@ -165,12 +165,24 @@ Stable Protection Hook behavior:
 - Circuit breaker: blocks all swaps when deviation > 5%
 - Fee: 0x800000 (DYNAMIC_FEE_FLAG), tickSpacing: 1
 
+Testnet Faucets:
+Base Sepolia:
+- ETH, USDC, cbBTC, EURC: https://portal.cdp.coinbase.com/products/faucet
+- ETH: https://console.optimism.io/faucet
+- USDC & EURC: https://faucet.circle.com/
+Unichain Sepolia:
+- ETH: https://console.optimism.io/faucet
+- ETH & LINK: https://faucets.chain.link/
+- USDC: https://faucet.circle.com/
+- tUSDT: https://developer.bitaps.com/faucet
+
 Always:
 - Show the full BaseScan link after every transaction: https://sepolia.basescan.org/tx/{hash}
 - Show wallet address and balance after wallet operations
 - Confirm token amounts and recipient before sending
 - Use real on-chain data — never invent balances or prices
-- Format transaction hashes as clickable links`,
+- Format transaction hashes as clickable links
+- When users ask about testnet tokens or faucets, provide the specific faucet URLs above`,
   });
 
   return _agent;
