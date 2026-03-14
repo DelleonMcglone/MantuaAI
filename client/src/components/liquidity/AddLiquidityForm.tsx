@@ -53,7 +53,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
   const chainId = useChainId();
   const { getBalance } = useWalletBalances(address as `0x${string}` | undefined);
   const { addLiquidity, isPending, isConfirming, step, totalSteps, stepLabel, isSuccess, error, hash, reset } = useAddLiquidity();
-  const hookAddr = getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none');
+  const hookAddr = getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none', chainId);
   // Stable Protection hook requires DYNAMIC_FEE_FLAG (0x800000) and tickSpacing=1
   const poolFee = selectedHook === 'stable-protection' ? 0x800000 : 500;
   const poolState = usePoolState(tokenA?.address, tokenB?.address, poolFee, hookAddr);
@@ -118,7 +118,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
   const buildPoolParams = () => {
     if (!tokenA || !tokenB) return null;
     const { tickLower, tickUpper } = RANGE_TICKS[range];
-    const poolKey = createPoolKey(tokenA.address, tokenB.address, poolFee, getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none'));
+    const poolKey = createPoolKey(tokenA.address, tokenB.address, poolFee, getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none', chainId));
     const isCurrency0A = poolKey.currency0.toLowerCase() === tokenA.address.toLowerCase();
     const c0Dec = isCurrency0A ? tokenA.decimals : tokenB.decimals;
     const c1Dec = isCurrency0A ? tokenB.decimals : tokenA.decimals;
@@ -144,7 +144,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
     const isCurrency0A = params.poolKey.currency0.toLowerCase() === tokenA.address.toLowerCase();
     const sym0 = isCurrency0A ? tokenA.symbol : tokenB.symbol;
     const sym1 = isCurrency0A ? tokenB.symbol : tokenA.symbol;
-    const hookAddress = getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none');
+    const hookAddress = getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none', chainId);
     const chainName = chainId === 1301 ? 'Unichain Sepolia' : 'Base Sepolia';
     const actionLabel = mode === 'create'
       ? `Created ${sym0}/${sym1} pool on ${chainName}`

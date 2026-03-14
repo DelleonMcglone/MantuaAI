@@ -1761,8 +1761,8 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
     inputDecimals: fromTokenData.decimals,
     outputDecimals: toTokenData.decimals,
     slippageTolerance,
-    hookAddress: getHookAddress(selectedHook),
-    feeTier: 500, // 0.05% fee tier — matches the ETH/USDC pool on Base Sepolia
+    hookAddress: getHookAddress(selectedHook, currentChainId),
+    feeTier: selectedHook === 'stable-protection' ? 0x800000 : 500,
     enabled: parsedAmount > BigInt(0),
   });
 
@@ -1871,9 +1871,9 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
       tokenIn: fromTokenData.address as `0x${string}`,
       tokenOut: toTokenData.address as `0x${string}`,
       amountIn: parsedAmount,
-      hookAddress: getHookAddress(selectedHook),
+      hookAddress: getHookAddress(selectedHook, currentChainId),
       hookId: selectedHook,
-      feeTier: 500, // must match the fee tier of the active ETH/USDC pool
+      feeTier: selectedHook === 'stable-protection' ? 0x800000 : 500,
     };
 
     try {

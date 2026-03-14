@@ -106,8 +106,10 @@ export function useSwapQuote({
       ? spotPriceFloat
       : BigInt(10 ** 18); // Fallback to 1:1 if no price data
 
-    // Deduct fee
-    const feeAmount = (parsedAmountIn * BigInt(feeTier)) / BigInt(1000000);
+    // Deduct fee — for DYNAMIC_FEE_FLAG (0x800000) pools, the actual fee is set
+    // by the hook at swap time. Use 500 (0.05%) as a reasonable quote estimate.
+    const effectiveFee = feeTier === 0x800000 ? 500 : feeTier;
+    const feeAmount = (parsedAmountIn * BigInt(effectiveFee)) / BigInt(1000000);
     const amountAfterFee = parsedAmountIn - feeAmount;
 
     // Apply exchange rate with decimal handling
