@@ -188,7 +188,7 @@ export default function MantuaLanding() {
               <img src={logo} alt="Mantua.AI" style={{ height: 32 }} />
               <span style={{ fontFamily: '"Outfit", sans-serif', fontSize: 18, fontWeight: 600, color: theme.textPrimary }}>Mantua.AI</span>
             </div>
-            <p style={{ fontSize: 14, color: theme.textSecondary, lineHeight: 1.6 }}>Programmable liquidity for DeFi.<br />Hooks for logic. Agents for action. AI for intelligence.</p>
+            <p style={{ fontSize: 14, color: theme.textSecondary, lineHeight: 1.6 }}>Agent driven liquidity for Stablecoins.<br />Hooks for logic. Agents for action. AI for intelligence.</p>
           </div>
           <div>
             <h4 style={{ fontFamily: '"Outfit", sans-serif', fontSize: 14, fontWeight: 600, color: theme.textPrimary, marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Protocol</h4>
