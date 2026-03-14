@@ -106,7 +106,9 @@
       "Bash(ss -tlnp)",
       "Bash(npm list:*)",
       "Bash(find /Users/delleonmcglone/MantuaAI -maxdepth 2 -type f \\\\\\(-name *.config.* -o -name mcp* -o -name .clauderc* -o -name *mcp*.ts -o -name *mcp*.js \\\\\\))",
-      "WebFetch(domain:www.npmjs.com)"
+      "WebFetch(domain:www.npmjs.com)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }
