@@ -755,8 +755,8 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
   const safeTotal = isNaN(totalValue) ? 0 : totalValue;
 
   // Explorer URL based on chain
-  const explorerBase = chainId === 1301 ? 'https://sepolia.uniscan.xyz' : 'https://sepolia.basescan.org';
-  const explorerLabel = chainId === 1301 ? 'Uniscan' : 'BaseScan';
+  const explorerBase = 'https://sepolia.basescan.org';
+  const explorerLabel = 'BaseScan';
 
   useEffect(() => {
     if (!address || !walletConnected) return;
@@ -2768,7 +2768,7 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
         </div>
         <div style={{ flex: 1 }}>
           <span style={{ color: theme.textSecondary, fontSize: '14px', lineHeight: '1.5' }}>
-            <span style={{ color: theme.accent, fontWeight: '600' }}>{filteredPools.length > 0 ? `${filteredPools.length} pools on ${currentChainId === 1301 ? 'Unichain Sepolia' : 'Base Sepolia'}` : 'No pools yet — create your first pool'}</span>
+            <span style={{ color: theme.accent, fontWeight: '600' }}>{filteredPools.length > 0 ? `${filteredPools.length} pools on Base Sepolia` : 'No pools yet — create your first pool'}</span>
             {' '}• ETH, USDC, EURC on Uniswap v4.
           </span>
         </div>
@@ -3319,15 +3319,15 @@ const AgentFaucetPanel = ({ theme, isDark }) => {
 };
 
 // ─── Agent v2: Autonomous Mode ────────────────────────────────────────────────
-// Helper: render agent text with clickable BaseScan / Uniscan tx links
+// Helper: render agent text with clickable BaseScan tx links
 const renderAgentText = (text: string) => {
-  const urlPattern = /(https:\/\/sepolia\.(basescan\.org|uniscan\.xyz)\/tx\/0x[a-fA-F0-9]+)/g;
+  const urlPattern = /(https:\/\/sepolia\.basescan\.org\/tx\/0x[a-fA-F0-9]+)/g;
   const parts = text.split(urlPattern);
   if (parts.length === 1) return <>{text}</>;
   return (
     <>
       {parts.map((part, i) => {
-        if (/^https:\/\/sepolia\.(basescan\.org|uniscan\.xyz)\/tx\/0x[a-fA-F0-9]+$/.test(part)) {
+        if (/^https:\/\/sepolia\.basescan\.org\/tx\/0x[a-fA-F0-9]+$/.test(part)) {
           return (
             <a key={i} href={part} target="_blank" rel="noopener noreferrer"
               style={{ color: '#10b981', textDecoration: 'underline', wordBreak: 'break-all' }}>
@@ -3347,7 +3347,7 @@ const CHAT_ACTION_STARTERS: Record<string, { message: string; action: string }> 
   'faucet':    { action: 'get-funds',     message: 'Request testnet ETH from the faucet for my wallet. Show the transaction hash and BaseScan link.' },
   'swap':      { action: 'swap',          message: 'I want to swap tokens. Ask me which tokens and how much.' },
   'transfer':  { action: 'send',          message: 'I want to send tokens. Ask me the recipient address, token, and amount.' },
-  'liquidity': { action: 'create-pool',   message: 'Create a USDC/EURC pool with the Stable Protection Hook on Unichain Sepolia.' },
+  'liquidity': { action: 'create-pool',   message: 'Create a USDC/EURC pool with the Stable Protection Hook on Base Sepolia.' },
   'query':     { action: 'query',         message: "I want to query on-chain data. Ask me what I'd like to know." },
 };
 
@@ -3802,7 +3802,7 @@ export default function MantuaApp() {
     document.documentElement.classList.toggle('dark', isDark);
   }, [isDark]);
 
-  // Chain configuration — Base Sepolia + Unichain Sepolia
+  // Chain configuration — Base Sepolia only
   const SUPPORTED_CHAINS = {
     'base-sepolia': {
       id: 84532,
@@ -3812,15 +3812,6 @@ export default function MantuaApp() {
       color: '#3b82f6',
       rpcUrl: 'https://sepolia.base.org',
       blockExplorer: 'https://sepolia.basescan.org',
-    },
-    'unichain-sepolia': {
-      id: 1301,
-      name: 'Unichain Sepolia',
-      shortName: 'Unichain',
-      icon: '🦄',
-      color: '#f472b6',
-      rpcUrl: 'https://sepolia.unichain.org',
-      blockExplorer: 'https://sepolia.uniscan.xyz',
     },
   };
 
@@ -4126,7 +4117,7 @@ export default function MantuaApp() {
        sendMessage(inputValue);
        const tokenA = command.params?.tokenA || '';
        const tokenB = command.params?.tokenB || '';
-       const chainName = currentChainId === 1301 ? 'Unichain Sepolia' : 'Base Sepolia';
+       const chainName = 'Base Sepolia';
        updateSessionTitle(tokenA && tokenB ? `Add liquidity to ${tokenA}/${tokenB} on ${chainName}` : `Add liquidity on ${chainName}`);
        loadRecentChats();
        return;

@@ -35,13 +35,8 @@ const sendSchema = z.object({
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const EXPLORERS: Record<number, string> = {
-  84532: 'https://sepolia.basescan.org',
-  1301:  'https://sepolia.uniscan.xyz',
-};
-
-function getExplorerBase(chainId?: number): string {
-  return EXPLORERS[chainId ?? 84532] ?? EXPLORERS[84532];
+function getExplorerBase(_chainId?: number): string {
+  return 'https://sepolia.basescan.org';
 }
 
 function getExplorerTxUrl(txHash: string, chainId?: number): string {
@@ -338,7 +333,7 @@ export function registerAgentRoutes(app: Express): void {
           return res.json({
             type: 'pools',
             data: rows.map(p => {
-              const network = p.chain_id === 1301 ? 'Unichain Sepolia' : 'Base Sepolia';
+              const network = 'Base Sepolia';
               return {
                 pair: `${p.token0}/${p.token1}`,
                 feeTier: `${(p.fee_tier / 10000).toFixed(2)}%`,

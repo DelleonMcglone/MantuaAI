@@ -1,21 +1,20 @@
 /**
  * Reown AppKit Configuration
  *
- * Initializes the AppKit instance with multi-chain support
+ * Initializes the AppKit instance with Base Sepolia support
  * and WALLET-ONLY authentication (no email/social login).
  *
- * Supported networks: Base Sepolia (default), Unichain Sepolia
+ * Supported networks: Base Sepolia
  *
  * IMPORTANT: Call this OUTSIDE React components to prevent re-renders.
  */
 
 import { createAppKit } from '@reown/appkit/react';
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
-import { baseSepolia, unichainSepolia } from '@reown/appkit/networks';
+import { baseSepolia } from '@reown/appkit/networks';
 import type { AppKitNetwork } from '@reown/appkit/networks';
 import { http } from 'viem';
 
-// Get project ID - REQUIRED for WalletConnect QR code
 const projectId = import.meta.env.VITE_REOWN_PROJECT_ID || 'ad3378514000476f8321eef10f16882e';
 const isDevMode = !import.meta.env.VITE_REOWN_PROJECT_ID;
 
@@ -25,77 +24,61 @@ if (isDevMode) {
   );
 }
 
-// Application metadata for wallet display (REQUIRED for WalletConnect QR pairing)
 const metadata = {
   name: 'Mantua.AI',
   description: 'AI-powered DeFi trading platform with Uniswap v4 hooks',
-  // Must match actual domain for WalletConnect verification
   url: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5000',
   icons: ['https://mantua.ai/favicon.png'],
 };
 
-// Supported networks — Base Sepolia (default) + Unichain Sepolia
 const networks: [AppKitNetwork, ...AppKitNetwork[]] = [
   baseSepolia,
-  unichainSepolia,
 ];
 
-// Initialize Wagmi adapter with explicit HTTP transports.
-// This is critical — without explicit transports, useReadContracts multicall
-// can silently fail for ERC20 balance reads when connected via WalletConnect/Reown.
 const wagmiAdapter = new WagmiAdapter({
   networks,
   projectId,
   transports: {
-    [baseSepolia.id]:    http('https://sepolia.base.org'),
-    [unichainSepolia.id]: http('https://sepolia.unichain.org'),
+    [baseSepolia.id]: http('https://sepolia.base.org'),
   },
 });
 
-// Create and export the AppKit modal instance
 export const appKit = createAppKit({
   adapters: [wagmiAdapter],
   networks,
   projectId,
   metadata,
 
-  // DEFAULT NETWORK — Base Sepolia
   defaultNetwork: baseSepolia,
-  allowUnsupportedChain: false,           // Only allow configured testnets
+  allowUnsupportedChain: false,
 
-  // Theme configuration - follows system preference by default
-  themeMode: undefined, // undefined = follows system preference automatically
+  themeMode: undefined,
 
   themeVariables: {
-    '--w3m-color-mix': '#00BB7F',        // Accent color (teal/green)
+    '--w3m-color-mix': '#00BB7F',
     '--w3m-color-mix-strength': 20,
-    '--w3m-accent': '#3B82F6',            // Blue accent for buttons
+    '--w3m-accent': '#3B82F6',
     '--w3m-border-radius-master': '8px',
   },
 
-  // WALLET-ONLY CONFIGURATION
   features: {
     analytics: true,
-    email: false,                         // DISABLED - wallet only
-    socials: false,                       // DISABLED - wallet only
-    swaps: false,                         // Disable for MVP
-    onramp: false,                        // Disable for MVP
+    email: false,
+    socials: false,
+    swaps: false,
+    onramp: false,
   },
 
-  // Wallet display options - CRITICAL for search functionality
-  allWallets: 'SHOW',                     // REQUIRED: Show "All Wallets" with search (540+)
+  allWallets: 'SHOW',
 
-  // Featured wallets appear at top, but search still works across all wallets
   featuredWalletIds: [
-    'c57ca95b47569778a828d19178114f4db188b89b763c899ba0be274e97267d96', // MetaMask
-    '1ae92b26df02f0abca6304df07debccd18262fdf5fe82daa81593582dac9a369', // Rainbow
-    '4622a2b2d6af1c9844944291e5e7351a6aa24cd7b23099efac1b2fd875da31a0', // Trust
-    'a797aa35c0fadbfc1a53e7f675162ed5226968b44a19ee3d24385c64d1d3c393', // Phantom
+    'c57ca95b47569778a828d19178114f4db188b89b763c899ba0be274e97267d96',
+    '1ae92b26df02f0abca6304df07debccd18262fdf5fe82daa81593582dac9a369',
+    '4622a2b2d6af1c9844944291e5e7351a6aa24cd7b23099efac1b2fd875da31a0',
+    'a797aa35c0fadbfc1a53e7f675162ed5226968b44a19ee3d24385c64d1d3c393',
   ],
 });
 
-// Export wagmi config for WagmiProvider
 export const wagmiConfig = wagmiAdapter.wagmiConfig;
 
-// Export networks for use in components
-export { networks, baseSepolia, unichainSepolia };
+export { networks, baseSepolia };

@@ -2,13 +2,11 @@
 
 ## Overview
 
-Mantua.AI is a chat-native DeFi platform that combines natural language interactions with Uniswap v4 hooks and autonomous AI agents. Users interact with DeFi features (swaps, liquidity, vaults, portfolios) through a persistent chat interface, with modals rendered above the chatbot rather than page navigation. The platform supports both light and dark themes and targets Base Sepolia and Unichain Sepolia testnets for Web3 operations.
+Mantua.AI is a chat-native DeFi platform that combines natural language interactions with Uniswap v4 hooks and autonomous AI agents. Users interact with DeFi features (swaps, liquidity, vaults, portfolios) through a persistent chat interface, with modals rendered above the chatbot rather than page navigation. The platform supports both light and dark themes and targets Base Sepolia testnet for Web3 operations.
 
-### Multi-Chain Support
-- **Base Sepolia** (Chain ID: 84532) — primary chain
-- **Unichain Sepolia** (Chain ID: 1301) — secondary chain
-- Pools, positions, and activity are filtered by the currently connected chain
-- Explorer links use chain-specific URLs: `sepolia.basescan.org` or `sepolia.uniscan.xyz`
+### Network
+- **Base Sepolia** (Chain ID: 84532) — only supported chain
+- Explorer links: `sepolia.basescan.org`
 
 ### Stable Protection Hook
 - Custom Uniswap v4 hook for stablecoin pools (USDC/EURC)
@@ -23,23 +21,17 @@ Mantua.AI is a chat-native DeFi platform that combines natural language interact
 - Accent: `#14b8a6` (teal)
 - Text primary: `#ffffff`, secondary: `#9ca3af`, muted: `#6b7280`
 
-### Token Universe
-**Base Sepolia (84532):**
+### Token Universe (Base Sepolia 84532)
 - **ETH** (native, 18 decimals)
 - **USDC** (`0x036CbD53842c5426634e7929541eC2318f3dCF7e`, 6 decimals)
 - **EURC** (`0x808456652fdb597867f38412077A9182bf77359F`, 6 decimals)
 - **cbBTC** (`0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf`, 8 decimals)
 
-**Unichain Sepolia (1301):**
-- **ETH** (native, 18 decimals)
-- **USDC** (`0x31d0220469e10c4E71834a79b1f276d740d3768F`, 6 decimals)
-
 ### Target Pools
-- ETH/USDC on both chains
-- USDC/EURC on Base Sepolia
-- USDC/EURC with Stable Protection Hook on Base Sepolia
-- cbBTC/USDC on Base Sepolia
-- Pools display only on the chain they were created on
+- ETH/USDC
+- USDC/EURC
+- USDC/EURC with Stable Protection Hook
+- cbBTC/USDC
 
 ### Transaction Flow (Testnet Mode)
 - **Simplified Transactions**: Both swaps and liquidity additions use simple ETH self-transfers (0.0001 ETH) instead of complex Uniswap contract calls. This ensures transactions always succeed with verifiable explorer links.

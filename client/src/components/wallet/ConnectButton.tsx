@@ -3,8 +3,8 @@
  *
  * Displays "Connect Wallet" when disconnected.
  * When connected, shows truncated address and a dropdown with:
- *  - Dynamic network badge + inline network switcher (Base Sepolia ↔ Unichain Sepolia)
- *  - ETH + chain-specific ERC20 balances with USD values
+ *  - Network badge (Base Sepolia)
+ *  - ETH + ERC20 balances with USD values
  *  - Copy address and Disconnect buttons
  */
 
@@ -56,7 +56,6 @@ function ChevronIcon({ open }: { open: boolean }) {
   );
 }
 
-// Per-chain display config
 const CHAIN_OPTIONS = [
   {
     id: CHAIN_IDS.BASE_SEPOLIA,
@@ -66,15 +65,6 @@ const CHAIN_OPTIONS = [
     color: '#60a5fa',
     bgColor: 'rgba(59,130,246,0.12)',
     icon: '🔵',
-  },
-  {
-    id: CHAIN_IDS.UNICHAIN_SEPOLIA,
-    key: 'unichain-sepolia',
-    name: 'Unichain Sepolia',
-    shortName: 'Unichain',
-    color: '#f472b6',
-    bgColor: 'rgba(244,114,182,0.12)',
-    icon: '🦄',
   },
 ];
 

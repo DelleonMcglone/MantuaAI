@@ -119,7 +119,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
     const sym0 = params.poolKey.currency0 === tokenA.address.toLowerCase() ? tokenA.symbol : tokenB.symbol;
     const sym1 = params.poolKey.currency0 === tokenA.address.toLowerCase() ? tokenB.symbol : tokenA.symbol;
     const hookAddress = getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none');
-    const chainName = chainId === 1301 ? 'Unichain Sepolia' : 'Base Sepolia';
+    const chainName = 'Base Sepolia';
     const actionLabel = mode === 'create'
       ? `Created ${sym0}/${sym1} pool on ${chainName}`
       : `Added liquidity to ${sym0}/${sym1}`;

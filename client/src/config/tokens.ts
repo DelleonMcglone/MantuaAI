@@ -9,8 +9,6 @@ export interface Token {
   chainId: number;
 }
 
-// ─── Base Sepolia (84532) ───────────────────────────────────────────────────
-
 export const NATIVE_ETH: Token = {
   symbol: 'ETH',
   name: 'Ethereum',
@@ -26,8 +24,6 @@ export const BASE_SEPOLIA_ERC20_TOKENS: Token[] = [
   {
     symbol: 'cbBTC',
     name: 'Coinbase Wrapped BTC',
-    // Verified: https://sepolia.basescan.org/tx/0x2a0c23fe06fee9b8e93a8fb0988f0c31b4c09b5127e477677e2eed8cc067553f
-    // Base Sepolia testnet address (different from mainnet 0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf)
     address: '0xcbb7c0006f23900c38eb856149f799620fcb8a4a',
     decimals: 8,
     chainId: 84532,
@@ -48,7 +44,6 @@ export const BASE_SEPOLIA_ERC20_TOKENS: Token[] = [
   {
     symbol: 'EURC',
     name: 'Euro Coin',
-    // Verified: https://base-sepolia.blockscout.com/token/0x808456652fdb597867f38412077A9182bf77359F
     address: '0x808456652fdb597867f38412077A9182bf77359F',
     decimals: 6,
     chainId: 84532,
@@ -58,83 +53,30 @@ export const BASE_SEPOLIA_ERC20_TOKENS: Token[] = [
   },
 ];
 
-// ─── Unichain Sepolia (1301) ────────────────────────────────────────────────
-// Source: https://docs.unichain.org/docs/technical-information/contract-addresses
-// USDC: https://developers.circle.com/stablecoins/usdc-contract-addresses
-// EURC: https://developers.circle.com/stablecoins/eurc-on-test-networks
-
-export const UNICHAIN_SEPOLIA_NATIVE_ETH: Token = {
-  symbol: 'ETH',
-  name: 'Ethereum',
-  address: '0x0000000000000000000000000000000000000000',
-  decimals: 18,
-  chainId: 1301,
-  logoURI: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png',
-  coingeckoId: 'ethereum',
-  isNative: true,
-};
-
-export const UNICHAIN_SEPOLIA_ERC20_TOKENS: Token[] = [
-  {
-    symbol: 'USDC',
-    name: 'USD Coin',
-    // Verified: https://unichain-sepolia.blockscout.com/token/0x31d0220469e10c4E71834a79b1f276d740d3768F
-    // Source: https://developers.circle.com/stablecoins/usdc-contract-addresses
-    address: '0x31d0220469e10c4E71834a79b1f276d740d3768F',
-    decimals: 6,
-    chainId: 1301,
-    logoURI: 'https://assets.coingecko.com/coins/images/6319/small/usdc.png',
-    coingeckoId: 'usd-coin',
-    isNative: false,
-  },
-  // Note: EURC on Unichain Sepolia — address unconfirmed via on-chain verification.
-  // If you receive EURC from https://faucet.circle.com on Unichain Sepolia,
-  // check your wallet's token list for the contract address and update here.
-];
-
-// ─── Chain-aware token helpers ──────────────────────────────────────────────
-
 export const CHAIN_IDS = {
   BASE_SEPOLIA: 84532,
-  UNICHAIN_SEPOLIA: 1301,
 } as const;
 
-/** Returns the native ETH token for a given chainId */
-export function getNativeToken(chainId: number): Token {
-  if (chainId === CHAIN_IDS.UNICHAIN_SEPOLIA) return UNICHAIN_SEPOLIA_NATIVE_ETH;
-  return NATIVE_ETH; // default Base Sepolia
+export function getNativeToken(_chainId: number): Token {
+  return NATIVE_ETH;
 }
 
-/** Returns ERC20 tokens for a given chainId */
-export function getERC20Tokens(chainId: number): Token[] {
-  if (chainId === CHAIN_IDS.UNICHAIN_SEPOLIA) return UNICHAIN_SEPOLIA_ERC20_TOKENS;
-  return BASE_SEPOLIA_ERC20_TOKENS; // default Base Sepolia
+export function getERC20Tokens(_chainId: number): Token[] {
+  return BASE_SEPOLIA_ERC20_TOKENS;
 }
 
-/** Returns all tokens (native + ERC20) for a given chainId */
 export function getTokensForChain(chainId: number): Token[] {
   const native = getNativeToken(chainId);
   const erc20s = getERC20Tokens(chainId);
   return [native, ...erc20s];
 }
 
-// ─── Legacy exports (default to Base Sepolia) ──────────────────────────────
-
-/** @deprecated Use getERC20Tokens(chainId) for multi-chain support */
 export const ERC20_TOKENS: Token[] = BASE_SEPOLIA_ERC20_TOKENS;
 
 export const SUPPORTED_TOKENS: Token[] = [NATIVE_ETH, ...BASE_SEPOLIA_ERC20_TOKENS];
 
-// All tokens across all supported chains — used for icon lookups and display only.
-// For actual contract interactions, always use getTokensForChain(chainId).
-export const ALL_CHAIN_TOKENS: Token[] = [
-  NATIVE_ETH,
-  ...BASE_SEPOLIA_ERC20_TOKENS,
-  UNICHAIN_SEPOLIA_NATIVE_ETH,
-  ...UNICHAIN_SEPOLIA_ERC20_TOKENS,
-];
+export const ALL_CHAIN_TOKENS: Token[] = SUPPORTED_TOKENS;
 
-// Legacy aliases — kept for backward compatibility
 export const MOCK_TOKENS: Token[] = SUPPORTED_TOKENS;
 export const ALL_TOKENS: Token[] = SUPPORTED_TOKENS;
 export const POPULAR_TOKENS: Token[] = SUPPORTED_TOKENS;
