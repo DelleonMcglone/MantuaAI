@@ -14,16 +14,11 @@ import { DuneResultTable } from "../DuneResultTable";
  */
 function RichContent({ text, linkColor }: { text: string; linkColor: string }) {
   const parts = useMemo(() => {
-    // Split on URLs, bold markers, and newlines
-    const urlRe = /(https?:\/\/[^\s)]+)/g;
-    const boldRe = /\*\*(.+?)\*\*/g;
-
     // First pass: split by lines
     return text.split('\n').map((line, lineIdx) => {
-      // Replace bold markers, then split on URLs
       const segments: React.ReactNode[] = [];
-      // Combined regex: match URLs or bold
-      const combined = /(\*\*(.+?)\*\*|https?:\/\/[^\s)]+)/g;
+      // Combined regex: match markdown links [text](url), bold, or bare URLs
+      const combined = /(\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|\*\*(.+?)\*\*|https?:\/\/[^\s)]+)/g;
       let lastIndex = 0;
       let match: RegExpExecArray | null;
 
@@ -32,11 +27,24 @@ function RichContent({ text, linkColor }: { text: string; linkColor: string }) {
         if (match.index > lastIndex) {
           segments.push(line.slice(lastIndex, match.index));
         }
-        if (match[0].startsWith('**')) {
+        if (match[2] && match[3]) {
+          // Markdown link [text](url)
+          segments.push(
+            <a
+              key={`ml-${lineIdx}-${match.index}`}
+              href={match[3]}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: linkColor, textDecoration: 'underline' }}
+            >
+              {match[2]}
+            </a>
+          );
+        } else if (match[0].startsWith('**')) {
           // Bold text
-          segments.push(<strong key={`b-${lineIdx}-${match.index}`}>{match[2]}</strong>);
+          segments.push(<strong key={`b-${lineIdx}-${match.index}`}>{match[4]}</strong>);
         } else {
-          // URL
+          // Bare URL
           segments.push(
             <a
               key={`a-${lineIdx}-${match.index}`}

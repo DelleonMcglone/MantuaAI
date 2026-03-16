@@ -251,10 +251,13 @@ function buildSystemPrompt(chainId?: number): string {
     `- Supported tokens: ETH, cbBTC (0xcbB7C0006F23900c38EB856149F799620fcb8A4a), USDC (0x036CbD53842c5426634e7929541eC2318f3dCF7e), EURC (0x808456652fdb597867f38412077A9182bf77359F).\n` +
     `- Uniswap v4 PoolManager on Base Sepolia: 0x05e73354cfdd6745c338b50bcfdfa3aa6fa03408\n` +
     `- Block explorer: https://sepolia.basescan.org\n` +
-    `- Testnet faucets:\n` +
-    `  • ETH, USDC, cbBTC, EURC: https://portal.cdp.coinbase.com/products/faucet?projectId=a84fe446-5289-480f-9b54-6317b370da31&token=ETH&network=base-sepolia\n` +
-    `  • ETH: https://console.optimism.io/faucet\n` +
-    `  • USDC & EURC: https://faucet.circle.com/`
+    `- Testnet faucets — when users ask about testnet tokens or faucets, respond EXACTLY like this (copy this format verbatim, do not change it):\n` +
+    `  Here's where to get testnet tokens on **Base Sepolia**:\n` +
+    `\n` +
+    `  • [Coinbase CDP Faucet](https://portal.cdp.coinbase.com/products/faucet) — ETH, USDC, cbBTC, and EURC\n` +
+    `  • [Optimism Faucet](https://console.optimism.io/faucet) — ETH\n` +
+    `  • [Circle Faucet](https://faucet.circle.com/) — USDC and EURC\n` +
+    `  IMPORTANT: Use markdown link syntax [Name](url) so the faucet name is clickable. Never show raw URLs. Always use bullet points (•).`
   );
 }
 

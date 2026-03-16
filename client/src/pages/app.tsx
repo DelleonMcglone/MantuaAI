@@ -4120,10 +4120,11 @@ export default function MantuaApp() {
         resetModals();
         const chainName = 'Base Sepolia';
         const faucetLines = [
-          `Here's where to get testnet tokens on **${chainName}**:\n`,
-          `**ETH, USDC, cbBTC, EURC** — https://portal.cdp.coinbase.com/products/faucet?projectId=a84fe446-5289-480f-9b54-6317b370da31&token=ETH&network=base-sepolia`,
-          `**ETH** — https://console.optimism.io/faucet`,
-          `**USDC & EURC** — https://faucet.circle.com/`,
+          `Here's where to get testnet tokens on **${chainName}**:`,
+          ``,
+          `• [Coinbase CDP Faucet](https://portal.cdp.coinbase.com/products/faucet) — ETH, USDC, cbBTC, and EURC`,
+          `• [Optimism Faucet](https://console.optimism.io/faucet) — ETH`,
+          `• [Circle Faucet](https://faucet.circle.com/) — USDC and EURC`,
         ];
         const faucetContent = faucetLines.join('\n');
         setAnalyticsMessages(prev => [
