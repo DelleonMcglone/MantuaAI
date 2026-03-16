@@ -6,7 +6,7 @@
  * chat interface, and swap functionality for DeFi interactions.
  */
 
-import React, { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { useLocation } from 'wouter';
 import { useAccount, useBalance, useSwitchChain, useChainId } from 'wagmi';
 import logoWhite from '@assets/Mantua_logo_white_1768946648374.png';
@@ -727,7 +727,7 @@ const ZoneBadge = ({ zone }) => {
   );
 };
 
-const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, currentChain, onRemoveLiquidity }) => {
+const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, currentChain, onRemoveLiquidity, refreshKey = 0 }) => {
   const [activeTab, setActiveTab] = useState('balances');
   const [txns, setTxns] = useState<Array<{type:string;tx_hash:string;token_in?:string;token_out?:string;amount_in?:string;amount_out?:string;timestamp:string;base_scan_url:string}>>([]);
   const [agentWallet, setAgentWallet] = useState<{address:string;wallet_id:string;id?:string} | null>(null);
@@ -759,39 +759,13 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
   const explorerBase = 'https://sepolia.basescan.org';
   const explorerLabel = 'BaseScan';
 
-  const refreshPortfolioData = useCallback(() => {
-    if (!address || !walletConnected) return Promise.resolve();
-    return Promise.all([
-      fetch(`/api/portfolio/transactions?walletAddress=${address}`)
-        .then(r => r.ok ? r.json() : []).catch(() => []),
-      fetch(`/api/portfolio?chainId=${chainId}`)
-        .then(r => r.ok ? r.json() : []).catch(() => []),
-      fetch(`/api/portfolio/positions?walletAddress=${address}&chainId=${chainId}`)
-        .then(r => r.ok ? r.json() : []).catch(() => []),
-    ]).then(([txnRows, poolRows, posRows]) => {
-      setTxns(txnRows ?? []);
-      const savedPositions = (posRows ?? []) as typeof positions;
-      const positionPairs = new Set(savedPositions.map((p: any) => `${p.token0}-${p.token1}`));
-      const poolDerived = (poolRows ?? [])
-        .filter((p: any) => p.creator_address?.toLowerCase() === address?.toLowerCase() && !positionPairs.has(`${p.token0}-${p.token1}`))
-        .map((p: any) => ({
-          id: p.id,
-          token0: p.token0,
-          token1: p.token1,
-          liquidity: '1',
-          amount0: '0',
-          amount1: '0',
-          fee_tier: p.fee_tier,
-          status: 'active',
-          hook_address: p.hook_address,
-        }));
-      setPositions([...savedPositions, ...poolDerived]);
-    });
-  }, [address, walletConnected, chainId]);
-
   useEffect(() => {
-    refreshPortfolioData().catch(() => {});
-  }, [refreshPortfolioData]);
+    if (!address || !walletConnected) return;
+    fetch(`/api/portfolio/transactions?walletAddress=${address}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(rows => setTxns(rows ?? []))
+      .catch(() => {});
+  }, [address, walletConnected, refreshKey]);
 
   useEffect(() => {
     if (!address) return;
@@ -809,10 +783,33 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
   }, [address]);
 
   useEffect(() => {
-    const handleRefresh = () => { refreshPortfolioData().catch(() => {}); };
-    window.addEventListener('portfolio:refresh', handleRefresh);
-    return () => window.removeEventListener('portfolio:refresh', handleRefresh);
-  }, [refreshPortfolioData]);
+    if (!address) return;
+    // Fetch saved positions AND pools created by this wallet — combine as LP positions
+    Promise.all([
+      fetch(`/api/portfolio/positions?walletAddress=${address}&chainId=${chainId}`)
+        .then(r => r.ok ? r.json() : []).catch(() => []),
+      fetch(`/api/portfolio?chainId=${chainId}`)
+        .then(r => r.ok ? r.json() : []).catch(() => []),
+    ]).then(([posRows, poolRows]) => {
+      const savedPositions = (posRows ?? []) as typeof positions;
+      // Derive positions from pools created by this user that have no matching saved position
+      const positionPairs = new Set(savedPositions.map((p: any) => `${p.token0}-${p.token1}`));
+      const poolDerived = (poolRows ?? [])
+        .filter((p: any) => p.creator_address?.toLowerCase() === address?.toLowerCase() && !positionPairs.has(`${p.token0}-${p.token1}`))
+        .map((p: any) => ({
+          id: p.id,
+          token0: p.token0,
+          token1: p.token1,
+          liquidity: '1',
+          amount0: '0',
+          amount1: '0',
+          fee_tier: p.fee_tier,
+          status: 'active',
+          hook_address: p.hook_address,
+        }));
+      setPositions([...savedPositions, ...poolDerived]);
+    });
+  }, [address, chainId, refreshKey]);
 
   const tokenRows = [
     { symbol: 'ETH', name: 'Ethereum', balance: ethBalanceNum, usdValue: isNaN(ethValueUSD) ? 0 : ethValueUSD, price: ethPrice },
@@ -1864,9 +1861,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
           amountOut: toAmount || '',
           chainId: currentChainId,
         }),
-      })
-        .then(() => window.dispatchEvent(new CustomEvent('portfolio:refresh')))
-        .catch(err => console.warn('[Portfolio] Failed to record swap transaction:', err));
+      }).catch(err => console.warn('[Portfolio] Failed to record swap transaction:', err));
       if (onActionComplete) {
         onActionComplete(`Swap ${fromAmount} ${fromToken} → ${toToken}`);
       }
@@ -2349,26 +2344,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
               color: '#f59e0b',
               fontSize: '13px',
             }}>
-              <div style={{ marginBottom: '8px' }}>
-                No pool found for {fromToken}/{toToken} on Base Sepolia. Would you like to create one?
-              </div>
-              <button
-                onClick={() => window.dispatchEvent(new CustomEvent('mantua:open-liquidity', {
-                  detail: { tokenA: fromToken, tokenB: toToken, hook: selectedHook },
-                }))}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid rgba(245, 158, 11, 0.3)',
-                  background: 'rgba(245, 158, 11, 0.12)',
-                  color: '#f59e0b',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                }}
-              >
-                Open Liquidity Tab
-              </button>
+              No pool exists for {fromToken}/{toToken}. Create one in the Liquidity tab first.
             </div>
           )}
 
@@ -2535,10 +2511,34 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
 
   const [poolsRaw, setPoolsRaw] = React.useState([]);
   React.useEffect(() => {
+    const LS_KEY = 'mantua_pending_pools';
     fetch(`/api/portfolio?chainId=84532`)
       .then(r => (r.ok ? r.json() : []))
-      .then(base => setPoolsRaw(base ?? []))
-      .catch(() => setPoolsRaw([]));
+      .then(dbRows => {
+        const rows = dbRows ?? [];
+        // Merge any localStorage-backed pools that the DB doesn't have yet
+        try {
+          const pending: any[] = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
+          const dbTxHashes = new Set(rows.map((r: any) => r.tx_hash));
+          const missing = pending.filter((p: any) => !dbTxHashes.has(p.tx_hash));
+          // Clean up localStorage entries that are now in the DB
+          if (missing.length < pending.length) {
+            localStorage.setItem(LS_KEY, JSON.stringify(missing));
+          }
+          setPoolsRaw([...rows, ...missing]);
+        } catch {
+          setPoolsRaw(rows);
+        }
+      })
+      .catch(() => {
+        // DB unreachable — show localStorage pools at minimum
+        try {
+          const pending = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
+          setPoolsRaw(pending);
+        } catch {
+          setPoolsRaw([]);
+        }
+      });
   }, [refreshKey]);
 
   // Generate deterministic simulated stats per pool (testnet has no real indexer)
@@ -3811,6 +3811,7 @@ export default function MantuaApp() {
   const [showSwap, setShowSwap] = useState(false);
   const [showLiquidity, setShowLiquidity] = useState(false);
   const [liquidityRefreshKey, setLiquidityRefreshKey] = useState(0);
+  const [portfolioRefreshKey, setPortfolioRefreshKey] = useState(0);
   const [showAgentBuilder, setShowAgentBuilder] = useState(false);
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const [showAddLiquidityModal, setShowAddLiquidityModal] = useState(false);
@@ -3825,24 +3826,6 @@ export default function MantuaApp() {
   const [voiceTranscript, setVoiceTranscript] = useState('');
   const [voiceParsedCommand, setVoiceParsedCommand] = useState(null);
   const isVoiceSubmitRef = useRef(false);
-
-  useEffect(() => {
-    const handleOpenLiquidity = (event: Event) => {
-      const detail = (event as CustomEvent<{ tokenA?: string; tokenB?: string; hook?: string }>).detail;
-      setShowSwap(false);
-      setShowLiquidity(false);
-      setShowAgentBuilder(false);
-      setShowPortfolioModal(false);
-      setSelectedPool(null);
-      setAddLiquidityMode('create');
-      setLiquidityInitialTokens(detail?.tokenA || detail?.tokenB ? { tokenA: detail?.tokenA, tokenB: detail?.tokenB } : null);
-      setLiquidityInitialHook(detail?.hook || '');
-      setShowAddLiquidityModal(true);
-    };
-
-    window.addEventListener('mantua:open-liquidity', handleOpenLiquidity as EventListener);
-    return () => window.removeEventListener('mantua:open-liquidity', handleOpenLiquidity as EventListener);
-  }, []);
   // Persistent chat state from useChat hook — pass chainId for context-aware AI responses
   const { messages: chatMessages, sendMessage, persistLocalExchange, updateSessionTitle, startNewSession, isSending, isLoading: chatIsLoading, userId: chatUserId } = useChat({ chainId: currentChainId });
   const [analyticsMessages, setAnalyticsMessages] = useState<any[]>([]);
@@ -4050,36 +4033,6 @@ export default function MantuaApp() {
     }
 
     const command = classifyQuery(inputValue);
-
-    if (command.type === 'price' && command.assets.length > 0) {
-      const symbol = command.assets[0];
-      const price = getPriceBySymbol(symbol);
-      const priceContent = price > 0
-        ? `${symbol} is currently about $${price.toLocaleString(undefined, { maximumFractionDigits: symbol === 'USDC' || symbol === 'EURC' ? 4 : 2 })} on Base Sepolia reference pricing.`
-        : `I couldn't find a current price for ${symbol} right now.`;
-      setAnalyticsMessages(prev => [
-        ...prev,
-        { id: 'user-price-' + Date.now(), sessionId: '', role: 'user' as const, content: inputValue, createdAt: new Date().toISOString() },
-        { id: 'asst-price-' + Date.now(), sessionId: '', role: 'assistant' as const, content: priceContent, createdAt: new Date().toISOString() },
-      ]);
-      persistLocalExchange(inputValue, priceContent);
-      updateSessionTitle(`Price check — ${symbol}`);
-      loadRecentChats();
-      return;
-    }
-
-    if (/percentage of stablecoins.*base|stablecoins.*on base/i.test(inputValue)) {
-      const marketContent = "I can't answer that precisely from the data wired into this app yet. I don't have a live Base-wide stablecoin market-share dataset here, but I can help with token prices, your balances, or pool activity on Base Sepolia.";
-      setAnalyticsMessages(prev => [
-        ...prev,
-        { id: 'user-market-' + Date.now(), sessionId: '', role: 'user' as const, content: inputValue, createdAt: new Date().toISOString() },
-        { id: 'asst-market-' + Date.now(), sessionId: '', role: 'assistant' as const, content: marketContent, createdAt: new Date().toISOString() },
-      ]);
-      persistLocalExchange(inputValue, marketContent);
-      updateSessionTitle('Stablecoin market analysis');
-      loadRecentChats();
-      return;
-    }
 
     // Reset modals helper
     const resetModals = () => {
@@ -4444,6 +4397,7 @@ export default function MantuaApp() {
                   isDark={isDark}
                   isConnected={isConnected}
                   currentChain={currentChain}
+                  refreshKey={portfolioRefreshKey}
                   onRemoveLiquidity={(pool) => {
                     setSelectedPool({ token1: pool.token1, token2: pool.token2 });
                     setAddLiquidityMode('remove');
@@ -4497,7 +4451,7 @@ export default function MantuaApp() {
                         swapDetails={swapDetails}
                         theme={theme}
                         isDark={isDark}
-                        onActionComplete={async (title) => { await updateSessionTitle(title); loadRecentChats(); }}
+                        onActionComplete={async (title) => { setPortfolioRefreshKey(k => k + 1); await updateSessionTitle(title); loadRecentChats(); }}
                       />
                     </div>
                   )}
@@ -4545,6 +4499,7 @@ export default function MantuaApp() {
                           setLiquidityInitialTokens(null);
                           setLiquidityInitialHook('');
                           setLiquidityRefreshKey(k => k + 1);
+                          setPortfolioRefreshKey(k => k + 1);
                           setShowLiquidity(true);
                           // Update session title in background (non-blocking)
                           updateSessionTitle(title).then(() => loadRecentChats()).catch(() => {});
