@@ -150,17 +150,6 @@ export default function MantuaLanding() {
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
           <button onClick={() => window.location.href = '/app'} style={{ background: 'linear-gradient(135deg, #a855f7, #9333ea)', border: 'none', borderRadius: 12, padding: '16px 32px', color: '#fff', fontFamily: '"DM Sans", sans-serif', fontSize: 16, fontWeight: 600, cursor: 'pointer' }}>Launch App</button>
         </div>
-        
-        {/* Video Demo Placeholder */}
-        <div style={{ marginTop: 64, width: '100%', maxWidth: 900, aspectRatio: '16/9', borderRadius: 16, background: `linear-gradient(135deg, ${theme.accent}10, ${theme.accentGreen}10)`, border: `1px solid ${theme.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(circle at 30% 40%, ${theme.accent}15 0%, transparent 50%), radial-gradient(circle at 70% 60%, ${theme.accentGreen}10 0%, transparent 50%)` }} />
-          <div style={{ width: 80, height: 80, borderRadius: '50%', background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentGreen})`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 1, boxShadow: `0 8px 32px ${theme.accent}40` }}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" style={{ marginLeft: 4 }}>
-              <path d="M8 5.14v14.72a1 1 0 001.5.86l11-7.36a1 1 0 000-1.72l-11-7.36a1 1 0 00-1.5.86z" fill="#fff"/>
-            </svg>
-          </div>
-          <span style={{ fontFamily: '"Outfit", sans-serif', fontSize: 16, fontWeight: 500, color: theme.textSecondary, zIndex: 1 }}>Watch Demo</span>
-        </div>
       </section>
 
       {/* Features */}
