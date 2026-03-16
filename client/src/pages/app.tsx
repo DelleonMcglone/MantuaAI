@@ -2511,10 +2511,34 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
 
   const [poolsRaw, setPoolsRaw] = React.useState([]);
   React.useEffect(() => {
+    const LS_KEY = 'mantua_pending_pools';
     fetch(`/api/portfolio?chainId=84532`)
       .then(r => (r.ok ? r.json() : []))
-      .then(base => setPoolsRaw(base ?? []))
-      .catch(() => setPoolsRaw([]));
+      .then(dbRows => {
+        const rows = dbRows ?? [];
+        // Merge any localStorage-backed pools that the DB doesn't have yet
+        try {
+          const pending: any[] = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
+          const dbTxHashes = new Set(rows.map((r: any) => r.tx_hash));
+          const missing = pending.filter((p: any) => !dbTxHashes.has(p.tx_hash));
+          // Clean up localStorage entries that are now in the DB
+          if (missing.length < pending.length) {
+            localStorage.setItem(LS_KEY, JSON.stringify(missing));
+          }
+          setPoolsRaw([...rows, ...missing]);
+        } catch {
+          setPoolsRaw(rows);
+        }
+      })
+      .catch(() => {
+        // DB unreachable — show localStorage pools at minimum
+        try {
+          const pending = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
+          setPoolsRaw(pending);
+        } catch {
+          setPoolsRaw([]);
+        }
+      });
   }, [refreshKey]);
 
   // Generate deterministic simulated stats per pool (testnet has no real indexer)

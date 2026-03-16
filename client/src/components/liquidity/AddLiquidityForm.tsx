@@ -137,7 +137,9 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
     return { poolKey, tickLower, tickUpper, c0Dec, c1Dec, amount0Desired, amount1Desired, ethValue, sqrtPriceX96 };
   };
 
-  // Save liquidity to DB after successful confirmation — single atomic call
+  // Save pool after successful on-chain confirmation.
+  // Always persist to localStorage first so the pool is guaranteed to appear in the list,
+  // then attempt DB save in the background.
   useEffect(() => {
     if (!isSuccess || !hash || !address || !tokenA || !tokenB) return;
     const params = buildPoolParams();
@@ -151,57 +153,60 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
       ? `Created ${sym0}/${sym1} pool on ${chainName}`
       : `Added liquidity to ${sym0}/${sym1}`;
 
-    let cancelled = false;
-
-    (async () => {
-      let saved = false;
-      try {
-        const res = await fetch('/api/portfolio/backfill-pool', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            walletAddress: address,
-            creatorAddress: address,
-            txHash: hash,
-            token0: sym0,
-            token1: sym1,
-            feeTier: poolFee,
-            chainId,
-            hookAddress: curHookAddress,
-            amount0: amount0 || '0',
-            amount1: amount1 || '0',
-            liquidity: '1',
-            type: 'add_liquidity',
-          }),
-        });
-        if (cancelled) return;
-        if (!res.ok) {
-          const errBody = await res.text();
-          console.error('[backfill-pool] HTTP', res.status, errBody);
-          toast.error('Pool record failed to save', { description: errBody.slice(0, 120), duration: 8000 });
-        } else {
-          const data = await res.json();
-          console.info('[backfill-pool] saved', { pool: data.pool?.id, position: data.position?.id });
-          saved = true;
-        }
-      } catch (err) {
-        if (cancelled) return;
-        console.error('[backfill-pool] network error', err);
-        toast.error('Pool record failed to save', { description: 'Network error — check server logs', duration: 8000 });
+    // Persist to localStorage immediately — guarantees pool appears in list
+    try {
+      const LS_KEY = 'mantua_pending_pools';
+      const pending = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
+      const poolRecord = {
+        id: `local-${hash}`,
+        token0: sym0,
+        token1: sym1,
+        fee_tier: poolFee,
+        creator_address: address.toLowerCase(),
+        tx_hash: hash,
+        chain_id: chainId || 84532,
+        hook_address: curHookAddress,
+        created_at: new Date().toISOString(),
+      };
+      if (!pending.some((p: any) => p.tx_hash === hash)) {
+        pending.push(poolRecord);
+        localStorage.setItem(LS_KEY, JSON.stringify(pending));
       }
-      if (cancelled) return;
-      // Show success toast with explorer link
-      const explorerUrl = getExplorerTxUrl(hash, chainId);
-      toast.success(saved ? actionLabel : 'Liquidity confirmed on-chain', {
-        description: saved ? 'Pool is now visible in your liquidity list.' : 'On-chain tx succeeded but pool record may not appear in list.',
-        action: { label: 'View Tx', onClick: () => window.open(explorerUrl, '_blank') },
-        duration: 6000,
-      });
-      // Always navigate back — the on-chain tx succeeded; toast already shows save status
-      onActionComplete?.(actionLabel);
-    })();
+    } catch (e) {
+      console.warn('[pending-pools] localStorage write failed', e);
+    }
 
-    return () => { cancelled = true; };
+    // Show success toast immediately — no waiting for DB
+    const explorerUrl = getExplorerTxUrl(hash, chainId);
+    toast.success(actionLabel, {
+      description: 'Pool is now visible in your liquidity list.',
+      action: { label: 'View Tx', onClick: () => window.open(explorerUrl, '_blank') },
+      duration: 6000,
+    });
+    onActionComplete?.(actionLabel);
+
+    // Best-effort DB save in background
+    fetch('/api/portfolio/backfill-pool', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        walletAddress: address,
+        creatorAddress: address,
+        txHash: hash,
+        token0: sym0,
+        token1: sym1,
+        feeTier: poolFee,
+        chainId,
+        hookAddress: curHookAddress,
+        amount0: amount0 || '0',
+        amount1: amount1 || '0',
+        liquidity: '1',
+        type: 'add_liquidity',
+      }),
+    })
+      .then(res => res.ok ? res.json() : Promise.reject(res.status))
+      .then(data => console.info('[backfill-pool] saved', { pool: data.pool?.id, position: data.position?.id }))
+      .catch(err => console.warn('[backfill-pool] DB save failed (pool still visible via localStorage)', err));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSuccess, hash]);
 
