@@ -31,6 +31,7 @@ import { useTokenApproval } from '../hooks/useTokenApproval';
 import { useSwapQuote, getPriceImpactSeverity } from '../hooks/useSwapQuote';
 import { useSwapExecution, getExplorerLink } from '../hooks/useSwapExecution';
 import { useTokenBalances } from '../hooks/useTokenBalances';
+import { useWalletBalances } from '../hooks/useWalletBalances';
 import { PriceImpact, SwapButton, SwapButtonStyles, SwapConfirmation, SwapPriceChart } from '../components/swap';
 import { parseTokenAmount, formatTokenAmount, isNativeEth, getZeroAddress, getHookAddress, createPoolKey, getPoolId } from '../lib/swap-utils';
 import { usePoolState } from '../hooks/usePoolState';
@@ -738,20 +739,19 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
   // Use wagmi's own isConnected — the prop can be stale and prevents balance fetches
   const { address, isConnected: walletConnected } = useAccount();
   const chainId = useChainId();
-  const { data: liveEthBalance } = useBalance({ address, chainId, query: { enabled: !!address && walletConnected, refetchInterval: 30_000 } });
-  const { balancesBySymbol } = useTokenBalances();
+  const { getBalance } = useWalletBalances(address as `0x${string}` | undefined);
   const { price: ethPriceUSD }   = useLivePriceUSD('ETH');
   const { price: eurcPriceUSD }  = useLivePriceUSD('EURC');
   const { price: cbbtcPriceUSD } = useLivePriceUSD('cbBTC');
 
-  const ethBalanceNum = liveEthBalance ? (parseFloat(liveEthBalance.formatted) || 0) : 0;
+  const ethBalanceNum = parseFloat(getBalance('ETH')?.formatted ?? '0') || 0;
   const ethPrice   = (ethPriceUSD   != null && !isNaN(ethPriceUSD))   ? ethPriceUSD   : TESTNET_PRICES.ETH;
   const eurcPrice  = (eurcPriceUSD  != null && !isNaN(eurcPriceUSD))  ? eurcPriceUSD  : TESTNET_PRICES.EURC;
   const cbbtcPrice = (cbbtcPriceUSD != null && !isNaN(cbbtcPriceUSD)) ? cbbtcPriceUSD : TESTNET_PRICES.cbBTC;
   const ethValueUSD = ethBalanceNum * ethPrice;
-  const usdcBalance  = parseFloat(balancesBySymbol['USDC']?.formatted  ?? '0') || 0;
-  const eurcBalance  = parseFloat(balancesBySymbol['EURC']?.formatted  ?? '0') || 0;
-  const cbbtcBalance = parseFloat(balancesBySymbol['cbBTC']?.formatted ?? '0') || 0;
+  const usdcBalance  = parseFloat(getBalance('USDC')?.formatted  ?? '0') || 0;
+  const eurcBalance  = parseFloat(getBalance('EURC')?.formatted  ?? '0') || 0;
+  const cbbtcBalance = parseFloat(getBalance('cbBTC')?.formatted ?? '0') || 0;
   const totalValue = (isNaN(ethValueUSD) ? 0 : ethValueUSD) + usdcBalance + (eurcBalance * eurcPrice) + (cbbtcBalance * cbbtcPrice);
   const safeTotal = isNaN(totalValue) ? 0 : totalValue;
 
@@ -4028,6 +4028,8 @@ export default function MantuaApp() {
 
     if (command.type === 'addLiquidity') {
        resetModals();
+       setSelectedPool(null);
+       setAddLiquidityMode('add');
        if (command.params?.tokenA || command.params?.tokenB) {
          setLiquidityInitialTokens({ tokenA: command.params.tokenA, tokenB: command.params.tokenB });
        } else {

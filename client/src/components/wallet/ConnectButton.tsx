@@ -10,10 +10,10 @@
 
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useAppKit, useAppKitAccount, useDisconnect } from '@reown/appkit/react';
-import { useBalance, useReadContracts, useChainId, useSwitchChain } from 'wagmi';
-import { erc20Abi, formatUnits } from 'viem';
+import { useChainId, useSwitchChain } from 'wagmi';
 import { getPriceBySymbol } from '../../services/priceService';
 import { getERC20Tokens, CHAIN_IDS } from '../../config/tokens';
+import { useWalletBalances } from '../../hooks/useWalletBalances';
 
 interface ConnectButtonProps {
   className?: string;
@@ -107,48 +107,23 @@ export function ConnectButton({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Native ETH balance — scoped to current chain
-  const { data: ethBalance } = useBalance({
-    address: address as `0x${string}` | undefined,
-    chainId,
-    query: { enabled: isConnected && !!address, refetchInterval: 30_000 },
-  });
-
   // ERC20 tokens for the current chain
   const erc20Tokens = useMemo(() => getERC20Tokens(chainId), [chainId]);
-
-  // ERC20 balances via multicall — explicitly scoped to current chain
-  const erc20Contracts = useMemo(() => {
-    if (!address) return [];
-    return erc20Tokens.map(token => ({
-      address: token.address as `0x${string}`,
-      abi: erc20Abi,
-      functionName: 'balanceOf' as const,
-      args: [address as `0x${string}`],
-      chainId,
-    }));
-  }, [address, erc20Tokens, chainId]);
-
-  const { data: erc20Data } = useReadContracts({
-    contracts: erc20Contracts,
-    query: { enabled: isConnected && !!address, refetchInterval: 30_000 },
-  });
+  const { getBalance } = useWalletBalances(address as `0x${string}` | undefined);
 
   // Build display rows: ETH + chain-specific ERC20s
   const tokenRows = useMemo(() => [
     {
       symbol: 'ETH',
-      balance: ethBalance ? parseFloat(formatUnits(ethBalance.value, 18)) : 0,
+      balance: parseFloat(getBalance('ETH')?.formatted ?? '0') || 0,
       displayDecimals: 4,
     },
     ...erc20Tokens.map((token, i) => ({
       symbol: token.symbol,
-      balance: erc20Data?.[i]?.result
-        ? parseFloat(formatUnits(erc20Data[i].result as bigint, token.decimals))
-        : 0,
+      balance: parseFloat(getBalance(token.symbol)?.formatted ?? '0') || 0,
       displayDecimals: token.symbol === 'cbBTC' ? 6 : 4,
     })),
-  ], [ethBalance, erc20Data, erc20Tokens]);
+  ], [erc20Tokens, getBalance]);
 
   // Format balance for display — handles very large numbers gracefully
   const fmtBalance = (balance: number, decimals: number) => {

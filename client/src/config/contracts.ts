@@ -24,7 +24,7 @@ export const UNISWAP_V4_ADDRESSES = {
 };
 
 export const STABLE_PROTECTION_HOOK_ADDRESSES: Record<number, Address> = {
-  [BASE_SEPOLIA_CHAIN_ID]: '0x0000000000000000000000000000000000000000' as Address,
+  [BASE_SEPOLIA_CHAIN_ID]: '0xB5faDA071CD56b3F56632F6771356C3e3834a0C0' as Address,
 };
 
 export function getStableProtectionHookAddress(chainId: number): Address {

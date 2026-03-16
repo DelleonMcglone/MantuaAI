@@ -100,16 +100,18 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
   }, []);
 
   useEffect(() => {
-    if ((mode === 'add' || mode === 'remove') && pool) {
+    if (initialTokenA || initialTokenB) {
+      if (initialTokenA) setTokenA(getTokenBySymbol(initialTokenA, chainId) ?? null);
+      if (initialTokenB) setTokenB(getTokenBySymbol(initialTokenB, chainId) ?? null);
+      if (!initialTokenA) setTokenA(null);
+      if (!initialTokenB) setTokenB(null);
+    } else if ((mode === 'add' || mode === 'remove') && pool) {
       setTokenA(getTokenBySymbol(pool.token1, chainId) ?? null);
       setTokenB(getTokenBySymbol(pool.token2, chainId) ?? null);
       if (pool.hook && pool.hook !== 'None') {
         const matched = HOOKS.find(h => h.name.toLowerCase().includes(pool.hook!.toLowerCase()));
         if (matched) setSelectedHook(matched.id);
       }
-    } else if (initialTokenA || initialTokenB) {
-      if (initialTokenA) setTokenA(getTokenBySymbol(initialTokenA, chainId) ?? null);
-      if (initialTokenB) setTokenB(getTokenBySymbol(initialTokenB, chainId) ?? null);
     } else {
       setTokenA(null);
       setTokenB(null);

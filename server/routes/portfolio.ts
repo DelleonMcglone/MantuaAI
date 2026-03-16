@@ -5,6 +5,7 @@ import { Router, Request, Response } from 'express';
 import { pool as dbPool } from '../db/index';
 
 const router = Router();
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 // ─── Pools ────────────────────────────────────────────────────────────────────
 
@@ -29,15 +30,190 @@ router.post('/', async (req: Request, res: Response) => {
     }
     const networkChainId = parseInt(chainId) || 84532;
     const resolvedHookAddress = hookAddress || '0x0000000000000000000000000000000000000000';
-    const { rows } = await dbPool.query(
-      `INSERT INTO pools (token0, token1, fee_tier, creator_address, tx_hash, chain_id, hook_address)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [token0, token1, feeTier, creatorAddress.toLowerCase(), txHash, networkChainId, resolvedHookAddress]
+
+    const existing = await dbPool.query(
+      `SELECT * FROM pools WHERE tx_hash = $1 LIMIT 1`,
+      [txHash]
     );
-    res.status(201).json(rows[0]);
+    if (existing.rows[0]) {
+      return res.status(200).json(existing.rows[0]);
+    }
+
+    try {
+      const { rows } = await dbPool.query(
+        `INSERT INTO pools (token0, token1, fee_tier, creator_address, tx_hash, chain_id, hook_address)
+         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+        [token0, token1, feeTier, creatorAddress.toLowerCase(), txHash, networkChainId, resolvedHookAddress]
+      );
+      return res.status(201).json(rows[0]);
+    } catch (insertErr: unknown) {
+      const insertMsg = insertErr instanceof Error ? insertErr.message : String(insertErr);
+
+      // Backward compatibility for databases that predate the hook_address migration.
+      if (insertMsg.includes('hook_address')) {
+        const legacy = await dbPool.query(
+          `INSERT INTO pools (token0, token1, fee_tier, creator_address, tx_hash, chain_id)
+           VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+          [token0, token1, feeTier, creatorAddress.toLowerCase(), txHash, networkChainId]
+        );
+        return res.status(201).json(legacy.rows[0]);
+      }
+
+      throw insertErr;
+    }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     res.status(500).json({ error: 'Failed to save pool', detail: msg });
+  }
+});
+
+router.post('/backfill-pool', async (req: Request, res: Response) => {
+  try {
+    const {
+      walletAddress,
+      creatorAddress,
+      txHash,
+      token0,
+      token1,
+      feeTier,
+      chainId,
+      hookAddress,
+      amount0,
+      amount1,
+      liquidity,
+      type,
+    } = req.body;
+
+    const ownerAddress = (walletAddress || creatorAddress || '').toLowerCase();
+    if (!ownerAddress || !txHash || !token0 || !token1 || !feeTier) {
+      return res.status(400).json({
+        error: 'walletAddress (or creatorAddress), txHash, token0, token1, and feeTier are required',
+      });
+    }
+
+    const networkChainId = parseInt(chainId) || 84532;
+    const resolvedHookAddress = hookAddress || ZERO_ADDRESS;
+
+    let poolRow = (
+      await dbPool.query(`SELECT * FROM pools WHERE tx_hash = $1 LIMIT 1`, [txHash])
+    ).rows[0];
+
+    if (!poolRow) {
+      try {
+        poolRow = (
+          await dbPool.query(
+            `INSERT INTO pools (token0, token1, fee_tier, creator_address, tx_hash, chain_id, hook_address)
+             VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+            [token0, token1, feeTier, ownerAddress, txHash, networkChainId, resolvedHookAddress]
+          )
+        ).rows[0];
+      } catch (insertErr: unknown) {
+        const insertMsg = insertErr instanceof Error ? insertErr.message : String(insertErr);
+        if (insertMsg.includes('hook_address')) {
+          poolRow = (
+            await dbPool.query(
+              `INSERT INTO pools (token0, token1, fee_tier, creator_address, tx_hash, chain_id)
+               VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+              [token0, token1, feeTier, ownerAddress, txHash, networkChainId]
+            )
+          ).rows[0];
+        } else {
+          throw insertErr;
+        }
+      }
+    }
+
+    let positionRow = (
+      await dbPool.query(
+        `SELECT * FROM positions
+         WHERE wallet_address = $1
+           AND pool_id = $2
+           AND token0 = $3
+           AND token1 = $4
+           AND fee_tier = $5
+           AND chain_id = $6
+           AND status = 'active'
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [ownerAddress, poolRow.id, token0, token1, feeTier, networkChainId]
+      )
+    ).rows[0];
+
+    if (!positionRow) {
+      positionRow = (
+        await dbPool.query(
+          `INSERT INTO positions
+             (wallet_address, pool_id, position_token_id, token0, token1, liquidity, amount0, amount1,
+              fee_tier, pool_address, tick_lower, tick_upper, status, chain_id, hook_address)
+           VALUES ($1,$2,NULL,$3,$4,$5,$6,$7,$8,$9,0,0,'active',$10,$11)
+           RETURNING *`,
+          [
+            ownerAddress,
+            poolRow.id,
+            token0,
+            token1,
+            liquidity || '1',
+            amount0 || '0',
+            amount1 || '0',
+            feeTier,
+            ZERO_ADDRESS,
+            networkChainId,
+            resolvedHookAddress,
+          ]
+        )
+      ).rows[0];
+    }
+
+    const txType = type || 'add_liquidity';
+    let transactionRow = (
+      await dbPool.query(
+        `SELECT * FROM portfolio_transactions WHERE tx_hash = $1 LIMIT 1`,
+        [txHash]
+      )
+    ).rows[0];
+
+    if (!transactionRow) {
+      transactionRow = (
+        await dbPool.query(
+          `INSERT INTO portfolio_transactions
+             (wallet_address, type, tx_hash, token_in, token_out, amount_in, amount_out, pool_id, chain_id, base_scan_url)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+           ON CONFLICT (tx_hash) DO NOTHING
+           RETURNING *`,
+          [
+            ownerAddress,
+            txType,
+            txHash,
+            token0,
+            token1,
+            amount0 || '0',
+            amount1 || '0',
+            poolRow.id,
+            networkChainId,
+            `https://sepolia.basescan.org/tx/${txHash}`,
+          ]
+        )
+      ).rows[0];
+
+      if (!transactionRow) {
+        transactionRow = (
+          await dbPool.query(
+            `SELECT * FROM portfolio_transactions WHERE tx_hash = $1 LIMIT 1`,
+            [txHash]
+          )
+        ).rows[0];
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      pool: poolRow,
+      position: positionRow,
+      transaction: transactionRow,
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to backfill pool', detail: msg });
   }
 });
 
@@ -211,6 +387,26 @@ router.post('/positions', async (req: Request, res: Response) => {
     }
     const networkChainId = parseInt(chainId) || 84532;
     const resolvedHookAddress = hookAddress || '0x0000000000000000000000000000000000000000';
+
+    if (poolId) {
+      const existing = await dbPool.query(
+        `SELECT * FROM positions
+         WHERE wallet_address = $1
+           AND pool_id = $2
+           AND token0 = $3
+           AND token1 = $4
+           AND fee_tier = $5
+           AND chain_id = $6
+           AND status = 'active'
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [walletAddress.toLowerCase(), poolId, token0, token1, feeTier || 3000, networkChainId]
+      );
+      if (existing.rows[0]) {
+        return res.status(200).json(existing.rows[0]);
+      }
+    }
+
     const { rows } = await dbPool.query(
       `INSERT INTO positions
          (wallet_address, pool_id, position_token_id, token0, token1, liquidity, amount0, amount1,

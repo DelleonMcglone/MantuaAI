@@ -153,6 +153,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
 
     (async () => {
       let poolSaved = false;
+      let savedPoolId: string | null = null;
       // Await pool save so the list is ready before navigation
       try {
         const poolRes = await fetch('/api/portfolio', {
@@ -168,6 +169,8 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
           console.error('[save-pool]', errText);
           toast.error('Pool record failed to save', { description: errText.slice(0, 120), duration: 8000 });
         } else {
+          const savedPool = await poolRes.json();
+          savedPoolId = savedPool?.id ?? null;
           poolSaved = true;
         }
       } catch (err) {
@@ -180,7 +183,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            walletAddress: address, token0: sym0, token1: sym1,
+            walletAddress: address, poolId: savedPoolId, token0: sym0, token1: sym1,
             liquidity: '1', amount0: amount0, amount1: amount1,
             feeTier: poolFee, chainId, hookAddress,
           }),
