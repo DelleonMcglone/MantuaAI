@@ -727,7 +727,7 @@ const ZoneBadge = ({ zone }) => {
   );
 };
 
-const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, currentChain, onRemoveLiquidity }) => {
+const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, currentChain, onRemoveLiquidity, refreshKey = 0 }) => {
   const [activeTab, setActiveTab] = useState('balances');
   const [txns, setTxns] = useState<Array<{type:string;tx_hash:string;token_in?:string;token_out?:string;amount_in?:string;amount_out?:string;timestamp:string;base_scan_url:string}>>([]);
   const [agentWallet, setAgentWallet] = useState<{address:string;wallet_id:string;id?:string} | null>(null);
@@ -765,7 +765,7 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
       .then(r => r.ok ? r.json() : [])
       .then(rows => setTxns(rows ?? []))
       .catch(() => {});
-  }, [address, walletConnected]);
+  }, [address, walletConnected, refreshKey]);
 
   useEffect(() => {
     if (!address) return;
@@ -809,7 +809,7 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
         }));
       setPositions([...savedPositions, ...poolDerived]);
     });
-  }, [address, chainId]);
+  }, [address, chainId, refreshKey]);
 
   const tokenRows = [
     { symbol: 'ETH', name: 'Ethereum', balance: ethBalanceNum, usdValue: isNaN(ethValueUSD) ? 0 : ethValueUSD, price: ethPrice },
@@ -2511,10 +2511,34 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
 
   const [poolsRaw, setPoolsRaw] = React.useState([]);
   React.useEffect(() => {
+    const LS_KEY = 'mantua_pending_pools';
     fetch(`/api/portfolio?chainId=84532`)
       .then(r => (r.ok ? r.json() : []))
-      .then(base => setPoolsRaw(base ?? []))
-      .catch(() => setPoolsRaw([]));
+      .then(dbRows => {
+        const rows = dbRows ?? [];
+        // Merge any localStorage-backed pools that the DB doesn't have yet
+        try {
+          const pending: any[] = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
+          const dbTxHashes = new Set(rows.map((r: any) => r.tx_hash));
+          const missing = pending.filter((p: any) => !dbTxHashes.has(p.tx_hash));
+          // Clean up localStorage entries that are now in the DB
+          if (missing.length < pending.length) {
+            localStorage.setItem(LS_KEY, JSON.stringify(missing));
+          }
+          setPoolsRaw([...rows, ...missing]);
+        } catch {
+          setPoolsRaw(rows);
+        }
+      })
+      .catch(() => {
+        // DB unreachable — show localStorage pools at minimum
+        try {
+          const pending = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
+          setPoolsRaw(pending);
+        } catch {
+          setPoolsRaw([]);
+        }
+      });
   }, [refreshKey]);
 
   // Generate deterministic simulated stats per pool (testnet has no real indexer)
@@ -3787,6 +3811,7 @@ export default function MantuaApp() {
   const [showSwap, setShowSwap] = useState(false);
   const [showLiquidity, setShowLiquidity] = useState(false);
   const [liquidityRefreshKey, setLiquidityRefreshKey] = useState(0);
+  const [portfolioRefreshKey, setPortfolioRefreshKey] = useState(0);
   const [showAgentBuilder, setShowAgentBuilder] = useState(false);
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const [showAddLiquidityModal, setShowAddLiquidityModal] = useState(false);
@@ -4372,6 +4397,7 @@ export default function MantuaApp() {
                   isDark={isDark}
                   isConnected={isConnected}
                   currentChain={currentChain}
+                  refreshKey={portfolioRefreshKey}
                   onRemoveLiquidity={(pool) => {
                     setSelectedPool({ token1: pool.token1, token2: pool.token2 });
                     setAddLiquidityMode('remove');
@@ -4425,7 +4451,7 @@ export default function MantuaApp() {
                         swapDetails={swapDetails}
                         theme={theme}
                         isDark={isDark}
-                        onActionComplete={async (title) => { await updateSessionTitle(title); loadRecentChats(); }}
+                        onActionComplete={async (title) => { setPortfolioRefreshKey(k => k + 1); await updateSessionTitle(title); loadRecentChats(); }}
                       />
                     </div>
                   )}
@@ -4473,6 +4499,7 @@ export default function MantuaApp() {
                           setLiquidityInitialTokens(null);
                           setLiquidityInitialHook('');
                           setLiquidityRefreshKey(k => k + 1);
+                          setPortfolioRefreshKey(k => k + 1);
                           setShowLiquidity(true);
                           // Update session title in background (non-blocking)
                           updateSessionTitle(title).then(() => loadRecentChats()).catch(() => {});
