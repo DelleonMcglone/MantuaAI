@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect } from 'react';
-import { Moon, Sun, ChevronDown, Zap, Bot, Brain, Shield, Coins, BarChart3, Lock } from 'lucide-react';
+import { Moon, Sun, ChevronDown, Bot, Shield, Coins, BarChart3 } from 'lucide-react';
 import logoWhite from '@assets/Mantua_logo_white_1768946648374.png';
 import logoBlack from '@assets/Mantua_logo_black_1768946648374.png';
 
@@ -37,13 +37,10 @@ const themes = {
 };
 
 const FEATURES = [
-  { icon: Zap, title: 'Uniswap v4 Hooks', description: 'Dynamic Uniswap v4 hooks that protect LPs and improve swap execution through directional fees, JIT liquidity rebalancing, and MEV-resistant ordering.', status: 'Live', statusColor: '#22c55e' },
+  { icon: Shield, title: 'Stable Protection Hook', description: 'A Uniswap v4 hook that dynamically adjusts swap fees across five depeg zones to protect stablecoin LPs from adverse selection. Fees scale from 0.05% in healthy conditions to 1% during severe depeg, with a circuit breaker for extreme events.', status: 'Live', statusColor: '#22c55e' },
   { icon: Bot, title: 'AI Agents', description: 'Autonomous AI agents that manage trading and liquidity strategies collaboratively or independently, executing on-chain actions through natural-language commands.', status: 'Live', statusColor: '#22c55e' },
-  { icon: Shield, title: 'Hook Verification', description: 'Trustless hook verification that ensures deployed Uniswap v4 hooks are audited, permissioned, and behaving exactly as intended before liquidity or volume flows through them.', status: 'Live', statusColor: '#22c55e' },
   { icon: Coins, title: 'Portfolio Management', description: 'Unified portfolio tracking and analytics for users and agents, with real-time performance insights and on-chain position management.', status: 'Live', statusColor: '#22c55e' },
   { icon: BarChart3, title: 'Analytics', description: 'Real-time on-chain analytics delivering actionable blockchain insights across markets and liquidity.', status: 'Live', statusColor: '#22c55e' },
-  { icon: Lock, title: 'Secure by Design', description: 'Security-first architecture built on battle-tested Uniswap infrastructure, with audited contracts and transparent on-chain operations.', status: 'Live', statusColor: '#22c55e' },
-  { icon: Brain, title: 'Voice Text', description: 'Voice-powered trading and liquidity management that lets you execute on-chain actions using natural language.', status: 'Beta', statusColor: '#a855f7' },
 ];
 
 const FAQ_DATA = [
@@ -150,24 +147,12 @@ export default function MantuaLanding() {
         <p style={{ fontSize: 18, color: theme.textSecondary, marginBottom: 48, letterSpacing: '0.02em' }}>Hooks for logic. Agents for action. AI for intelligence.</p>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
           <button onClick={() => window.location.href = '/app'} style={{ background: 'linear-gradient(135deg, #a855f7, #9333ea)', border: 'none', borderRadius: 12, padding: '16px 32px', color: '#fff', fontFamily: '"DM Sans", sans-serif', fontSize: 16, fontWeight: 600, cursor: 'pointer' }}>Launch App</button>
-          <button style={{ background: 'transparent', border: `1px solid ${theme.border}`, borderRadius: 12, padding: '16px 32px', color: theme.textPrimary, fontFamily: '"DM Sans", sans-serif', fontSize: 16, fontWeight: 500, cursor: 'pointer' }}>Learn More</button>
-        </div>
-        
-        {/* Video Demo Placeholder */}
-        <div style={{ marginTop: 64, width: '100%', maxWidth: 900, aspectRatio: '16/9', borderRadius: 16, background: `linear-gradient(135deg, ${theme.accent}10, ${theme.accentGreen}10)`, border: `1px solid ${theme.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(circle at 30% 40%, ${theme.accent}15 0%, transparent 50%), radial-gradient(circle at 70% 60%, ${theme.accentGreen}10 0%, transparent 50%)` }} />
-          <div style={{ width: 80, height: 80, borderRadius: '50%', background: `linear-gradient(135deg, ${theme.accent}, ${theme.accentGreen})`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 1, boxShadow: `0 8px 32px ${theme.accent}40` }}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" style={{ marginLeft: 4 }}>
-              <path d="M8 5.14v14.72a1 1 0 001.5.86l11-7.36a1 1 0 000-1.72l-11-7.36a1 1 0 00-1.5.86z" fill="#fff"/>
-            </svg>
-          </div>
-          <span style={{ fontFamily: '"Outfit", sans-serif', fontSize: 16, fontWeight: 500, color: theme.textSecondary, zIndex: 1 }}>Watch Demo</span>
         </div>
       </section>
 
       {/* Features */}
       <section style={{ padding: '80px 40px', maxWidth: 1200, margin: '0 auto' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 24 }}>
           {FEATURES.map((f, i) => <FeatureCard key={i} feature={f} theme={theme} index={i} />)}
         </div>
       </section>
