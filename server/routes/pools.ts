@@ -14,7 +14,7 @@ const ZERO_HOOK = "0x0000000000000000000000000000000000000000" as Address;
 // Supported tokens on Base Sepolia (matching client config/tokens.ts)
 const SUPPORTED_TOKENS: Record<string, { address: Address; decimals: number; symbol: string }> = {
   ETH:   { address: "0x0000000000000000000000000000000000000000", decimals: 18, symbol: "ETH" },
-  cbBTC: { address: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf", decimals: 8, symbol: "cbBTC" },
+  cbBTC: { address: "0xcbB7C0006F23900c38EB856149F799620fcb8A4a", decimals: 8, symbol: "cbBTC" },
   USDC:  { address: "0x036CbD53842c5426634e7929541eC2318f3dCF7e", decimals: 6, symbol: "USDC" },
   EURC:  { address: "0x808456652fdb597867f38412077A9182bf77359", decimals: 6, symbol: "EURC" },
 };

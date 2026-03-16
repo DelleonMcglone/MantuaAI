@@ -182,10 +182,20 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
         const { message: assistantMsg }: CreateMessageResponse = await assistRes.json();
         setMessages((prev) => [...prev, assistantMsg]);
       } catch (err) {
-        setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+        const description = err instanceof Error ? err.message : "Unknown error";
+        setMessages((prev) => [
+          ...prev.filter((m) => m.id !== optimisticId),
+          {
+            id: `err-${Date.now()}`,
+            sessionId: sid,
+            role: "assistant",
+            content: `I couldn't complete that request. ${description}`,
+            createdAt: new Date().toISOString(),
+          },
+        ]);
         toast({
           title: "Failed to send message",
-          description: err instanceof Error ? err.message : "Unknown error",
+          description,
           variant: "destructive",
         });
       } finally {

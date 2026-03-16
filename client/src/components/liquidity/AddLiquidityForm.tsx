@@ -155,38 +155,65 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
 
     (async () => {
       let saved = false;
+      console.error(JSON.stringify({
+        stage: 'backfill-pool:receipt-confirmed',
+        txHash: hash,
+        walletAddress: address,
+        chainId,
+        tokenA: tokenA.symbol,
+        tokenB: tokenB.symbol,
+        mode,
+      }));
       try {
+        const payload = {
+          walletAddress: address,
+          creatorAddress: address,
+          txHash: hash,
+          token0: sym0,
+          token1: sym1,
+          feeTier: poolFee,
+          chainId,
+          hookAddress: curHookAddress,
+          amount0: amount0 || '0',
+          amount1: amount1 || '0',
+          liquidity: '1',
+          type: 'add_liquidity',
+        };
+        console.error(JSON.stringify({
+          stage: 'backfill-pool:before-request',
+          payload,
+        }));
         const res = await fetch('/api/portfolio/backfill-pool', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            walletAddress: address,
-            creatorAddress: address,
-            txHash: hash,
-            token0: sym0,
-            token1: sym1,
-            feeTier: poolFee,
-            chainId,
-            hookAddress: curHookAddress,
-            amount0: amount0 || '0',
-            amount1: amount1 || '0',
-            liquidity: '1',
-            type: 'add_liquidity',
-          }),
+          body: JSON.stringify(payload),
         });
         if (cancelled) return;
         if (!res.ok) {
           const errBody = await res.text();
-          console.error('[backfill-pool] HTTP', res.status, errBody);
+          console.error(JSON.stringify({
+            stage: 'backfill-pool:request-failed',
+            status: res.status,
+            body: errBody,
+          }));
           toast.error('Pool record failed to save', { description: errBody.slice(0, 120), duration: 8000 });
         } else {
           const data = await res.json();
-          console.info('[backfill-pool] saved', { pool: data.pool?.id, position: data.position?.id });
+          console.error(JSON.stringify({
+            stage: 'backfill-pool:request-succeeded',
+            poolId: data.pool?.id,
+            positionId: data.position?.id,
+            transactionId: data.transaction?.id,
+          }));
           saved = true;
+          window.dispatchEvent(new CustomEvent('portfolio:refresh'));
         }
       } catch (err) {
         if (cancelled) return;
-        console.error('[backfill-pool] network error', err);
+        console.error(JSON.stringify({
+          stage: 'backfill-pool:request-threw',
+          error: err instanceof Error ? { message: err.message, stack: err.stack, name: err.name } : err,
+        }));
         toast.error('Pool record failed to save', { description: 'Network error — check server logs', duration: 8000 });
       }
       if (cancelled) return;

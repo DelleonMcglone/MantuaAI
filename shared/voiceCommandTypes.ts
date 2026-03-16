@@ -37,7 +37,11 @@ export const TOKEN_ALIASES: Record<string, string> = {
   ether: 'ETH', ethereum: 'ETH', eth: 'ETH',
   usdc: 'USDC', 'usd coin': 'USDC',
   eurc: 'EURC', euro: 'EURC', 'euro coin': 'EURC',
-  cbbtc: 'cbBTC', bitcoin: 'cbBTC', btc: 'cbBTC', 'coinbase btc': 'cbBTC',
+  cbbtc: 'cbBTC',
+  bitcoin: 'cbBTC',
+  btc: 'cbBTC',
+  'coinbase btc': 'cbBTC',
+  'coinbase wrapped btc': 'cbBTC',
 };
 
 export function normalizeToken(raw: string): string {

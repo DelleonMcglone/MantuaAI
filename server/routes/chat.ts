@@ -8,7 +8,7 @@ import { duneService } from "../services/duneService";
 import { matchDuneQuery, matchSQLTemplate, fillTemplateParams, getAllQueries, getAllSQLTemplates } from "../services/duneQueries";
 
 const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
@@ -341,7 +341,7 @@ async function generateResponse(
   parsed: ReturnType<typeof parseVoiceCommand>,
   chainId?: number,
 ): Promise<string> {
-  if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
+  if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY && !process.env.OPENAI_API_KEY) {
     return fallbackResponse(message, parsed);
   }
 

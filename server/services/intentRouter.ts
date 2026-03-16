@@ -54,13 +54,26 @@ function detectChain(message: string): number | undefined {
 // ── Token extraction ────────────────────────────────────────────────────────
 const TOKEN_RE = /\b(USDC|EURC|ETH|cbBTC)\b/gi;
 
+function canonicalizeTokenMentions(message: string): string {
+  return message
+    .replace(/\bcb[\s-]?btc\b/gi, 'cbBTC')
+    .replace(/\bcoinbase[\s-]?(?:wrapped\s+)?btc\b/gi, 'cbBTC')
+    .replace(/\beth(?:ereum)?\b/gi, 'ETH')
+    .replace(/\busd\s+coin\b/gi, 'USDC')
+    .replace(/\beuro\s+coin\b/gi, 'EURC');
+}
+
 function normalizeSymbol(raw: string): TokenSymbol {
-  const upper = raw.toUpperCase();
-  return upper as TokenSymbol;
+  const key = raw.toLowerCase().replace(/[^a-z]/g, '');
+  if (key === 'eth' || key === 'ether' || key === 'ethereum') return 'ETH';
+  if (key === 'usdc' || key === 'usdcoin') return 'USDC';
+  if (key === 'eurc' || key === 'euro' || key === 'eurocoin') return 'EURC';
+  if (key === 'cbbtc' || key === 'btc' || key === 'coinbasebtc' || key === 'coinbasewrappedbtc') return 'cbBTC';
+  return raw as TokenSymbol;
 }
 
 function extractTokens(message: string): TokenSymbol[] {
-  const matches = message.match(TOKEN_RE) ?? [];
+  const matches = canonicalizeTokenMentions(message).match(TOKEN_RE) ?? [];
   return [...new Set(matches.map(normalizeSymbol))];
 }
 
@@ -68,7 +81,7 @@ function extractTokens(message: string): TokenSymbol[] {
 const AMOUNT_RE = /(\d+\.?\d*)\s*(?:USDC|EURC|ETH|cbBTC)/i;
 
 function extractAmount(message: string): string | undefined {
-  const match = AMOUNT_RE.exec(message);
+  const match = AMOUNT_RE.exec(canonicalizeTokenMentions(message));
   return match ? match[1] : undefined;
 }
 
@@ -189,12 +202,13 @@ const PATTERNS: Array<{ type: IntentType; patterns: RegExp[] }> = [
 ];
 
 function parseSwapParams(message: string): Partial<DetectedIntent> {
-  const tokens = extractTokens(message);
-  const amount = extractAmount(message);
+  const canonical = canonicalizeTokenMentions(message);
+  const tokens = extractTokens(canonical);
+  const amount = extractAmount(canonical);
 
   // Try explicit "X for Y" pattern
   const forPattern = /(\d+\.?\d*)?\s*(USDC|EURC|ETH|cbBTC)\s+(?:for|to|→|into)\s+(USDC|EURC|ETH|cbBTC)/i;
-  const forMatch = forPattern.exec(message);
+  const forMatch = forPattern.exec(canonical);
   if (forMatch) {
     return {
       fromToken: normalizeSymbol(forMatch[2]),
@@ -205,7 +219,7 @@ function parseSwapParams(message: string): Partial<DetectedIntent> {
 
   // "buy X with Y" pattern
   const buyPattern = /buy\s+(USDC|EURC|ETH|cbBTC)\s+with\s+(?:(\d+\.?\d*)\s+)?(USDC|EURC|ETH|cbBTC)/i;
-  const buyMatch = buyPattern.exec(message);
+  const buyMatch = buyPattern.exec(canonical);
   if (buyMatch) {
     return {
       fromToken: normalizeSymbol(buyMatch[3]),
@@ -216,7 +230,7 @@ function parseSwapParams(message: string): Partial<DetectedIntent> {
 
   // "sell X for Y" pattern
   const sellPattern = /sell\s+(?:(\d+\.?\d*)\s+)?(USDC|EURC|ETH|cbBTC)\s+(?:for|to)\s+(USDC|EURC|ETH|cbBTC)/i;
-  const sellMatch = sellPattern.exec(message);
+  const sellMatch = sellPattern.exec(canonical);
   if (sellMatch) {
     return {
       fromToken: normalizeSymbol(sellMatch[2]),
@@ -227,7 +241,7 @@ function parseSwapParams(message: string): Partial<DetectedIntent> {
 
   // "get X for my Y" pattern
   const getPattern = /get\s+(USDC|EURC|ETH|cbBTC)\s+for\s+(?:my\s+)?(USDC|EURC|ETH|cbBTC)/i;
-  const getMatch = getPattern.exec(message);
+  const getMatch = getPattern.exec(canonical);
   if (getMatch) {
     return {
       fromToken: normalizeSymbol(getMatch[2]),
@@ -249,12 +263,13 @@ function parseSwapParams(message: string): Partial<DetectedIntent> {
 }
 
 function parseLiquidityParams(message: string): Partial<DetectedIntent> {
-  const tokens = extractTokens(message);
+  const canonical = canonicalizeTokenMentions(message);
+  const tokens = extractTokens(canonical);
   const useStableHook = detectHook(message);
   const chainHint = detectChain(message);
 
   // Try pair pattern "USDC/EURC", "USDC EURC", or "USDC, EURC"
-  const pairMatch = /\b(USDC|EURC|ETH|cbBTC)\s*[/\-,\s]\s*(USDC|EURC|ETH|cbBTC)\b/i.exec(message);
+  const pairMatch = /\b(USDC|EURC|ETH|cbBTC)\s*[/\-,\s]\s*(USDC|EURC|ETH|cbBTC)\b/i.exec(canonical);
   if (pairMatch) {
     return {
       fromToken: normalizeSymbol(pairMatch[1]),

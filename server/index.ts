@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { runMigrations } from "./db/migrate";
+import { logAgentKitHealth } from "./lib/agentkit";
 
 const app = express();
 app.set('trust proxy', 1);
@@ -68,6 +69,8 @@ app.use((req, res, next) => {
   } catch (err) {
     console.error("Migration error (continuing):", err);
   }
+
+  await logAgentKitHealth();
 
   await registerRoutes(httpServer, app);
 

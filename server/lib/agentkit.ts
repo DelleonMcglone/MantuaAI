@@ -36,16 +36,22 @@ let _agent: ReturnType<typeof createReactAgent> | null = null;
 let _walletAddress: string | null = null;
 let _initPromise: Promise<AgentKit> | null = null;
 
+function isConfiguredValue(value: string | undefined): boolean {
+  if (!value) return false;
+  const trimmed = value.trim();
+  return trimmed.length > 0 && !/^your_.+_here$/i.test(trimmed);
+}
+
 /**
  * Validate that all required env vars are present.
  * Throws a descriptive error if any are missing.
  */
 function validateEnvVars(): void {
   const missing: string[] = [];
-  if (!process.env.CDP_API_KEY_ID)     missing.push('CDP_API_KEY_ID');
-  if (!process.env.CDP_API_KEY_SECRET) missing.push('CDP_API_KEY_SECRET');
-  if (!process.env.CDP_WALLET_SECRET)  missing.push('CDP_WALLET_SECRET');
-  if (!process.env.ANTHROPIC_API_KEY)  missing.push('ANTHROPIC_API_KEY');
+  if (!isConfiguredValue(process.env.CDP_API_KEY_ID))     missing.push('CDP_API_KEY_ID');
+  if (!isConfiguredValue(process.env.CDP_API_KEY_SECRET)) missing.push('CDP_API_KEY_SECRET');
+  if (!isConfiguredValue(process.env.CDP_WALLET_SECRET))  missing.push('CDP_WALLET_SECRET');
+  if (!isConfiguredValue(process.env.ANTHROPIC_API_KEY))  missing.push('ANTHROPIC_API_KEY');
 
   if (missing.length > 0) {
     throw new Error(
@@ -187,6 +193,16 @@ export async function getCachedWalletAddress(): Promise<string | null> {
     }
   }
   return _walletAddress;
+}
+
+export async function logAgentKitHealth(): Promise<void> {
+  try {
+    const info = await getAgentWalletInfo();
+    console.log(`[AgentKit] initialized successfully, agent wallet: ${info.address}, network: ${info.network}`);
+  } catch (err) {
+    const detail = err instanceof Error ? { message: err.message, stack: err.stack, name: err.name } : err;
+    console.error(`[AgentKit] startup health check failed: ${JSON.stringify(detail)}`);
+  }
 }
 
 /**

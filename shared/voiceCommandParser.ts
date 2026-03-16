@@ -10,11 +10,20 @@ export type { SwapCommand, LiquidityCommand, VaultCommand };
 export { normalizeToken } from './voiceCommandTypes';
 export type { HookType } from './voiceCommandTypes';
 
+function canonicalizeTokenMentions(text: string): string {
+  return text
+    .replace(/\bcb[\s-]?btc\b/gi, 'cbBTC')
+    .replace(/\bcoinbase[\s-]?(?:wrapped\s+)?btc\b/gi, 'cbBTC')
+    .replace(/\beth(?:ereum)?\b/gi, 'ETH')
+    .replace(/\busd\s+coin\b/gi, 'USDC')
+    .replace(/\beuro\s+coin\b/gi, 'EURC');
+}
+
 // ── Token extraction ──────────────────────────────────────────────────────
 const TOKEN_RE = /\b(m?[A-Z]{2,6})\b/g;
 
 function extractTokens(text: string): string[] {
-  const upper = text.replace(/\b(ether|ethereum|bitcoin|tether)\b/gi, (w) => normalizeToken(w));
+  const upper = canonicalizeTokenMentions(text).replace(/\b(ether|ethereum|bitcoin|tether)\b/gi, (w) => normalizeToken(w));
   return (upper.match(TOKEN_RE) ?? []).map(normalizeToken);
 }
 
@@ -31,17 +40,18 @@ const SWAP_VERBS = /\b(swap|trade|exchange|convert|buy|sell)\b/i;
 const BUY_PAT = /\bbuy\s+([a-z]+)\s+with\s+([\d.,]+)\s+([a-z]+)/i;
 
 export function parseSwapCommand(text: string): SwapCommand | null {
-  if (!SWAP_VERBS.test(text)) return null;
-  const hook = detectHook(text);
-  const buy = BUY_PAT.exec(text);
+  const canonical = canonicalizeTokenMentions(text);
+  if (!SWAP_VERBS.test(canonical)) return null;
+  const hook = detectHook(canonical);
+  const buy = BUY_PAT.exec(canonical);
   if (buy) {
     const amount = buy[2].replace(',', '.');
     if (parseFloat(amount) > 0)
       return { type: 'swap', fromToken: normalizeToken(buy[3]), toToken: normalizeToken(buy[1]), amount, ...(hook ? { hook } : {}) };
   }
-  const amount = parseAmount(text);
+  const amount = parseAmount(canonical);
   if (!amount) return null;
-  const cleaned = text.replace(SWAP_VERBS, '').replace(amount, '').replace(/\b(for|to|into|→)\b/gi, ' ');
+  const cleaned = canonical.replace(SWAP_VERBS, '').replace(amount, '').replace(/\b(for|to|into|→)\b/gi, ' ');
   const [fromToken, toToken] = extractTokens(cleaned);
   if (!fromToken || !toToken) return null;
   return { type: 'swap', fromToken, toToken, amount, ...(hook ? { hook } : {}) };
@@ -61,21 +71,22 @@ function extractAmounts(text: string): Array<{ amount: string; token: string }> 
 }
 
 export function parseLiquidityCommand(text: string): LiquidityCommand | null {
-  if (!LIQUIDITY_RE.test(text)) return null;
-  const action: 'add' | 'remove' = REMOVE_RE.test(text) ? 'remove' : 'add';
-  const hook = detectHook(text);
-  const pairMatch = PAIR_RE.exec(text);
+  const canonical = canonicalizeTokenMentions(text);
+  if (!LIQUIDITY_RE.test(canonical)) return null;
+  const action: 'add' | 'remove' = REMOVE_RE.test(canonical) ? 'remove' : 'add';
+  const hook = detectHook(canonical);
+  const pairMatch = PAIR_RE.exec(canonical);
   if (pairMatch) {
     const token0 = normalizeToken(pairMatch[1]), token1 = normalizeToken(pairMatch[2]);
-    const amounts = extractAmounts(text);
+    const amounts = extractAmounts(canonical);
     const a0 = amounts.find(a => a.token === token0), a1 = amounts.find(a => a.token === token1);
     return { type: 'liquidity', action, token0, token1, ...(a0 ? { amount0: a0.amount } : {}), ...(a1 ? { amount1: a1.amount } : {}), ...(hook ? { hook } : {}) };
   }
-  const amounts = extractAmounts(text);
+  const amounts = extractAmounts(canonical);
   if (amounts.length >= 2)
     return { type: 'liquidity', action, token0: amounts[0].token, token1: amounts[1].token, amount0: amounts[0].amount, amount1: amounts[1].amount, ...(hook ? { hook } : {}) };
   if (amounts.length === 1) {
-    const other = extractTokens(text).filter(t => t !== amounts[0].token);
+    const other = extractTokens(canonical).filter(t => t !== amounts[0].token);
     if (other.length > 0) return { type: 'liquidity', action, token0: amounts[0].token, token1: other[0], amount0: amounts[0].amount, ...(hook ? { hook } : {}) };
   }
   return null;

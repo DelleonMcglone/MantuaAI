@@ -109,7 +109,8 @@
       "WebFetch(domain:www.npmjs.com)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(Liquidity tab first.\" when pool is not initialized:*)"
+      "Bash(Liquidity tab first.\" when pool is not initialized:*)",
+      "Bash(find /Users/delleonmcglone/MantuaAI/public -name *.js -o -name *.mjs)"
     ]
   }
 }

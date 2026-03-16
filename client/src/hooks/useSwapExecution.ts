@@ -84,6 +84,7 @@ export function useSwapExecution(): UseSwapExecutionReturn {
 
   const { isLoading: isConfirming, isSuccess: isConfirmed, isError: isTxError } = useWaitForTransactionReceipt({
     hash: txHash,
+    confirmations: 1,
   });
 
   useEffect(() => {
@@ -93,7 +94,7 @@ export function useSwapExecution(): UseSwapExecutionReturn {
   }, [isConfirming, status]);
 
   useEffect(() => {
-    if (isConfirmed && status === 'confirming' && !hasShownConfirmToast.current) {
+    if (isConfirmed && status !== 'confirmed' && !hasShownConfirmToast.current) {
       hasShownConfirmToast.current = true;
       setStatus('confirmed');
       if (lastParams) {
@@ -113,10 +114,10 @@ export function useSwapExecution(): UseSwapExecutionReturn {
         duration: 5000,
       });
     }
-  }, [isConfirmed, status, txHash]);
+  }, [isConfirmed, status, txHash, lastParams, userAddress, chainId]);
 
   useEffect(() => {
-    if (isTxError && status === 'confirming' && !hasShownErrorToast.current) {
+    if (isTxError && status !== 'failed' && !hasShownErrorToast.current) {
       hasShownErrorToast.current = true;
       setStatus('failed');
       console.error('[SwapExecution] On-chain transaction failed:', { txHash, chainId });
@@ -126,7 +127,7 @@ export function useSwapExecution(): UseSwapExecutionReturn {
         duration: 0,
       });
     }
-  }, [isTxError, status]);
+  }, [isTxError, status, txHash, chainId]);
 
   const execute = useCallback(async (params: SwapExecutionParams) => {
     hasShownConfirmToast.current = false;

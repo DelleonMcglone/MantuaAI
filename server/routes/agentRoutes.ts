@@ -36,7 +36,11 @@ router.get("/wallet", async (req, res) => {
     return res.json({ success: true, response });
   } catch (err: any) {
     const msg = err?.message ?? 'Unknown error';
-    console.error("[agentkit] GET /wallet error:", msg);
+    console.error("[agentkit] GET /wallet error:", JSON.stringify({
+      message: err?.message,
+      stack: err?.stack,
+      name: err?.name,
+    }));
 
     if (msg.includes('not configured') || msg.includes('Missing required')) {
       return res.status(503).json({
@@ -93,7 +97,11 @@ router.post("/chat", async (req, res) => {
     return res.json({ success: true, response });
   } catch (err: any) {
     const msg = err?.message ?? 'Unknown error';
-    console.error("[agentkit] POST /chat error:", msg);
+    console.error("[agentkit] POST /chat error:", JSON.stringify({
+      message: err?.message,
+      stack: err?.stack,
+      name: err?.name,
+    }));
 
     if (msg.includes('not configured') || msg.includes('Missing required')) {
       return res.status(503).json({
@@ -196,8 +204,12 @@ router.post("/autonomous", async (req, res) => {
     const response = await runAgent(enrichedMessage);
     return res.json({ success: true, intent: intent.type, response });
   } catch (err: any) {
-    console.error("[agentkit] POST /autonomous error:", err.message);
-    return res.status(500).json({ success: false, error: err.message });
+    console.error("[agentkit] POST /autonomous error:", JSON.stringify({
+      message: err?.message,
+      stack: err?.stack,
+      name: err?.name,
+    }));
+    return res.status(500).json({ success: false, error: err?.message ?? 'Unknown error' });
   }
 });
 
@@ -208,8 +220,12 @@ router.post("/create-pool", async (req, res) => {
     const result = await createStableProtectionPool();
     return res.json({ success: true, ...result });
   } catch (err: any) {
-    console.error("[agentkit] POST /create-pool error:", err.message);
-    return res.status(500).json({ success: false, error: err.message });
+    console.error("[agentkit] POST /create-pool error:", JSON.stringify({
+      message: err?.message,
+      stack: err?.stack,
+      name: err?.name,
+    }));
+    return res.status(500).json({ success: false, error: err?.message ?? 'Unknown error' });
   }
 });
 
