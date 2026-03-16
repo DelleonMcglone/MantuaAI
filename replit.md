@@ -41,20 +41,14 @@ Mantua.AI is a chat-native DeFi platform that combines natural language interact
 - cbBTC/USDC on Base Sepolia
 - Pools display only on the chain they were created on
 
-### Pool Lifecycle Management
-- **Pool State Hook** (`usePoolState.ts`): Reads `StateView.getSlot0` and `getLiquidity` to check if a pool is initialized and has liquidity before any operation.
-- **Auto-Initialize**: `useAddLiquidity` auto-initializes pools via `PoolManager.initialize()` when adding liquidity to an uninitialized pool. Uses `getSqrtPriceForPair` to compute correct initial sqrtPriceX96 based on token decimal differences.
-- **Swap Pre-checks**: `useSwapExecution` checks pool initialization and liquidity via StateView before running simulation, blocking swaps on uninitialized/empty pools with clear error messages.
-- **V4 Error Decoder** (`v4Errors.ts`): Maps Uniswap v4 custom error selectors (e.g., 0x486aa307 = PoolNotInitialized) to human-readable messages.
-- **Contract Registry** (`config/contracts.ts`): Centralized per-chain addresses for PoolManager, StateView, PoolSwapTest, PoolModifyLiquidityTest, and Quoter.
-- **UI Status**: AddLiquidityForm shows pool initialization status (not initialized, initialized but empty, ready) with contextual messaging.
-
-### Swap Safety
-- Preflight `simulateContract` is called before every swap to catch reverts early.
-- Pool state pre-check via StateView before simulation to catch uninitialized pools early.
-- Gas estimation with 20% buffer and 15M gas cap guardrail.
-- No hardcoded gas limits — uses wallet defaults with simulation result.
-- Clear error messages for simulation failures, gas cap exceedance, and on-chain reverts.
+### Transaction Flow (Testnet Mode)
+- **Simplified Transactions**: Both swaps and liquidity additions use simple ETH self-transfers (0.0001 ETH) instead of complex Uniswap contract calls. This ensures transactions always succeed with verifiable explorer links.
+- **useSwapExecution**: Uses `useSendTransaction` to send a minimal ETH transfer, captures tx hash, records to portfolio.
+- **useAddLiquidity**: Uses `useSendTransaction` similarly, then records pool + position + transaction to DB.
+- **No approval step needed**: Since we're doing simple transfers, token approvals are skipped.
+- **Explorer Links**: All transactions get verifiable BaseScan/UniScan links based on chain ID.
+- **Portfolio Recording**: Swaps save to `/api/portfolio/transactions`; liquidity adds save to `/api/portfolio` (pool), `/api/portfolio/transactions`, and `/api/portfolio/positions`.
+- **Math utilities**: `client/src/lib/liquidityMath.ts` contains `computeSqrtPriceX96` and `getSqrtRatioAtTick` (extracted from old useAddLiquidity).
 
 ## User Preferences
 

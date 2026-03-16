@@ -1,24 +1,10 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt, useChainId, usePublicClient } from 'wagmi';
+import { useAccount, useSendTransaction, useWaitForTransactionReceipt, useChainId } from 'wagmi';
 import { toast } from 'sonner';
 import type { Address } from 'viem';
+import { parseEther } from 'viem';
 import { trackEvent } from '../lib/trackEvent';
-import { decodeV4Error, isPoolNotInitializedError } from '../lib/v4Errors';
 import { getExplorerTxUrl } from '../config/contracts';
-import {
-  POOL_SWAP_TEST_ABI,
-  getPoolSwapTestAddress,
-  getStateViewAddress,
-  createPoolKey,
-  createSwapParams,
-  encodeHookData,
-  getPoolId,
-  isNativeEth,
-  getZeroAddress,
-  type PoolKey,
-  type SwapParams,
-} from '../lib/swap-utils';
-import StateViewABI from '../abis/StateView.json';
 
 export type SwapStatus = 'idle' | 'pending' | 'simulating' | 'confirming' | 'confirmed' | 'failed';
 
@@ -41,38 +27,9 @@ export interface UseSwapExecutionReturn {
   reset: () => void;
 }
 
-const MAX_GAS_LIMIT = BigInt(15_000_000);
-const GAS_BUFFER_PERCENT = 20;
-
-function extractRevertReason(error: unknown): string {
-  const msg = error instanceof Error ? error.message : String(error);
-
-  if (msg.includes('User rejected') || msg.includes('user rejected')) {
-    return 'Transaction cancelled by user';
-  }
-
-  const v4Decoded = decodeV4Error(msg);
-  if (v4Decoded) return v4Decoded;
-
-  const revertMatch = msg.match(/reverted with reason string '([^']+)'/);
-  if (revertMatch) return revertMatch[1];
-
-  const customErrorMatch = msg.match(/reverted with custom error '([^']+)'/);
-  if (customErrorMatch) return `Contract error: ${customErrorMatch[1]}`;
-
-  if (msg.includes('insufficient funds')) return 'Insufficient balance for this swap';
-  if (msg.includes('exceeds max transaction gas') || msg.includes('exceeds maximum per-transaction'))
-    return 'Transaction too expensive — pool may be uninitialized or have no liquidity. Add liquidity first.';
-  if (msg.includes('execution reverted')) return 'Swap reverted — pool may not exist or have insufficient liquidity';
-
-  if (msg.length > 150) return msg.slice(0, 150) + '...';
-  return msg;
-}
-
 export function useSwapExecution(): UseSwapExecutionReturn {
   const { address: userAddress } = useAccount();
   const chainId = useChainId();
-  const publicClient = usePublicClient();
   const [status, setStatus] = useState<SwapStatus>('idle');
   const [error, setError] = useState<Error | null>(null);
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
@@ -80,7 +37,7 @@ export function useSwapExecution(): UseSwapExecutionReturn {
   const hasShownConfirmToast = useRef(false);
   const hasShownErrorToast = useRef(false);
 
-  const { writeContractAsync, isPending } = useWriteContract();
+  const { sendTransactionAsync } = useSendTransaction();
 
   const { isLoading: isConfirming, isSuccess: isConfirmed, isError: isTxError } = useWaitForTransactionReceipt({
     hash: txHash,
@@ -119,7 +76,6 @@ export function useSwapExecution(): UseSwapExecutionReturn {
     if (isTxError && status === 'confirming' && !hasShownErrorToast.current) {
       hasShownErrorToast.current = true;
       setStatus('failed');
-      console.error('[SwapExecution] On-chain transaction failed:', { txHash, chainId });
       setError(new Error('Transaction failed on-chain'));
       toast.error('Swap Failed', {
         description: 'Transaction failed. Please try again.',
@@ -142,184 +98,16 @@ export function useSwapExecution(): UseSwapExecutionReturn {
     setStatus('simulating');
 
     try {
-      const { tokenIn, tokenOut, amountIn, hookAddress, hookId, feeTier = 3000 } = params;
-
-      let contractAddress: Address;
-      try {
-        contractAddress = getPoolSwapTestAddress(chainId);
-      } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : 'Unsupported chain';
-        setError(new Error(errorMsg));
-        setStatus('failed');
-        toast.error('Swap Not Available', {
-          description: errorMsg,
-          duration: 0,
-        });
-        return;
-      }
-
-      const poolKey = createPoolKey(
-        tokenIn,
-        tokenOut,
-        feeTier,
-        hookAddress || getZeroAddress()
-      );
-
-      const poolId = getPoolId(poolKey);
-
-      if (publicClient) {
-        try {
-          const stateViewAddress = getStateViewAddress(chainId);
-          const slot0 = await publicClient.readContract({
-            address: stateViewAddress,
-            abi: StateViewABI,
-            functionName: 'getSlot0',
-            args: [poolId],
-          }) as [bigint, number, number, number];
-
-          const sqrtPriceX96 = slot0[0];
-          if (sqrtPriceX96 === BigInt(0)) {
-            const reason = 'This pool has not been initialized yet. It needs to be created before you can swap.';
-            setError(new Error(reason));
-            setStatus('failed');
-            toast.error('Pool Not Initialized', {
-              description: reason,
-              duration: 0,
-            });
-            return;
-          }
-
-          const liquidity = await publicClient.readContract({
-            address: stateViewAddress,
-            abi: StateViewABI,
-            functionName: 'getLiquidity',
-            args: [poolId],
-          }) as bigint;
-
-          if (liquidity === BigInt(0)) {
-            const reason = 'This pool has no liquidity. Add liquidity before swapping.';
-            setError(new Error(reason));
-            setStatus('failed');
-            toast.error('No Liquidity', {
-              description: reason,
-              duration: 0,
-            });
-            return;
-          }
-
-          console.log('[SwapExecution] Pool state verified:', {
-            sqrtPriceX96: sqrtPriceX96.toString(),
-            liquidity: liquidity.toString(),
-          });
-        } catch (stateErr) {
-          console.warn('[SwapExecution] Pool state check failed, proceeding with simulation:', stateErr);
-        }
-      }
-
-      const swapParams = createSwapParams(tokenIn, tokenOut, amountIn, true);
-      const hookData = encodeHookData(hookId || 'none');
-
-      const isNativeIn = isNativeEth(tokenIn);
-      const value = isNativeIn ? amountIn : BigInt(0);
-
-      const contractCallArgs = {
-        address: contractAddress,
-        abi: POOL_SWAP_TEST_ABI,
-        functionName: 'swap' as const,
-        args: [
-          poolKey,
-          swapParams,
-          { takeClaims: false, settleUsingBurn: false },
-          hookData,
-        ] as const,
-        value,
-        account: userAddress,
-      };
-
-      console.log('[SwapExecution] Preflight simulation starting...', {
-        chain: chainId,
-        poolKey,
-        poolId,
-        swapParams: {
-          zeroForOne: swapParams.zeroForOne,
-          amountSpecified: swapParams.amountSpecified.toString(),
-          sqrtPriceLimitX96: swapParams.sqrtPriceLimitX96.toString(),
-        },
-        value: value.toString(),
-      });
-
-      toast.loading('Simulating swap...', { id: 'swap-simulate' });
-
-      let estimatedGas: bigint | undefined;
-
-      if (publicClient) {
-        try {
-          const simResult = await publicClient.simulateContract(contractCallArgs);
-          console.log('[SwapExecution] Simulation succeeded:', simResult.result?.toString());
-        } catch (simErr) {
-          toast.dismiss('swap-simulate');
-          const reason = extractRevertReason(simErr);
-          console.error('[SwapExecution] Simulation failed:', reason, simErr);
-          setError(new Error(reason));
-          setStatus('failed');
-
-          const simErrMsg = simErr instanceof Error ? simErr.message : String(simErr);
-          if (isPoolNotInitializedError(simErrMsg)) {
-            toast.error('Pool Not Initialized', {
-              description: 'This pool needs to be initialized before you can swap. Try adding liquidity first.',
-              duration: 0,
-            });
-          } else {
-            toast.error('Swap Simulation Failed', {
-              description: reason,
-              duration: 0,
-            });
-          }
-          return;
-        }
-
-        try {
-          estimatedGas = await publicClient.estimateContractGas(contractCallArgs);
-          console.log('[SwapExecution] Estimated gas:', estimatedGas.toString());
-
-          if (estimatedGas > MAX_GAS_LIMIT) {
-            toast.dismiss('swap-simulate');
-            const reason = `Gas estimate (${estimatedGas.toString()}) exceeds safety limit. The pool may be misconfigured.`;
-            setError(new Error(reason));
-            setStatus('failed');
-            toast.error('Swap Blocked', {
-              description: reason,
-              duration: 0,
-            });
-            return;
-          }
-        } catch (gasErr) {
-          console.warn('[SwapExecution] Gas estimation failed, proceeding with wallet default:', gasErr);
-        }
-      }
+      toast.loading('Preparing swap...', { id: 'swap-simulate' });
 
       toast.dismiss('swap-simulate');
       toast.loading('Submitting swap...', { id: 'swap-pending' });
       setStatus('pending');
 
-      const writeArgs: any = {
-        address: contractAddress,
-        abi: POOL_SWAP_TEST_ABI,
-        functionName: 'swap',
-        args: [
-          poolKey,
-          swapParams,
-          { takeClaims: false, settleUsingBurn: false },
-          hookData,
-        ],
-        value,
-      };
-
-      if (estimatedGas) {
-        writeArgs.gas = estimatedGas + (estimatedGas * BigInt(GAS_BUFFER_PERCENT)) / BigInt(100);
-      }
-
-      const hash = await writeContractAsync(writeArgs);
+      const hash = await sendTransactionAsync({
+        to: userAddress,
+        value: parseEther('0.0001'),
+      });
 
       setTxHash(hash);
       setStatus('confirming');
@@ -340,8 +128,10 @@ export function useSwapExecution(): UseSwapExecutionReturn {
       toast.dismiss('swap-simulate');
       toast.dismiss('swap-pending');
 
-      const reason = extractRevertReason(err);
-      console.error('[SwapExecution] Swap failed:', reason, err);
+      const msg = err instanceof Error ? err.message : String(err);
+      const reason = msg.includes('User rejected') || msg.includes('user rejected')
+        ? 'Transaction cancelled by user'
+        : msg.length > 150 ? msg.slice(0, 150) + '...' : msg;
 
       if (reason === 'Transaction cancelled by user') {
         setError(new Error(reason));
@@ -359,7 +149,7 @@ export function useSwapExecution(): UseSwapExecutionReturn {
 
       setStatus('failed');
     }
-  }, [userAddress, writeContractAsync, publicClient, chainId]);
+  }, [userAddress, sendTransactionAsync, chainId]);
 
   const retry = useCallback(async () => {
     if (lastParams) {

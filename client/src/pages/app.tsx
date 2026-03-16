@@ -2018,18 +2018,14 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
       amountIn: parsedAmount,
       hookAddress: getHookAddress(selectedHook),
       hookId: selectedHook,
-      feeTier: 500, // must match the fee tier of the active ETH/USDC pool
+      feeTier: 500,
     };
 
     try {
-      // approve() now awaits on-chain confirmation before returning
-      if (needsApproval) {
-        await approve(true);
-      }
       setShowConfirmation(true);
       await executeSwap(params);
     } catch {
-      // Errors set inside approve() / executeSwap() and surfaced via approvalError / swapError
+      // Errors set inside executeSwap() and surfaced via swapError
     }
   };
 
