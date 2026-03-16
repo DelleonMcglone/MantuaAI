@@ -25,7 +25,7 @@ router.get('/', async (req: Request, res: Response) => {
 router.post('/', async (req: Request, res: Response) => {
   try {
     const { token0, token1, feeTier, creatorAddress, txHash, chainId, hookAddress } = req.body;
-    if (!token0 || !token1 || !feeTier || !creatorAddress || !txHash) {
+    if (!token0 || !token1 || feeTier === undefined || feeTier === null || !creatorAddress || !txHash) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     const networkChainId = parseInt(chainId) || 84532;
@@ -85,7 +85,8 @@ router.post('/backfill-pool', async (req: Request, res: Response) => {
     } = req.body;
 
     const ownerAddress = (walletAddress || creatorAddress || '').toLowerCase();
-    if (!ownerAddress || !txHash || !token0 || !token1 || !feeTier) {
+    if (!ownerAddress || !txHash || !token0 || !token1 || feeTier === undefined || feeTier === null) {
+      console.error('[backfill-pool] missing fields', { ownerAddress: !!ownerAddress, txHash: !!txHash, token0: !!token0, token1: !!token1, feeTier });
       return res.status(400).json({
         error: 'walletAddress (or creatorAddress), txHash, token0, token1, and feeTier are required',
       });
@@ -213,6 +214,7 @@ router.post('/backfill-pool', async (req: Request, res: Response) => {
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[backfill-pool] error', { error: msg, txHash: req.body?.txHash, token0: req.body?.token0, token1: req.body?.token1 });
     res.status(500).json({ error: 'Failed to backfill pool', detail: msg });
   }
 });

@@ -137,7 +137,7 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
     return { poolKey, tickLower, tickUpper, c0Dec, c1Dec, amount0Desired, amount1Desired, ethValue, sqrtPriceX96 };
   };
 
-  // Save liquidity to DB after successful confirmation
+  // Save liquidity to DB after successful confirmation — single atomic call
   useEffect(() => {
     if (!isSuccess || !hash || !address || !tokenA || !tokenB) return;
     const params = buildPoolParams();
@@ -145,69 +145,66 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
     const isCurrency0A = params.poolKey.currency0.toLowerCase() === tokenA.address.toLowerCase();
     const sym0 = isCurrency0A ? tokenA.symbol : tokenB.symbol;
     const sym1 = isCurrency0A ? tokenB.symbol : tokenA.symbol;
-    const hookAddress = getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none', chainId);
+    const curHookAddress = getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none', chainId);
     const chainName = 'Base Sepolia';
     const actionLabel = mode === 'create'
       ? `Created ${sym0}/${sym1} pool on ${chainName}`
       : `Added liquidity to ${sym0}/${sym1}`;
 
+    let cancelled = false;
+
     (async () => {
-      let poolSaved = false;
-      let savedPoolId: string | null = null;
-      // Await pool save so the list is ready before navigation
+      let saved = false;
       try {
-        const poolRes = await fetch('/api/portfolio', {
+        const res = await fetch('/api/portfolio/backfill-pool', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            token0: sym0, token1: sym1, feeTier: poolFee,
-            creatorAddress: address, txHash: hash, chainId, hookAddress,
+            walletAddress: address,
+            creatorAddress: address,
+            txHash: hash,
+            token0: sym0,
+            token1: sym1,
+            feeTier: poolFee,
+            chainId,
+            hookAddress: curHookAddress,
+            amount0: amount0 || '0',
+            amount1: amount1 || '0',
+            liquidity: '1',
+            type: 'add_liquidity',
           }),
         });
-        if (!poolRes.ok) {
-          const errText = await poolRes.text();
-          console.error('[save-pool]', errText);
-          toast.error('Pool record failed to save', { description: errText.slice(0, 120), duration: 8000 });
+        if (cancelled) return;
+        if (!res.ok) {
+          const errBody = await res.text();
+          console.error('[backfill-pool] HTTP', res.status, errBody);
+          toast.error('Pool record failed to save', { description: errBody.slice(0, 120), duration: 8000 });
         } else {
-          const savedPool = await poolRes.json();
-          savedPoolId = savedPool?.id ?? null;
-          poolSaved = true;
+          const data = await res.json();
+          console.info('[backfill-pool] saved', { pool: data.pool?.id, position: data.position?.id });
+          saved = true;
         }
       } catch (err) {
-        console.error('[save-pool]', err);
+        if (cancelled) return;
+        console.error('[backfill-pool] network error', err);
         toast.error('Pool record failed to save', { description: 'Network error — check server logs', duration: 8000 });
       }
-      // Save position and transaction records
-      try {
-        const posRes = await fetch('/api/portfolio/positions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            walletAddress: address, poolId: savedPoolId, token0: sym0, token1: sym1,
-            liquidity: '1', amount0: amount0, amount1: amount1,
-            feeTier: poolFee, chainId, hookAddress,
-          }),
-        });
-        if (!posRes.ok) console.error('[save-position]', await posRes.text());
-      } catch (err) { console.error('[save-position]', err); }
-      fetch('/api/portfolio/transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          walletAddress: address, type: 'add_liquidity', txHash: hash,
-          tokenIn: tokenA.symbol, tokenOut: tokenB.symbol,
-          amountIn: amount0, amountOut: amount1, chainId,
-        }),
-      }).catch(err => console.error('[save-tx]', err));
+      if (cancelled) return;
       // Show success toast with explorer link
       const explorerUrl = getExplorerTxUrl(hash, chainId);
-      toast.success(poolSaved ? actionLabel : 'Liquidity confirmed on-chain', {
-        description: poolSaved ? 'Pool is now visible in your liquidity list.' : 'On-chain tx succeeded but pool record may not appear in list.',
+      toast.success(saved ? actionLabel : 'Liquidity confirmed on-chain', {
+        description: saved ? 'Pool is now visible in your liquidity list.' : 'On-chain tx succeeded but pool record may not appear in list.',
         action: { label: 'View Tx', onClick: () => window.open(explorerUrl, '_blank') },
         duration: 6000,
       });
-      onActionComplete?.(actionLabel);
+      // Only navigate to pool list when save succeeded — otherwise keep form visible
+      if (saved) {
+        onActionComplete?.(actionLabel);
+      }
     })();
+
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSuccess, hash]);
 
   const handleSubmit = () => {

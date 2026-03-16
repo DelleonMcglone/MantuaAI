@@ -495,6 +495,7 @@ export function useAddLiquidity() {
               hooks:       poolKey.hooks,
             },
             currentSqrtPrice,
+            '0x', // hookData — empty bytes for standard initialization
           ],
         });
         const modifyData = encodeFunctionData({
