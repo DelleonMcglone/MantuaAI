@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect } from 'react';
-import { Moon, Sun, ChevronDown, Zap, Bot, Shield, Coins, BarChart3, Lock } from 'lucide-react';
+import { Moon, Sun, ChevronDown, Bot, Shield, Coins, BarChart3 } from 'lucide-react';
 import logoWhite from '@assets/Mantua_logo_white_1768946648374.png';
 import logoBlack from '@assets/Mantua_logo_black_1768946648374.png';
 
@@ -39,10 +39,8 @@ const themes = {
 const FEATURES = [
   { icon: Shield, title: 'Stable Protection Hook', description: 'A Uniswap v4 hook that dynamically adjusts swap fees across five depeg zones to protect stablecoin LPs from adverse selection. Fees scale from 0.05% in healthy conditions to 1% during severe depeg, with a circuit breaker for extreme events.', status: 'Live', statusColor: '#22c55e' },
   { icon: Bot, title: 'AI Agents', description: 'Autonomous AI agents that manage trading and liquidity strategies collaboratively or independently, executing on-chain actions through natural-language commands.', status: 'Live', statusColor: '#22c55e' },
-  { icon: Zap, title: 'Hook Verification', description: 'Trustless hook verification that ensures deployed Uniswap v4 hooks are audited, permissioned, and behaving exactly as intended before liquidity or volume flows through them.', status: 'Live', statusColor: '#22c55e' },
   { icon: Coins, title: 'Portfolio Management', description: 'Unified portfolio tracking and analytics for users and agents, with real-time performance insights and on-chain position management.', status: 'Live', statusColor: '#22c55e' },
   { icon: BarChart3, title: 'Analytics', description: 'Real-time on-chain analytics delivering actionable blockchain insights across markets and liquidity.', status: 'Live', statusColor: '#22c55e' },
-  { icon: Lock, title: 'Secure by Design', description: 'Security-first architecture built on battle-tested Uniswap infrastructure, with audited contracts and transparent on-chain operations.', status: 'Live', statusColor: '#22c55e' },
 ];
 
 const FAQ_DATA = [
@@ -120,6 +118,8 @@ export default function MantuaLanding() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap');
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        .features-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+        @media (max-width: 768px) { .features-grid { grid-template-columns: 1fr; } }
         @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
@@ -165,7 +165,7 @@ export default function MantuaLanding() {
 
       {/* Features */}
       <section style={{ padding: '80px 40px', maxWidth: 1200, margin: '0 auto' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 24 }}>
+        <div className="features-grid">
           {FEATURES.map((f, i) => <FeatureCard key={i} feature={f} theme={theme} index={i} />)}
         </div>
       </section>
