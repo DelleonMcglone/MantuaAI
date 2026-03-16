@@ -197,10 +197,8 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
         action: { label: 'View Tx', onClick: () => window.open(explorerUrl, '_blank') },
         duration: 6000,
       });
-      // Only navigate to pool list when save succeeded — otherwise keep form visible
-      if (saved) {
-        onActionComplete?.(actionLabel);
-      }
+      // Always navigate back — the on-chain tx succeeded; toast already shows save status
+      onActionComplete?.(actionLabel);
     })();
 
     return () => { cancelled = true; };
