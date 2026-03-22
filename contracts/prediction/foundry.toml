@@ -9,9 +9,7 @@ optimizer_runs = 200
 ffi = false
 
 [rpc_endpoints]
-base_sepolia     = "${BASE_SEPOLIA_RPC_URL}"
-unichain_sepolia = "${UNICHAIN_SEPOLIA_RPC_URL}"
+base_sepolia = "${BASE_SEPOLIA_RPC_URL}"
 
 [etherscan]
-base_sepolia     = { key = "${BASESCAN_API_KEY}", url = "https://api-sepolia.basescan.org/api" }
-unichain_sepolia = { key = "${UNISCAN_API_KEY}",  url = "https://unichain-sepolia.blockscout.com/api" }
+base_sepolia = { key = "${BASESCAN_API_KEY}", url = "https://api-sepolia.basescan.org/api" }

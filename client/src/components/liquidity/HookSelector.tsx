@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { CloseIcon, StarIcon, CheckIcon, CodeIcon, ChevronUpIcon, ChevronDownIcon } from '../icons';
+import React from 'react';
+import { CloseIcon, StarIcon, CheckIcon } from '../icons';
 
 interface HookSelectorProps {
   isOpen: boolean;
@@ -12,8 +12,6 @@ interface HookSelectorProps {
 }
 
 const HookSelector: React.FC<HookSelectorProps> = ({ isOpen, onClose, hooks, selectedHook, onSelect, theme, isDark }) => {
-  const [customAddress, setCustomAddress] = useState('');
-  const [showCustomInput, setShowCustomInput] = useState(false);
 
   if (!isOpen) return null;
 
@@ -147,141 +145,6 @@ const HookSelector: React.FC<HookSelectorProps> = ({ isOpen, onClose, hooks, sel
                 </div>
               </button>
             ))}
-          </div>
-          
-          {/* Custom Hook Section */}
-          <div style={{ marginTop: '20px' }}>
-            <button 
-              onClick={() => setShowCustomInput(!showCustomInput)}
-              style={{ 
-                width: '100%',
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
-                padding: '16px',
-                borderRadius: '12px',
-                border: showCustomInput 
-                  ? '2px solid #8b5cf6'
-                  : `1px solid ${theme.border}`,
-                background: showCustomInput 
-                  ? (isDark ? 'rgba(139, 92, 246, 0.1)' : 'rgba(139, 92, 246, 0.05)') 
-                  : 'transparent',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                color: theme.textPrimary
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '10px',
-                  background: showCustomInput ? 'rgba(139, 92, 246, 0.2)' : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'),
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: showCustomInput ? '#8b5cf6' : theme.textSecondary,
-                }}>
-                  <CodeIcon />
-                </div>
-                <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontWeight: '600', fontSize: '15px', color: theme.textPrimary }}>Custom Hook Address</div>
-                  <div style={{ fontSize: '13px', color: theme.textSecondary }}>Use your own deployed hook contract</div>
-                </div>
-              </div>
-              {showCustomInput ? <ChevronUpIcon /> : <ChevronDownIcon />}
-            </button>
-
-            {showCustomInput && (
-              <div style={{ 
-                marginTop: '12px', 
-                padding: '20px', 
-                background: theme.bgCard,
-                border: `1px solid ${theme.border}`,
-                borderRadius: '12px',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.05)'
-              }}>
-                <input 
-                  type="text" 
-                  placeholder="Enter hook contract address (0x...)"
-                  value={customAddress}
-                  onChange={(e) => setCustomAddress(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '14px',
-                    borderRadius: '10px',
-                    border: `1px solid ${theme.border}`,
-                    background: theme.bgSecondary,
-                    color: theme.textPrimary,
-                    fontSize: '14px',
-                    fontFamily: 'SF Mono, Monaco, monospace',
-                    marginBottom: '12px',
-                    outline: 'none'
-                  }}
-                />
-                
-                <button style={{
-                  width: '100%',
-                  padding: '12px',
-                  borderRadius: '10px',
-                  background: theme.bgSecondary,
-                  border: 'none',
-                  color: theme.textSecondary,
-                  fontWeight: '600',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  marginBottom: '20px'
-                }}>
-                  Validate Address
-                </button>
-
-                <div style={{ fontSize: '11px', color: theme.textSecondary, fontWeight: '600', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.5px' }}>
-                  Recent Custom Hooks
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
-                  <div style={{ 
-                    padding: '12px', 
-                    borderRadius: '10px', 
-                    border: `1px solid ${theme.border}`, 
-                    background: theme.bgCard,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    cursor: 'pointer'
-                  }}>
-                    <div>
-                      <div style={{ fontSize: '14px', fontWeight: '500', color: theme.textPrimary }}>TWAMM Hook</div>
-                      <div style={{ fontSize: '12px', color: theme.textSecondary, fontFamily: 'monospace' }}>0x1234...5678</div>
-                    </div>
-                    <div style={{ fontSize: '12px', color: theme.textMuted }}>2 days ago</div>
-                  </div>
-                </div>
-
-                <button 
-                  onClick={() => {
-                    if (customAddress) {
-                      onSelect('custom');
-                      onClose();
-                    }
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '14px',
-                    borderRadius: '12px',
-                    background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
-                    border: 'none',
-                    color: 'white',
-                    fontWeight: '600',
-                    fontSize: '15px',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)'
-                  }}
-                >
-                  Apply Hook Selection
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>

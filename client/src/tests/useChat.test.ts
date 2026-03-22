@@ -112,7 +112,7 @@ describe("useChat — sendMessage", () => {
     expect(msgs.some((m) => m.role === "assistant")).toBe(true);
   });
 
-  it("removes optimistic message on API error and shows toast", async () => {
+  it("replaces failed sends with a visible assistant error and shows toast", async () => {
     const { toast } = await import("../hooks/use-toast");
     localStorageMock.setItem("mantua_user_id", "user-4");
     global.fetch = vi.fn()
@@ -128,7 +128,9 @@ describe("useChat — sendMessage", () => {
       await result.current.sendMessage("fail message");
     });
 
-    expect(result.current.messages.length).toBe(initialCount);
+    expect(result.current.messages.length).toBe(initialCount + 1);
+    expect(result.current.messages.at(-1)?.role).toBe("assistant");
+    expect(result.current.messages.at(-1)?.content).toContain("I couldn't complete that request");
     expect(toast).toHaveBeenCalled();
   });
 

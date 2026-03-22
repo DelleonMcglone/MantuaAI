@@ -10,6 +10,9 @@ import { usePoolState } from '../../hooks/usePoolState';
 import { createPoolKey, getHookAddress, isNativeEth } from '../../lib/swap-utils';
 import { LiquidityTokenInput } from './LiquidityTokenInput';
 import { getExplorerTxUrl } from '../../config/contracts';
+import { isStablePair, CHAIN_NAMES } from '../../config/stablePairs';
+import { useWalletBalances } from '../../hooks/useWalletBalances';
+import { toast } from 'sonner';
 
 type RangeType = 'Full Range' | 'Wide' | 'Narrow' | 'Custom';
 const RANGE_TICKS: Record<RangeType, { tickLower: number; tickUpper: number }> = {
@@ -49,11 +52,17 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
   const [range, setRange] = useState<RangeType>('Full Range');
   const { isConnected, address } = useAccount();
   const chainId = useChainId();
+  const { getBalance } = useWalletBalances(address as `0x${string}` | undefined);
   const { addLiquidity, isPending, isConfirming, step, totalSteps, stepLabel, isSuccess, error, hash, reset } = useAddLiquidity();
-  const hookAddr = getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none');
+  const hookAddr = getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none', chainId);
   // Stable Protection hook requires DYNAMIC_FEE_FLAG (0x800000) and tickSpacing=1
   const poolFee = selectedHook === 'stable-protection' ? 0x800000 : 500;
   const poolState = usePoolState(tokenA?.address, tokenB?.address, poolFee, hookAddr);
+
+  // Stable pair validation
+  const hookIsStableProtection = selectedHook === 'stable-protection';
+  const pairIsStable = tokenA && tokenB ? isStablePair(chainId, tokenA.symbol, tokenB.symbol) : false;
+  const showStableWarning = hookIsStableProtection && tokenA && tokenB && !pairIsStable;
 
   const { price: priceALive } = useLivePriceUSD(tokenA?.symbol ?? '');
   const { price: priceBLive } = useLivePriceUSD(tokenB?.symbol ?? '');
@@ -62,6 +71,23 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
 
   const parsedAmount0 = parseFloat(amount0) || 0;
   const parsedAmount1 = parseFloat(amount1) || 0;
+
+  // Format balances for display in token inputs
+  const balanceA = useMemo(() => {
+    if (!tokenA) return '0.00';
+    const bal = getBalance(tokenA.symbol);
+    if (!bal) return '0.00';
+    const num = parseFloat(bal.formatted);
+    return isNaN(num) ? '0.00' : num.toFixed(4);
+  }, [tokenA, getBalance]);
+
+  const balanceB = useMemo(() => {
+    if (!tokenB) return '0.00';
+    const bal = getBalance(tokenB.symbol);
+    if (!bal) return '0.00';
+    const num = parseFloat(bal.formatted);
+    return isNaN(num) ? '0.00' : num.toFixed(4);
+  }, [tokenB, getBalance]);
 
   const rawAmount0 = useMemo(() => {
     if (!tokenA || parsedAmount0 <= 0) return BigInt(0);
@@ -88,12 +114,12 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
       setAmount0((parseFloat(val) * priceB / priceA).toFixed(6));
   };
 
-  const canSubmit = isConnected && !!tokenA && !!tokenB && parsedAmount0 > 0 && parsedAmount1 > 0;
+  const canSubmit = isConnected && !!tokenA && !!tokenB && parsedAmount0 > 0 && parsedAmount1 > 0 && !showStableWarning;
 
   const buildPoolParams = () => {
     if (!tokenA || !tokenB) return null;
     const { tickLower, tickUpper } = RANGE_TICKS[range];
-    const poolKey = createPoolKey(tokenA.address, tokenB.address, poolFee, getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none'));
+    const poolKey = createPoolKey(tokenA.address, tokenB.address, poolFee, getHookAddress(HOOK_ID_MAP[selectedHook] ?? 'none', chainId));
     const isCurrency0A = poolKey.currency0.toLowerCase() === tokenA.address.toLowerCase();
     const c0Dec = isCurrency0A ? tokenA.decimals : tokenB.decimals;
     const c1Dec = isCurrency0A ? tokenB.decimals : tokenA.decimals;
@@ -111,7 +137,9 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
     return { poolKey, tickLower, tickUpper, c0Dec, c1Dec, amount0Desired, amount1Desired, ethValue, sqrtPriceX96 };
   };
 
-  // Save liquidity to DB after successful confirmation
+  // Save pool after successful on-chain confirmation.
+  // Always persist to localStorage first so the pool is guaranteed to appear in the list,
+  // then attempt DB save in the background.
   useEffect(() => {
     if (!isSuccess || !hash || !address || !tokenA || !tokenB) return;
     const params = buildPoolParams();
@@ -124,37 +152,61 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
       ? `Created ${sym0}/${sym1} pool on ${chainName}`
       : `Added liquidity to ${sym0}/${sym1}`;
 
-    (async () => {
-      // Await pool save so the list is ready before navigation
-      await fetch('/api/portfolio', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token0: sym0, token1: sym1, feeTier: poolFee,
-          creatorAddress: address, txHash: hash, chainId, hookAddress,
-        }),
-      }).catch(() => {});
-      // Fire-and-forget secondary records
-      fetch('/api/portfolio/transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          walletAddress: address, type: 'add_liquidity', txHash: hash,
-          tokenIn: tokenA.symbol, tokenOut: tokenB.symbol,
-          amountIn: amount0, amountOut: amount1, chainId,
-        }),
-      }).catch(() => {});
-      fetch('/api/portfolio/positions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          walletAddress: address, token0: sym0, token1: sym1,
-          liquidity: '1', amount0: amount0, amount1: amount1,
-          feeTier: poolFee, chainId,
-        }),
-      }).catch(() => {});
-      onActionComplete?.(actionLabel);
-    })();
+    // Persist to localStorage immediately — guarantees pool appears in list
+    try {
+      const LS_KEY = 'mantua_pending_pools';
+      const pending = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
+      const poolRecord = {
+        id: `local-${hash}`,
+        token0: sym0,
+        token1: sym1,
+        fee_tier: poolFee,
+        creator_address: address.toLowerCase(),
+        tx_hash: hash,
+        chain_id: chainId || 84532,
+        hook_address: hookAddress,
+        created_at: new Date().toISOString(),
+      };
+      if (!pending.some((p: any) => p.tx_hash === hash)) {
+        pending.push(poolRecord);
+        localStorage.setItem(LS_KEY, JSON.stringify(pending));
+      }
+    } catch (e) {
+      console.warn('[pending-pools] localStorage write failed', e);
+    }
+
+    // Show success toast immediately — no waiting for DB
+    const explorerUrl = getExplorerTxUrl(hash, chainId);
+    toast.success(actionLabel, {
+      description: 'Pool is now visible in your liquidity list.',
+      action: { label: 'View Tx', onClick: () => window.open(explorerUrl, '_blank') },
+      duration: 6000,
+    });
+    onActionComplete?.(actionLabel);
+
+    // Best-effort DB save in background
+    fetch('/api/portfolio/backfill-pool', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        walletAddress: address,
+        creatorAddress: address,
+        txHash: hash,
+        token0: sym0,
+        token1: sym1,
+        feeTier: poolFee,
+        chainId,
+        hookAddress: hookAddress,
+        amount0: amount0 || '0',
+        amount1: amount1 || '0',
+        liquidity: '1',
+        type: 'add_liquidity',
+      }),
+    })
+      .then(res => res.ok ? res.json() : Promise.reject(res.status))
+      .then(data => console.info('[backfill-pool] saved', { pool: data.pool?.id, position: data.position?.id }))
+      .catch(err => console.warn('[backfill-pool] DB save failed (pool still visible via localStorage)', err));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSuccess, hash]);
 
   const handleSubmit = () => {
@@ -192,13 +244,13 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
       </div>
 
       <div style={{ position: 'relative', marginBottom: '12px' }}>
-        <LiquidityTokenInput token={tokenA} amount={amount0} onAmountChange={handleAmount0Change} onTokenClick={onTokenAClick} priceUsd={priceA} side="Token A" theme={theme} isDark={isDark} />
+        <LiquidityTokenInput token={tokenA} amount={amount0} onAmountChange={handleAmount0Change} onTokenClick={onTokenAClick} priceUsd={priceA} balance={balanceA} side="Token A" theme={theme} isDark={isDark} />
         <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 10 }}>
           <div style={{ width: '36px', height: '36px', borderRadius: '10px', border: `4px solid ${theme.bgCard}`, background: theme.bgSecondary, color: theme.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
             <ArrowLeftRightIcon />
           </div>
         </div>
-        <LiquidityTokenInput token={tokenB} amount={amount1} onAmountChange={handleAmount1Change} onTokenClick={onTokenBClick} priceUsd={priceB} side="Token B" theme={theme} isDark={isDark} />
+        <LiquidityTokenInput token={tokenB} amount={amount1} onAmountChange={handleAmount1Change} onTokenClick={onTokenBClick} priceUsd={priceB} balance={balanceB} side="Token B" theme={theme} isDark={isDark} />
       </div>
 
       <div style={{ marginBottom: '12px' }}>
@@ -248,8 +300,23 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
         </div>
       )}
 
+      {/* Stable pair warning — shown when hook is stable-protection but pair is not stable */}
+      {showStableWarning && (
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '12px', borderRadius: '12px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', marginBottom: '12px' }}>
+          <span style={{ color: '#f59e0b', fontSize: '14px', marginTop: '1px' }}>&#9888;&#65039;</span>
+          <div>
+            <div style={{ fontSize: '13px', fontWeight: '600', color: '#f59e0b' }}>Not a stable pair</div>
+            <div style={{ fontSize: '12px', color: '#d97706', marginTop: '2px', lineHeight: '1.4' }}>
+              The Stable Protection Hook is designed for stable pairs only.{' '}
+              {tokenA?.symbol}/{tokenB?.symbol} is not a recognized stable pair on Base Sepolia.
+              {' '}Valid pairs on Base Sepolia: USDC/EURC.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Stable Protection Hook Panel — shown when stable hook is selected */}
-      {selectedHook === 'stable-protection' && (
+      {selectedHook === 'stable-protection' && !showStableWarning && (
         <div style={{ marginBottom: '12px', padding: '12px 16px', borderRadius: '12px', background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             <span style={{ color: '#10b981', fontWeight: '700', fontSize: '13px' }}>Stable Protection Hook</span>
@@ -257,27 +324,34 @@ export const AddLiquidityForm: React.FC<AddLiquidityFormProps> = ({
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
             <div style={{ padding: '8px 10px', borderRadius: '8px', background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }}>
-              <div style={{ color: theme.textMuted, fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Base Fee</div>
-              <div style={{ color: theme.textPrimary, fontWeight: '700', fontSize: '14px' }}>0.05%</div>
+              <div style={{ color: theme.textMuted, fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Base Fee (Healthy)</div>
+              <div style={{ color: theme.textPrimary, fontWeight: '700', fontSize: '14px' }}>1 bps</div>
             </div>
             <div style={{ padding: '8px 10px', borderRadius: '8px', background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }}>
-              <div style={{ color: theme.textMuted, fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Dynamic Fee</div>
-              <div style={{ color: '#10b981', fontWeight: '700', fontSize: '14px' }}>0.05% <span style={{ color: theme.textMuted, fontWeight: '400', fontSize: '10px' }}>now</span></div>
+              <div style={{ color: theme.textMuted, fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '3px' }}>Dynamic A (Healthy)</div>
+              <div style={{ color: '#10b981', fontWeight: '700', fontSize: '14px' }}>100% of A</div>
             </div>
           </div>
-          <div style={{ fontSize: '11px', color: theme.textSecondary, marginBottom: '8px', fontWeight: '600' }}>Fee Schedule by Depeg Zone</div>
+          <div style={{ fontSize: '11px', color: theme.textSecondary, marginBottom: '6px', fontWeight: '600' }}>Fee Schedule by Depeg Zone</div>
+          {/* Table header */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr 0.8fr 0.9fr 1.1fr', gap: '4px', padding: '3px 6px', marginBottom: '2px' }}>
+            {['Zone', 'Threshold', 'Base Fee', 'Dynamic A', 'Behaviour'].map(h => (
+              <span key={h} style={{ color: theme.textMuted, fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</span>
+            ))}
+          </div>
           {[
-            { zone: 'HEALTHY',  range: '0–0.2%',   fee: '0.05%', color: '#10b981', active: true },
-            { zone: 'MINOR',    range: '0.2–0.5%', fee: '0.10%', color: '#f59e0b', active: false },
-            { zone: 'MODERATE', range: '0.5–1%',   fee: '0.30%', color: '#f97316', active: false },
-            { zone: 'SEVERE',   range: '1–2%',     fee: '0.50%', color: '#ef4444', active: false },
-            { zone: 'CRITICAL', range: '>2%',      fee: '1.00%', color: '#7f1d1d', active: false },
+            { zone: 'HEALTHY',  threshold: '≤ 0.10% (10 bps)',   baseFee: '1 bps',  dynamicA: '100% of A', behaviour: 'Normal trading', color: '#10b981', active: true },
+            { zone: 'MINOR',    threshold: '≤ 0.50% (50 bps)',   baseFee: '5 bps',  dynamicA: '80% of A',  behaviour: 'Mild stress',    color: '#f59e0b', active: false },
+            { zone: 'MODERATE', threshold: '≤ 2.00% (200 bps)',  baseFee: '15 bps', dynamicA: '50% of A',  behaviour: 'Elevated risk',  color: '#f97316', active: false },
+            { zone: 'SEVERE',   threshold: '≤ 5.00% (500 bps)',  baseFee: '50 bps', dynamicA: '25% of A',  behaviour: 'High risk',      color: '#ef4444', active: false },
+            { zone: 'CRITICAL', threshold: '> 5.00% (500 bps)',  baseFee: '—',      dynamicA: '10% of A',  behaviour: 'Swaps blocked',  color: '#7f1d1d', active: false },
           ].map(row => (
-            <div key={row.zone} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 6px', borderRadius: '6px', marginBottom: '2px', background: row.active ? 'rgba(16,185,129,0.1)' : 'transparent' }}>
-              <span style={{ color: row.color, fontWeight: row.active ? '700' : '500', fontSize: '11px' }}>{row.zone}</span>
-              <span style={{ color: theme.textMuted, fontSize: '11px' }}>{row.range}</span>
-              <span style={{ color: theme.textPrimary, fontWeight: '600', fontSize: '11px' }}>{row.fee}</span>
-              {row.active && <span style={{ fontSize: '9px', color: '#10b981', fontWeight: '700' }}>◀ NOW</span>}
+            <div key={row.zone} style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr 0.8fr 0.9fr 1.1fr', gap: '4px', alignItems: 'center', padding: '4px 6px', borderRadius: '6px', marginBottom: '2px', background: row.active ? 'rgba(16,185,129,0.1)' : 'transparent' }}>
+              <span style={{ color: row.color, fontWeight: row.active ? '700' : '600', fontSize: '10px' }}>{row.zone}</span>
+              <span style={{ color: theme.textMuted, fontSize: '10px' }}>{row.threshold}</span>
+              <span style={{ color: theme.textPrimary, fontWeight: '600', fontSize: '10px' }}>{row.baseFee}</span>
+              <span style={{ color: theme.textSecondary, fontSize: '10px' }}>{row.dynamicA}</span>
+              <span style={{ color: row.zone === 'CRITICAL' ? row.color : theme.textSecondary, fontWeight: row.zone === 'CRITICAL' ? '700' : '400', fontSize: '10px' }}>{row.behaviour}</span>
             </div>
           ))}
           <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: `1px solid rgba(16,185,129,0.15)`, display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>

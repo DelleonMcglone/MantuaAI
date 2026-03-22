@@ -50,10 +50,10 @@ The system follows a modular architecture with clear separation of concerns:
 **Frontend Application**
 - React / TypeScript with wagmi and Reown AppKit (WalletConnect)
 - Swap, liquidity, portfolio, and agent interfaces
-- Chain selector supporting Base Sepolia and Unichain Sepolia
+- Chain selector supporting Base Sepolia
 
 **Sepolia Networks**
-- Deployed on Unichain Sepolia
+- Deployed on Base Sepolia
 - Deployed on Base Sepolia
 
 ### Hook Parameters
@@ -165,19 +165,19 @@ source .env
 
 # 2. Deploy Stable Protection Hook
 forge script script/00_DeployStableProtectionHook.s.sol \
-  --rpc-url $UNICHAIN_SEPOLIA_RPC --broadcast --verify
+  --rpc-url $BASE_SEPOLIA_RPC --broadcast --verify
 
 # 3. Create pool with hook
 forge script script/01_CreatePool.s.sol \
-  --rpc-url $UNICHAIN_SEPOLIA_RPC --broadcast
+  --rpc-url $BASE_SEPOLIA_RPC --broadcast
 
 # 4. Add initial liquidity
 forge script script/02_AddLiquidity.s.sol \
-  --rpc-url $UNICHAIN_SEPOLIA_RPC --broadcast
+  --rpc-url $BASE_SEPOLIA_RPC --broadcast
 
 # 5. Test swap execution
 forge script script/03_Swap.s.sol \
-  --rpc-url $UNICHAIN_SEPOLIA_RPC --broadcast
+  --rpc-url $BASE_SEPOLIA_RPC --broadcast
 ```
 
 ### Testnet Contract Addresses
@@ -186,9 +186,6 @@ forge script script/03_Swap.s.sol \
 
 | Contract | Network | Address |
 |---|---|---|
-| Unichain PoolManager | Unichain Sepolia | `0x00b036b58a818b1bc34d502d3fe730db729e62ac` |
-| PoolSwapTest | Unichain Sepolia | `0x9140a78c1a137c7ff1c151ec8231272af78a99a4` |
-| PoolModifyLiquidityTest | Unichain Sepolia | `0x5fa728c0a5cfd51bee4b060773f50554c0c8a7ab` |
 | Mock Token Faucet | Base Sepolia | `0xaa0D98c815C3003d35E571fD51C65d7F92391883` |
 
 ---
@@ -198,7 +195,6 @@ forge script script/03_Swap.s.sol \
 | Network | Chain ID | Explorer |
 |---|---|---|
 | Base Sepolia | 84532 | [BaseScan](https://sepolia.basescan.org) |
-| Unichain Sepolia | 1301 | [Uniscan](https://sepolia.uniscan.xyz) |
 
 ---
 

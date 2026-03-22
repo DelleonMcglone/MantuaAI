@@ -11,14 +11,17 @@ export interface ClassifiedQuery {
 
 const VALID_TOKENS = new Set(['ETH', 'CBBTC', 'USDC', 'EURC']);
 
+const normalizeTokenKey = (value: string): string =>
+  value.toLowerCase().replace(/[^a-z]/g, '');
+
 const normalizeTokenSymbol = (sym: string): string => {
-  const upper = sym.toUpperCase();
+  const key = normalizeTokenKey(sym);
   // Normalize common aliases to our supported tokens
-  if (upper === 'CBBTC' || upper === 'BTC' || upper === 'WBTC') return 'cbBTC';
-  if (upper === 'ETH' || upper === 'WETH') return 'ETH';
-  if (upper === 'USDC' || upper === 'USD') return 'USDC';
-  if (upper === 'EURC' || upper === 'EUR') return 'EURC';
-  return upper;
+  if (key === 'cbbtc' || key === 'btc' || key === 'wbtc' || key === 'coinbasebtc' || key === 'coinbasewrappedbtc') return 'cbBTC';
+  if (key === 'eth' || key === 'weth' || key === 'ether' || key === 'ethereum') return 'ETH';
+  if (key === 'usdc' || key === 'usd' || key === 'usdcoin') return 'USDC';
+  if (key === 'eurc' || key === 'eur' || key === 'euro' || key === 'eurocoin') return 'EURC';
+  return sym.toUpperCase();
 };
 
 const extractHookFromMessage = (msg: string): string => {
@@ -27,10 +30,20 @@ const extractHookFromMessage = (msg: string): string => {
   return '';
 };
 
-const KNOWN_TOKENS_LOWER = ['eth', 'usdc', 'eurc', 'cbbtc', 'btc', 'wbtc', 'weth', 'usd', 'eur'];
+const KNOWN_TOKENS_LOWER = ['eth', 'ether', 'ethereum', 'usdc', 'usdcoin', 'eurc', 'euro', 'eurocoin', 'cbbtc', 'btc', 'wbtc', 'weth', 'usd', 'eur', 'coinbasebtc', 'coinbasewrappedbtc'];
+
+const canonicalizeTokenMentions = (msg: string): string => {
+  return msg
+    .replace(/\bcb[\s-]?btc\b/gi, 'cbBTC')
+    .replace(/\bcoinbase[\s-]?(?:wrapped\s+)?btc\b/gi, 'cbBTC')
+    .replace(/\beth(?:ereum)?\b/gi, 'ETH')
+    .replace(/\busd\s+coin\b/gi, 'USDC')
+    .replace(/\beuro\s+coin\b/gi, 'EURC');
+};
 
 const extractPoolFromMessage = (msg: string) => {
-  const poolMatch = msg.match(/([a-zA-Z0-9]+)\/([a-zA-Z0-9]+)/);
+  const canonical = canonicalizeTokenMentions(msg);
+  const poolMatch = canonical.match(/([a-zA-Z0-9]+)\/([a-zA-Z0-9]+)/);
   if (poolMatch) {
     const tokenA = normalizeTokenSymbol(poolMatch[1]);
     const tokenB = normalizeTokenSymbol(poolMatch[2]);
@@ -42,11 +55,11 @@ const extractPoolFromMessage = (msg: string) => {
     };
   }
 
-  const amountTokenPattern = /\$?\d+\.?\d*\s*([a-zA-Z]+)/g;
+  const amountTokenPattern = /\$?\d+\.?\d*\s*([a-zA-Z-]+)/g;
   const amountTokens: string[] = [];
   let m;
-  while ((m = amountTokenPattern.exec(msg)) !== null) {
-    const sym = m[1].toLowerCase();
+  while ((m = amountTokenPattern.exec(canonical)) !== null) {
+    const sym = normalizeTokenKey(m[1]);
     if (KNOWN_TOKENS_LOWER.includes(sym)) amountTokens.push(normalizeTokenSymbol(m[1]));
   }
   if (amountTokens.length >= 2) {
@@ -58,10 +71,10 @@ const extractPoolFromMessage = (msg: string) => {
     };
   }
 
-  const words = msg.replace(/[^a-zA-Z\s]/g, ' ').split(/\s+/);
+  const words = canonical.replace(/[^a-zA-Z\s-]/g, ' ').split(/\s+/);
   const foundTokens: string[] = [];
   for (const w of words) {
-    if (KNOWN_TOKENS_LOWER.includes(w.toLowerCase()) && foundTokens.length < 2) {
+    if (KNOWN_TOKENS_LOWER.includes(normalizeTokenKey(w)) && foundTokens.length < 2) {
       const normalized = normalizeTokenSymbol(w);
       if (!foundTokens.includes(normalized)) foundTokens.push(normalized);
     }
@@ -83,8 +96,8 @@ const extractSwapParams = (msg: string) => {
   if (match) {
     return {
       fromAmount: match[1] || '',
-      fromToken: match[2]?.toUpperCase() || '',
-      toToken: match[3]?.toUpperCase() || '',
+      fromToken: match[2] ? normalizeTokenSymbol(match[2]) : '',
+      toToken: match[3] ? normalizeTokenSymbol(match[3]) : '',
       hook: match[4]?.trim() || ''
     };
   }
@@ -93,6 +106,7 @@ const extractSwapParams = (msg: string) => {
 
 export const classifyQuery = (input: string): ClassifiedQuery => {
   const msg = input.toLowerCase().trim();
+  const canonicalMsg = canonicalizeTokenMentions(msg);
   
   const result: ClassifiedQuery = {
     type: 'general',
@@ -107,7 +121,7 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
     msg.includes('add liquidity')
   ) {
     result.type = 'addLiquidity';
-    result.params = extractPoolFromMessage(msg);
+    result.params = extractPoolFromMessage(canonicalMsg);
     return result;
   }
   
@@ -128,7 +142,7 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
     msg.match(/^(swap|exchange|trade)\s+\d*\.?\d*\s*\w+/)
   ) {
     result.type = 'swap';
-    result.params = extractSwapParams(msg);
+    result.params = extractSwapParams(canonicalMsg);
     return result;
   }
   
@@ -184,7 +198,21 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
   if (
     msg === 'faucet' ||
     msg.match(/^(get|request)\s*(test)?\s*tokens?/) ||
-    msg.includes('testnet tokens')
+    msg.includes('testnet tokens') ||
+    msg.includes('testnet funds') ||
+    msg.includes('test tokens') ||
+    msg.includes('get tokens') ||
+    msg.includes('get funds') ||
+    msg.includes('get eth') ||
+    msg.includes('free tokens') ||
+    msg.includes('free eth') ||
+    msg.match(/where\s+(?:can|do)\s+(?:i|we)\s+get\s+(?:testnet\s+)?(?:tokens|funds|eth)/) ||
+    msg.match(/how\s+(?:can|do|to)\s+(?:i|we)\s+get\s+(?:testnet\s+)?(?:tokens|funds|eth)/) ||
+    msg.match(/(?:need|want)\s+(?:testnet\s+)?(?:tokens|funds|eth)/) ||
+    msg.match(/claim\s+(?:testnet\s+)?(?:tokens|funds|eth)/) ||
+    msg.match(/(?:where|how)\s+.*faucet/) ||
+    msg.match(/fund\s+(?:my\s+)?wallet/) ||
+    msg.match(/(?:get|claim|request)\s+(?:some\s+)?(?:usdc|eurc|cbbtc|eth)/)
   ) {
     result.type = 'faucet';
     return result;
@@ -227,7 +255,7 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
   };
 
   for (const [key, value] of Object.entries(assetsMap)) {
-    if (msg.includes(key)) {
+    if (canonicalMsg.includes(key)) {
       if (!result.assets.includes(value)) {
         result.assets.push(value);
       }

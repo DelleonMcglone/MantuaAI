@@ -1,10 +1,80 @@
 // ChatMessageList: scrollable message list with auto-scroll, skeletons, and empty state.
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { formatDistanceToNow, isAfter, subHours } from "date-fns";
 import type { Message } from "../../types/chat";
 import CommandInterpretationCard from "./CommandInterpretationCard";
 import { ChartMessage } from "../analytics/ChartMessage";
 import { DuneResultTable } from "../DuneResultTable";
+
+/**
+ * Renders message content with:
+ *  - URLs converted to clickable links
+ *  - **bold** text rendered as <strong>
+ *  - Newlines preserved
+ */
+function RichContent({ text, linkColor }: { text: string; linkColor: string }) {
+  const parts = useMemo(() => {
+    // First pass: split by lines
+    return text.split('\n').map((line, lineIdx) => {
+      const segments: React.ReactNode[] = [];
+      // Combined regex: match markdown links [text](url), bold, or bare URLs
+      const combined = /(\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|\*\*(.+?)\*\*|https?:\/\/[^\s)]+)/g;
+      let lastIndex = 0;
+      let match: RegExpExecArray | null;
+
+      while ((match = combined.exec(line)) !== null) {
+        // Text before this match
+        if (match.index > lastIndex) {
+          segments.push(line.slice(lastIndex, match.index));
+        }
+        if (match[2] && match[3]) {
+          // Markdown link [text](url)
+          segments.push(
+            <a
+              key={`ml-${lineIdx}-${match.index}`}
+              href={match[3]}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: linkColor, textDecoration: 'underline' }}
+            >
+              {match[2]}
+            </a>
+          );
+        } else if (match[0].startsWith('**')) {
+          // Bold text
+          segments.push(<strong key={`b-${lineIdx}-${match.index}`}>{match[4]}</strong>);
+        } else {
+          // Bare URL
+          segments.push(
+            <a
+              key={`a-${lineIdx}-${match.index}`}
+              href={match[0]}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: linkColor, textDecoration: 'underline', wordBreak: 'break-all' }}
+            >
+              {match[0]}
+            </a>
+          );
+        }
+        lastIndex = match.index + match[0].length;
+      }
+      // Remaining text
+      if (lastIndex < line.length) {
+        segments.push(line.slice(lastIndex));
+      }
+
+      return (
+        <React.Fragment key={lineIdx}>
+          {lineIdx > 0 && <br />}
+          {segments.length > 0 ? segments : line}
+        </React.Fragment>
+      );
+    });
+  }, [text, linkColor]);
+
+  return <>{parts}</>;
+}
 
 interface ChatMessageListProps {
   messages: Message[];
@@ -147,7 +217,7 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                 wordBreak: "break-word",
               }}
             >
-              {msg.content}
+              <RichContent text={msg.content} linkColor={isDark ? '#93c5fd' : '#2563eb'} />
             </div>
             {msg.chart && (
               <ChartMessage

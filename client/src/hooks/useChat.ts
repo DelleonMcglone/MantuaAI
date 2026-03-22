@@ -30,6 +30,8 @@ export interface UseChatReturn {
   isLoading: boolean;
   isSending: boolean;
   sendMessage: (text: string) => Promise<void>;
+  /** Persist a user + assistant message pair without triggering an AI round-trip. */
+  persistLocalExchange: (userText: string, assistantText: string) => Promise<void>;
   updateSessionTitle: (title: string) => Promise<void>;
   startNewSession: () => Promise<void>;
   sessionId: string | null;
@@ -180,10 +182,20 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
         const { message: assistantMsg }: CreateMessageResponse = await assistRes.json();
         setMessages((prev) => [...prev, assistantMsg]);
       } catch (err) {
-        setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+        const description = err instanceof Error ? err.message : "Unknown error";
+        setMessages((prev) => [
+          ...prev.filter((m) => m.id !== optimisticId),
+          {
+            id: `err-${Date.now()}`,
+            sessionId: sid,
+            role: "assistant",
+            content: `I couldn't complete that request. ${description}`,
+            createdAt: new Date().toISOString(),
+          },
+        ]);
         toast({
           title: "Failed to send message",
-          description: err instanceof Error ? err.message : "Unknown error",
+          description,
           variant: "destructive",
         });
       } finally {
@@ -228,5 +240,47 @@ export function useChat(options: UseChatOptions = {}): UseChatReturn {
     }
   }, [userId]);
 
-  return { messages, isLoading, isSending, sendMessage, updateSessionTitle, startNewSession, sessionId, userId };
+  /**
+   * Persist a user + assistant message pair to the backend without calling the AI.
+   * Used for locally-generated responses (faucet links, balance checks, etc.).
+   */
+  const persistLocalExchange = useCallback(
+    async (userText: string, assistantText: string): Promise<void> => {
+      let sid = sessionIdRef.current;
+      if (!sid) {
+        try {
+          const res = await fetch("/api/chat/sessions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId, title: userText.slice(0, 50) }),
+          });
+          if (!res.ok) return;
+          const data: CreateSessionResponse = await res.json();
+          sid = data.session.id;
+          setSessionId(sid);
+          sessionIdRef.current = sid;
+          titleSetRef.current = true;
+        } catch {
+          return;
+        }
+      }
+      try {
+        await fetch("/api/chat/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId: sid, role: "user", content: userText }),
+        });
+        await fetch("/api/chat/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId: sid, role: "assistant", content: assistantText }),
+        });
+      } catch {
+        // Non-critical — local UI already shows the messages
+      }
+    },
+    [userId]
+  );
+
+  return { messages, isLoading, isSending, sendMessage, persistLocalExchange, updateSessionTitle, startNewSession, sessionId, userId };
 }

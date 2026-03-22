@@ -31,8 +31,10 @@ import { useTokenApproval } from '../hooks/useTokenApproval';
 import { useSwapQuote, getPriceImpactSeverity } from '../hooks/useSwapQuote';
 import { useSwapExecution, getExplorerLink } from '../hooks/useSwapExecution';
 import { useTokenBalances } from '../hooks/useTokenBalances';
+import { useWalletBalances } from '../hooks/useWalletBalances';
 import { PriceImpact, SwapButton, SwapButtonStyles, SwapConfirmation, SwapPriceChart } from '../components/swap';
-import { parseTokenAmount, formatTokenAmount, isNativeEth, getZeroAddress, getHookAddress } from '../lib/swap-utils';
+import { parseTokenAmount, formatTokenAmount, isNativeEth, getZeroAddress, getHookAddress, createPoolKey, getPoolId } from '../lib/swap-utils';
+import { usePoolState } from '../hooks/usePoolState';
 import { ALL_TOKENS, ALL_CHAIN_TOKENS, NATIVE_ETH, getTokenBySymbol, getTokensForChain } from '../config/tokens';
 import { calculateUsdValue as calcUsdValue, getPriceBySymbol } from '../services/priceService';
 import { useLivePriceUSD, useLivePairRate } from '../hooks/useLivePriceUSD';
@@ -231,12 +233,11 @@ const PortfolioSummary = ({ data, theme, currentChain }) => (
   }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <h2 style={{ color: theme.textPrimary, fontSize: '18px', fontWeight: '700', margin: 0 }}>
             Portfolio Summary
           </h2>
         </div>
-        <ChainBadge chain={currentChain} />
       </div>
       <div style={{ textAlign: 'right' }}>
         <div style={{ color: theme.textSecondary, fontSize: '13px', marginBottom: '4px' }}>Total Value</div>
@@ -725,7 +726,7 @@ const ZoneBadge = ({ zone }) => {
   );
 };
 
-const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, currentChain, onRemoveLiquidity }) => {
+const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, currentChain, onRemoveLiquidity, refreshKey = 0 }) => {
   const [activeTab, setActiveTab] = useState('balances');
   const [txns, setTxns] = useState<Array<{type:string;tx_hash:string;token_in?:string;token_out?:string;amount_in?:string;amount_out?:string;timestamp:string;base_scan_url:string}>>([]);
   const [agentWallet, setAgentWallet] = useState<{address:string;wallet_id:string;id?:string} | null>(null);
@@ -737,20 +738,19 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
   // Use wagmi's own isConnected — the prop can be stale and prevents balance fetches
   const { address, isConnected: walletConnected } = useAccount();
   const chainId = useChainId();
-  const { data: liveEthBalance } = useBalance({ address, chainId, query: { enabled: !!address && walletConnected, refetchInterval: 30_000 } });
-  const { balancesBySymbol } = useTokenBalances();
+  const { getBalance } = useWalletBalances(address as `0x${string}` | undefined);
   const { price: ethPriceUSD }   = useLivePriceUSD('ETH');
   const { price: eurcPriceUSD }  = useLivePriceUSD('EURC');
   const { price: cbbtcPriceUSD } = useLivePriceUSD('cbBTC');
 
-  const ethBalanceNum = liveEthBalance ? (parseFloat(liveEthBalance.formatted) || 0) : 0;
+  const ethBalanceNum = parseFloat(getBalance('ETH')?.formatted ?? '0') || 0;
   const ethPrice   = (ethPriceUSD   != null && !isNaN(ethPriceUSD))   ? ethPriceUSD   : TESTNET_PRICES.ETH;
   const eurcPrice  = (eurcPriceUSD  != null && !isNaN(eurcPriceUSD))  ? eurcPriceUSD  : TESTNET_PRICES.EURC;
   const cbbtcPrice = (cbbtcPriceUSD != null && !isNaN(cbbtcPriceUSD)) ? cbbtcPriceUSD : TESTNET_PRICES.cbBTC;
   const ethValueUSD = ethBalanceNum * ethPrice;
-  const usdcBalance  = parseFloat(balancesBySymbol['USDC']?.formatted  ?? '0') || 0;
-  const eurcBalance  = parseFloat(balancesBySymbol['EURC']?.formatted  ?? '0') || 0;
-  const cbbtcBalance = parseFloat(balancesBySymbol['cbBTC']?.formatted ?? '0') || 0;
+  const usdcBalance  = parseFloat(getBalance('USDC')?.formatted  ?? '0') || 0;
+  const eurcBalance  = parseFloat(getBalance('EURC')?.formatted  ?? '0') || 0;
+  const cbbtcBalance = parseFloat(getBalance('cbBTC')?.formatted ?? '0') || 0;
   const totalValue = (isNaN(ethValueUSD) ? 0 : ethValueUSD) + usdcBalance + (eurcBalance * eurcPrice) + (cbbtcBalance * cbbtcPrice);
   const safeTotal = isNaN(totalValue) ? 0 : totalValue;
 
@@ -764,7 +764,7 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
       .then(r => r.ok ? r.json() : [])
       .then(rows => setTxns(rows ?? []))
       .catch(() => {});
-  }, [address, walletConnected]);
+  }, [address, walletConnected, refreshKey]);
 
   useEffect(() => {
     if (!address) return;
@@ -808,15 +808,13 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
         }));
       setPositions([...savedPositions, ...poolDerived]);
     });
-  }, [address, chainId]);
+  }, [address, chainId, refreshKey]);
 
   const tokenRows = [
     { symbol: 'ETH', name: 'Ethereum', balance: ethBalanceNum, usdValue: isNaN(ethValueUSD) ? 0 : ethValueUSD, price: ethPrice },
     { symbol: 'USDC', name: 'USD Coin', balance: usdcBalance, usdValue: usdcBalance, price: 1 },
-    ...(chainId === 84532 ? [
-      { symbol: 'EURC', name: 'Euro Coin', balance: eurcBalance, usdValue: eurcBalance * eurcPrice, price: eurcPrice },
-      { symbol: 'cbBTC', name: 'Coinbase BTC', balance: cbbtcBalance, usdValue: cbbtcBalance * cbbtcPrice, price: cbbtcPrice },
-    ] : []),
+    { symbol: 'EURC', name: 'Euro Coin', balance: eurcBalance, usdValue: eurcBalance * eurcPrice, price: eurcPrice },
+    { symbol: 'cbBTC', name: 'Coinbase BTC', balance: cbbtcBalance, usdValue: cbbtcBalance * cbbtcPrice, price: cbbtcPrice },
   ].filter(t => !hideSmall || t.usdValue >= 1);
 
   const fmtUSD = (v: number) => `$${(isNaN(v) ? 0 : v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -1382,7 +1380,7 @@ const TokenSelectModal = ({ isOpen, onClose, onSelect, theme, isDark, getTokenBa
   );
 };
 
-const TokenSelect = ({ token, tokenData, balance, usdValue, side, amount, theme, onTokenClick, onAmountChange, livePrice, isPriceLoading, onPercentClick }) => {
+const TokenSelect = ({ token, tokenData, balance, usdValue, side, amount, theme, onTokenClick, onAmountChange, livePrice, isPriceLoading, onPercentClick, selectedPct = null }) => {
   // Use tokenData if available, otherwise fall back to string-based logic
   const tokenSymbol = tokenData?.symbol || token;
   const tokenLogoURI = tokenData?.logoURI;
@@ -1403,7 +1401,7 @@ const TokenSelect = ({ token, tokenData, balance, usdValue, side, amount, theme,
       {/* Percentage shortcut buttons — Sell side only */}
       {onPercentClick && (
         <div style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
-          {[25, 50, 75].map(pct => (
+          {[25, 50, 75, 100].map(pct => (
             <button
               key={pct}
               onClick={() => onPercentClick(pct / 100)}
@@ -1411,35 +1409,24 @@ const TokenSelect = ({ token, tokenData, balance, usdValue, side, amount, theme,
                 flex: 1,
                 padding: '4px 0',
                 borderRadius: '6px',
-                border: `1px solid ${theme?.border || 'rgba(139,92,246,0.2)'}`,
-                background: 'transparent',
-                color: theme?.textSecondary || '#9ca3af',
+                border: selectedPct === pct
+                  ? `1px solid ${theme?.accent || '#8b5cf6'}`
+                  : `1px solid ${theme?.border || 'rgba(139,92,246,0.2)'}`,
+                background: selectedPct === pct
+                  ? `${theme?.accent || '#8b5cf6'}15`
+                  : 'transparent',
+                color: selectedPct === pct
+                  ? (theme?.accent || '#8b5cf6')
+                  : (theme?.textSecondary || '#9ca3af'),
                 fontSize: '11px',
-                fontWeight: '600',
+                fontWeight: selectedPct === pct ? '700' : '600',
                 cursor: 'pointer',
                 transition: 'all 0.15s',
               }}
             >
-              {pct}%
+              {pct === 100 ? 'Max' : `${pct}%`}
             </button>
           ))}
-          <button
-            onClick={() => onPercentClick(1)}
-            style={{
-              flex: 1,
-              padding: '4px 0',
-              borderRadius: '6px',
-              border: `1px solid ${theme?.accent || '#8b5cf6'}`,
-              background: `${theme?.accent || '#8b5cf6'}15`,
-              color: theme?.accent || '#8b5cf6',
-              fontSize: '11px',
-              fontWeight: '700',
-              cursor: 'pointer',
-              transition: 'all 0.15s',
-            }}
-          >
-            Max
-          </button>
         </div>
       )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1555,9 +1542,6 @@ const TokenSelect = ({ token, tokenData, balance, usdValue, side, amount, theme,
 
 // Hook Selector Modal
 const HookSelectorModal = ({ isOpen, onClose, hooks, selectedHook, onSelect, theme, isDark }) => {
-  const [customAddress, setCustomAddress] = useState('');
-  const [showCustomInput, setShowCustomInput] = useState(false);
-
   if (!isOpen) return null;
 
   return (
@@ -1692,157 +1676,6 @@ const HookSelectorModal = ({ isOpen, onClose, hooks, selectedHook, onSelect, the
             ))}
           </div>
           
-          {/* Custom Hook Section */}
-          <div style={{ marginTop: '20px' }}>
-            <button 
-              onClick={() => setShowCustomInput(!showCustomInput)}
-              style={{ 
-                width: '100%',
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
-                padding: '16px',
-                borderRadius: '12px',
-                border: showCustomInput 
-                  ? '2px solid #8b5cf6'
-                  : `1px solid ${theme.border}`,
-                background: showCustomInput 
-                  ? (isDark ? 'rgba(139, 92, 246, 0.1)' : 'rgba(139, 92, 246, 0.05)') 
-                  : 'transparent',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                color: theme.textPrimary
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <div style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '10px',
-                  background: showCustomInput ? 'rgba(139, 92, 246, 0.2)' : (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'),
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: showCustomInput ? '#8b5cf6' : theme.textSecondary,
-                }}>
-                  <CodeIcon />
-                </div>
-                <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontWeight: '600', fontSize: '15px', color: theme.textPrimary }}>Custom Hook Address</div>
-                  <div style={{ fontSize: '13px', color: theme.textSecondary }}>Use your own deployed hook contract</div>
-                </div>
-              </div>
-              {showCustomInput ? <ChevronUpIcon /> : <ChevronDownIcon />}
-            </button>
-
-            {showCustomInput && (
-              <div style={{ 
-                marginTop: '12px', 
-                padding: '20px', 
-                background: theme.bgCard,
-                border: `1px solid ${theme.border}`,
-                borderRadius: '12px',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.05)'
-              }}>
-                <input 
-                  type="text" 
-                  placeholder="Enter hook contract address (0x...)"
-                  value={customAddress}
-                  onChange={(e) => setCustomAddress(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '14px',
-                    borderRadius: '10px',
-                    border: `1px solid ${theme.border}`,
-                    background: theme.bgSecondary,
-                    color: theme.textPrimary,
-                    fontSize: '14px',
-                    fontFamily: 'SF Mono, Monaco, monospace',
-                    marginBottom: '12px',
-                    outline: 'none'
-                  }}
-                />
-                
-                <button style={{
-                  width: '100%',
-                  padding: '12px',
-                  borderRadius: '10px',
-                  background: theme.bgSecondary,
-                  border: 'none',
-                  color: theme.textSecondary,
-                  fontWeight: '600',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  marginBottom: '20px'
-                }}>
-                  Validate Address
-                </button>
-
-                <div style={{ fontSize: '11px', color: theme.textSecondary, fontWeight: '600', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.5px' }}>
-                  Recent Custom Hooks
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
-                  <div style={{ 
-                    padding: '12px', 
-                    borderRadius: '10px', 
-                    border: `1px solid ${theme.border}`, 
-                    background: theme.bgCard,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    cursor: 'pointer'
-                  }}>
-                    <div>
-                      <div style={{ fontSize: '14px', fontWeight: '500', color: theme.textPrimary }}>No Hook</div>
-                      <div style={{ fontSize: '12px', color: theme.textSecondary, fontFamily: 'monospace' }}>0x1234...5678</div>
-                    </div>
-                    <div style={{ fontSize: '12px', color: theme.textMuted }}>2 days ago</div>
-                  </div>
-                  
-                  <div style={{ 
-                    padding: '12px', 
-                    borderRadius: '10px', 
-                    border: `1px solid ${theme.border}`, 
-                    background: theme.bgCard,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    cursor: 'pointer'
-                  }}>
-                    <div>
-                      <div style={{ fontSize: '14px', fontWeight: '500', color: theme.textPrimary }}>Custom Fee Hook</div>
-                      <div style={{ fontSize: '12px', color: theme.textSecondary, fontFamily: 'monospace' }}>0xabcd...efgh</div>
-                    </div>
-                    <div style={{ fontSize: '12px', color: theme.textMuted }}>1 week ago</div>
-                  </div>
-                </div>
-
-                <button 
-                  onClick={() => {
-                    if (customAddress) {
-                      onSelect('custom');
-                      onClose();
-                    }
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '14px',
-                    borderRadius: '12px',
-                    background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
-                    border: 'none',
-                    color: 'white',
-                    fontWeight: '600',
-                    fontSize: '15px',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)'
-                  }}
-                >
-                  Apply Hook Selection
-                </button>
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </div>
@@ -1876,6 +1709,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
   const [toToken, setToToken] = useState(swapDetails?.toToken || "USDC");
   const [fromAmount, setFromAmount] = useState(swapDetails?.fromAmount || "");
   const [toAmount, setToAmount] = useState(swapDetails?.toAmount || "");
+  const [selectedPct, setSelectedPct] = useState<number | null>(null);
 
   // Chain-aware token lookup — must use the correct contract addresses for the connected chain
   const chainTokens = useMemo(() => getTokensForChain(currentChainId), [currentChainId]);
@@ -1918,10 +1752,22 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
     inputDecimals: fromTokenData.decimals,
     outputDecimals: toTokenData.decimals,
     slippageTolerance,
-    hookAddress: getHookAddress(selectedHook),
-    feeTier: 500, // 0.05% fee tier — matches the ETH/USDC pool on Base Sepolia
+    hookAddress: getHookAddress(selectedHook, currentChainId),
+    feeTier: selectedHook === 'stable-protection' ? 0x800000 : 500,
     enabled: parsedAmount > BigInt(0),
   });
+
+  // Check if pool exists on-chain for the selected pair
+  const swapHookAddr = getHookAddress(selectedHook, currentChainId);
+  const swapFeeTier = selectedHook === 'stable-protection' ? 0x800000 : 500;
+  const swapPoolState = usePoolState(
+    fromTokenData.address as `0x${string}`,
+    toTokenData.address as `0x${string}`,
+    swapFeeTier,
+    swapHookAddr,
+  );
+  const noPoolExists = !swapPoolState.isLoading && !swapPoolState.isInitialized
+    && !!fromToken && !!toToken && fromToken !== toToken;
 
   // Swap execution hook
   const {
@@ -1937,9 +1783,10 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
   // Token balances hook (for ERC-20 tokens)
   const { balancesBySymbol, refetch: refetchTokenBalances } = useTokenBalances();
 
-  // Native ETH balance hook
+  // Native ETH balance hook — pass chainId so it reads from the correct RPC
   const { data: ethBalance, refetch: refetchEthBalance } = useBalance({
     address: address,
+    chainId: currentChainId,
     query: {
       enabled: !!address,
       staleTime: 10_000, // 10 seconds
@@ -1947,14 +1794,25 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
     },
   });
 
+  // Format balance for display: show up to 6 significant decimal digits
+  const formatBalance = (raw: string): string => {
+    const n = parseFloat(raw);
+    if (isNaN(n) || n === 0) return '0.00';
+    if (n >= 1000) return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    if (n >= 1) return n.toFixed(4);
+    // Small balances: show up to 6 decimals
+    return n.toFixed(6).replace(/0+$/, '').replace(/\.$/, '.00');
+  };
+
   // Helper function to get balance for any token
   const getTokenBalance = (tokenSymbol: string, tokenData: any) => {
     // Check if it's native ETH
     if (tokenSymbol === 'ETH' || isNativeEth(tokenData.address)) {
-      return ethBalance?.formatted || '0.00';
+      return formatBalance(ethBalance?.formatted || '0');
     }
     // Otherwise lookup in ERC-20 balances
-    return balancesBySymbol[tokenSymbol]?.formatted || balancesBySymbol[tokenData.symbol]?.formatted || '0.00';
+    const raw = balancesBySymbol[tokenSymbol]?.formatted || balancesBySymbol[tokenData.symbol]?.formatted || '0';
+    return formatBalance(raw);
   };
 
   // Helper function to calculate USD value using centralized price service
@@ -2016,9 +1874,9 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
       tokenIn: fromTokenData.address as `0x${string}`,
       tokenOut: toTokenData.address as `0x${string}`,
       amountIn: parsedAmount,
-      hookAddress: getHookAddress(selectedHook),
+      hookAddress: getHookAddress(selectedHook, currentChainId),
       hookId: selectedHook,
-      feeTier: 500,
+      feeTier: selectedHook === 'stable-protection' ? 0x800000 : 500,
     };
 
     try {
@@ -2063,6 +1921,8 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
     const fracStr = fracPart.toString().padStart(decimals, '0').slice(0, maxDecimals).replace(/0+$/, '');
     const result = fracStr ? `${wholePart}.${fracStr}` : `${wholePart}`;
     setFromAmount(result || '0');
+    // Track which % button was clicked (map fraction back to integer)
+    setSelectedPct(Math.round(pct * 100));
   };
 
   // Swap the from/to tokens and amounts
@@ -2073,6 +1933,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
     setToToken(tmpToken);
     setFromAmount(toAmount);
     setToAmount(tmpAmount);
+    setSelectedPct(null);
   };
 
   const handleTokenSelect = (tokenSymbol) => {
@@ -2080,6 +1941,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
         setFromToken(tokenSymbol);
         setFromAmount('');
         setToAmount('');
+        setSelectedPct(null);
     } else {
         setToToken(tokenSymbol);
         // Keep fromAmount so quote can recalculate with new token
@@ -2100,18 +1962,12 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
 
   useEffect(() => {
     if (swapDetails?.hook) {
-        // Find if hook name matches
         const hookId = hooks.find(h => h.name.toLowerCase().includes(swapDetails.hook.toLowerCase()) || h.id.toLowerCase() === swapDetails.hook.toLowerCase())?.id;
         if (hookId) setSelectedHook(hookId);
-        else if (swapDetails.hook.toLowerCase().includes('custom')) setSelectedHook('custom');
     }
   }, [swapDetails]);
 
-  const getSelectedHookObj = () => {
-    return hooks.find(h => h.id === selectedHook) || hooks[1]; // Default to No Hook if not found
-  };
-
-  const selectedHookObj = getSelectedHookObj();
+  const selectedHookObj = hooks.find(h => h.id === selectedHook) || hooks[0];
 
   return (
     <div style={{
@@ -2248,10 +2104,11 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
               amount={fromAmount}
               theme={theme}
               onTokenClick={() => openTokenSelector('from')}
-              onAmountChange={(val) => setFromAmount(val)}
+              onAmountChange={(val) => { setFromAmount(val); setSelectedPct(null); }}
               livePrice={fromTokenLivePrice}
               isPriceLoading={fromPriceLoading}
               onPercentClick={handlePercentage}
+              selectedPct={selectedPct}
             />
             
             <div style={{
@@ -2301,7 +2158,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
               <span style={{ color: theme.textSecondary, fontSize: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Swap Hook</span>
             </div>
 
-            <button 
+            <button
               onClick={() => setIsHookModalOpen(true)}
               style={{
                 display: 'flex',
@@ -2356,7 +2213,7 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
             const fmtImpact = (v) => v < 0.01 ? `${v.toFixed(4)}%` : `${v.toFixed(2)}%`;
 
             // Pool routing label based on token pair + hook
-            const STABLES = ['USDC', 'USDT', 'USDE', 'USDS'];
+            const STABLES = ['USDC', 'EURC'];
             const normA = fromToken.replace(/^m/, '').toUpperCase();
             const normB = toToken.replace(/^m/, '').toUpperCase();
             const aIsStable = STABLES.includes(normA);
@@ -2465,16 +2322,31 @@ const SwapInterface = ({ onClose, swapDetails, theme, isDark, onActionComplete =
               onConnect={openModal}
               onApprove={handleSwap}
               onSwap={handleSwap}
-              disabled={isExecuting || !quote || (approvalStatus === 'approving')}
+              disabled={isExecuting || !quote || noPoolExists || (approvalStatus === 'approving')}
               theme={theme}
               isDark={isDark}
             />
           </div>
 
+          {/* No pool exists warning */}
+          {noPoolExists && parsedAmount > BigInt(0) && (
+            <div style={{
+              marginTop: '8px',
+              padding: '10px 12px',
+              borderRadius: '10px',
+              background: 'rgba(245, 158, 11, 0.08)',
+              border: '1px solid rgba(245, 158, 11, 0.2)',
+              color: '#f59e0b',
+              fontSize: '13px',
+            }}>
+              No pool exists for {fromToken}/{toToken}. Create one in the Liquidity tab first.
+            </div>
+          )}
+
           {/* Approval/Error Status */}
           {approvalError && (
-            <div style={{ 
-              marginTop: '8px', 
+            <div style={{
+              marginTop: '8px',
               padding: '10px 12px', 
               borderRadius: '10px',
               background: 'rgba(239, 68, 68, 0.1)',
@@ -2632,21 +2504,63 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
   const [expandedPool, setExpandedPool] = useState<number | null>(null);
   const currentChainId = useChainId();
 
-  const [dbPools, setDbPools] = React.useState([]);
+  const [poolsRaw, setPoolsRaw] = React.useState([]);
   React.useEffect(() => {
-    fetch(`/api/portfolio?chainId=${currentChainId}`).then(r => r.ok ? r.json() : []).then(rows => setDbPools(rows ?? [])).catch(() => {});
-  }, [currentChainId, refreshKey]);
+    const LS_KEY = 'mantua_pending_pools';
+    fetch(`/api/portfolio?chainId=84532`)
+      .then(r => (r.ok ? r.json() : []))
+      .then(dbRows => {
+        const rows = dbRows ?? [];
+        // Merge any localStorage-backed pools that the DB doesn't have yet
+        try {
+          const pending: any[] = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
+          const dbTxHashes = new Set(rows.map((r: any) => r.tx_hash));
+          const missing = pending.filter((p: any) => !dbTxHashes.has(p.tx_hash));
+          // Clean up localStorage entries that are now in the DB
+          if (missing.length < pending.length) {
+            localStorage.setItem(LS_KEY, JSON.stringify(missing));
+          }
+          setPoolsRaw([...rows, ...missing]);
+        } catch {
+          setPoolsRaw(rows);
+        }
+      })
+      .catch(() => {
+        // DB unreachable — show localStorage pools at minimum
+        try {
+          const pending = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
+          setPoolsRaw(pending);
+        } catch {
+          setPoolsRaw([]);
+        }
+      });
+  }, [refreshKey]);
+
+  // Generate deterministic simulated stats per pool (testnet has no real indexer)
+  const simStats = (token0: string, token1: string, chainId: number) => {
+    // Simple hash for deterministic values
+    const seed = `${token0}${token1}${chainId}`.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+    const tvl = 5000 + (seed * 137) % 200000;
+    const vol = 500 + (seed * 53) % 30000;
+    const fees = vol * 0.003;
+    const apr = ((fees * 365) / tvl * 100);
+    return { tvl, volume: vol, fees, apr: apr.toFixed(2) };
+  };
 
   // Merge DB pools with display-friendly format
-  const pools = dbPools.length > 0 ? dbPools.map(p => ({
-    token1: p.token0, token2: p.token1,
-    type: p.hook_address && p.hook_address !== '0x0000000000000000000000000000000000000000' ? 'Stable' : 'Standard',
-    hook: p.hook_address && p.hook_address !== '0x0000000000000000000000000000000000000000' ? 'Stable Protection' : 'None',
-    hookAddress: p.hook_address,
-    volume: 0, fees: 0, liquidity: 0, yield: '0.00',
-    txHash: p.tx_hash, feeTier: p.fee_tier,
-    chainId: p.chain_id,
-  })) : [];
+  const mapPools = (rows: any[]) => rows.map(p => {
+    const stats = simStats(p.token0, p.token1, p.chain_id ?? 84532);
+    return {
+      token1: p.token0, token2: p.token1,
+      type: p.hook_address && p.hook_address !== '0x0000000000000000000000000000000000000000' ? 'Stable' : 'Standard',
+      hook: p.hook_address && p.hook_address !== '0x0000000000000000000000000000000000000000' ? 'Stable Protection' : 'None',
+      hookAddress: p.hook_address,
+      volume: stats.volume, fees: stats.fees, liquidity: stats.tvl, yield: stats.apr,
+      txHash: p.tx_hash, feeTier: p.fee_tier,
+      chainId: p.chain_id ?? 84532,
+    };
+  });
+  const pools = mapPools(poolsRaw);
 
   const hookOptions = ['All', 'None', 'Stable Protection'];
   const typeOptions = ['All', 'Standard', 'Stable'];
@@ -2747,8 +2661,12 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
     </div>
   );
 
-  // On-chain stats (volume/fees/yield) are not indexed on testnet — show pool count instead
+  // Aggregate stats from all pools
   const totalPoolCount = pools.length;
+  const totalTvl = filteredPools.reduce((s, p) => s + p.liquidity, 0);
+  const totalVolume = filteredPools.reduce((s, p) => s + p.volume, 0);
+  const totalFees = filteredPools.reduce((s, p) => s + p.fees, 0);
+  const fmtPoolUSD = (v: number) => v >= 1e6 ? `$${(v/1e6).toFixed(2)}M` : v >= 1e3 ? `$${(v/1e3).toFixed(2)}K` : `$${v.toFixed(2)}`;
 
   return (
     <div style={{ width: '100%', fontFamily: '"DM Sans", sans-serif' }}>
@@ -2768,8 +2686,8 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
         </div>
         <div style={{ flex: 1 }}>
           <span style={{ color: theme.textSecondary, fontSize: '14px', lineHeight: '1.5' }}>
-            <span style={{ color: theme.accent, fontWeight: '600' }}>{filteredPools.length > 0 ? `${filteredPools.length} pools on Base Sepolia` : 'No pools yet — create your first pool'}</span>
-            {' '}• ETH, USDC, EURC on Uniswap v4.
+            <span style={{ color: theme.accent, fontWeight: '600' }}>{filteredPools.length > 0 ? `${filteredPools.length} pools created` : 'No pools yet — create your first pool'}</span>
+            {' '}• Uniswap v4 with hooks.
           </span>
         </div>
       </div>
@@ -2788,9 +2706,9 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
 
         {/* Stats Cards */}
         <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
-          <StatsCard label="Pools" value={String(totalPoolCount)} change={null} />
-          <StatsCard label="Volume 24h" value="—" change={null} />
-          <StatsCard label="Fees 24h" value="—" change={null} />
+          <StatsCard label="Tvl" value={totalPoolCount > 0 ? fmtPoolUSD(totalTvl) : '—'} change={null} />
+          <StatsCard label="Volume" value={totalPoolCount > 0 ? fmtPoolUSD(totalVolume) : '—'} change={null} />
+          <StatsCard label="Fees" value={totalPoolCount > 0 ? fmtPoolUSD(totalFees) : '—'} change={null} />
         </div>
 
         {/* Filters */}
@@ -2821,61 +2739,76 @@ const LiquidityInterface = ({ onClose, theme, isDark, onAddLiquidity, onCreatePo
           </button>
         </div>
 
-        {/* Pools Table */}
+        {/* Pools Table — grouped by chain */}
         <div style={{ border: `1px solid ${theme.border}`, borderRadius: '16px', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: `1px solid ${theme.border}`, background: theme.bgSecondary }}>
-                <th style={{ padding: '14px 12px', textAlign: 'left', color: theme.textSecondary, fontSize: '13px', fontWeight: '600', width: '280px' }}>Pool <span style={{ opacity: 0.4, fontSize: '11px', marginLeft: '4px' }}>↕</span></th>
-                <th style={{ padding: '14px 12px', textAlign: 'left', width: '100px' }}><SortableHeader label="Vol(24h)" sortKey="volume" currentSort={sort} onSort={handleSort} /></th>
-                <th style={{ padding: '14px 12px', textAlign: 'left', width: '80px' }}><SortableHeader label="Fees" sortKey="fees" currentSort={sort} onSort={handleSort} /></th>
-                <th style={{ padding: '14px 12px', textAlign: 'left', width: '120px' }}><SortableHeader label="Liquidity" sortKey="liquidity" currentSort={sort} onSort={handleSort} /></th>
-                <th style={{ padding: '14px 12px', textAlign: 'left', width: '80px' }}><SortableHeader label="Yield" sortKey="yield" currentSort={sort} onSort={handleSort} /></th>
-                <th style={{ padding: '14px 12px', textAlign: 'left', width: '130px' }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredPools.length === 0 ? (
-                <tr><td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: theme.textMuted, fontSize: '14px' }}>
-                  <div style={{ marginBottom: '8px', fontSize: '32px' }}>🌊</div>
-                  No pools yet. Create your first pool →
-                </td></tr>
-              ) : filteredPools.map((pool, i) => (
-                <React.Fragment key={i}>
-                <tr style={{ borderBottom: (expandedPool === i && pool.hook === 'Stable Protection') ? 'none' : (i === filteredPools.length - 1 ? 'none' : `1px solid ${theme.border}`), cursor: pool.hook === 'Stable Protection' ? 'pointer' : 'default' }} onClick={() => pool.hook === 'Stable Protection' && setExpandedPool(expandedPool === i ? null : i)}>
-                  <td style={{ padding: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <TokenPairIcon token1={pool.token1} token2={pool.token2} size={24} />
-                      <div>
-                        <div style={{ color: theme.textPrimary, fontWeight: '600', fontSize: '14px', marginBottom: '2px' }}>{pool.token1} / {pool.token2}</div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
-                          <PoolTypeBadge type={pool.type} />
-                          {pool.feeTier && <span style={{ padding: '2px 6px', borderRadius: '4px', background: theme.bgSecondary, color: theme.textSecondary, fontSize: '10px', fontWeight: '600' }}>{pool.feeTier === 0x800000 ? 'Dynamic' : `${(pool.feeTier/10000).toFixed(2)}%`}</span>}
-                          <HookBadge hook={pool.hook} />
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td style={{ padding: '12px' }}><span style={{ color: theme.textMuted, fontSize: '13px' }}>—</span></td>
-                  <td style={{ padding: '12px' }}><span style={{ color: theme.textMuted, fontSize: '13px' }}>—</span></td>
-                  <td style={{ padding: '12px' }}><span style={{ color: theme.textMuted, fontSize: '13px' }}>—</span></td>
-                  <td style={{ padding: '12px' }}><span style={{ color: theme.textMuted, fontSize: '13px' }}>—</span></td>
-                  <td style={{ padding: '12px', textAlign: 'right', display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                     <button onClick={(e) => { e.stopPropagation(); onAddLiquidity(pool); }} style={{ padding: '8px 12px', borderRadius: '8px', border: `1px solid ${theme.accent}40`, background: `${theme.accent}10`, color: theme.accent, fontSize: '12px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }} data-testid={`button-add-liquidity-${i}`}>+ Add</button>
-                     {pool.txHash && <a href={getExplorerLink(pool.txHash, currentChainId)} target="_blank" rel="noopener noreferrer" style={{ padding: '8px 10px', borderRadius: '8px', border: `1px solid ${theme.border}`, background: 'transparent', color: theme.textSecondary, fontSize: '12px', textDecoration: 'none', display: 'flex', alignItems: 'center' }} data-testid={`link-pool-tx-${i}`}>↗</a>}
-                  </td>
-                </tr>
-                {expandedPool === i && pool.hook === 'Stable Protection' && (
-                  <tr style={{ borderBottom: i === filteredPools.length - 1 ? 'none' : `1px solid ${theme.border}` }}>
-                    <td colSpan={6} style={{ padding: '0 12px 12px 12px' }}>
-                      <StableProtectionHookInfo theme={theme} hookAddress={pool.hookAddress} />
-                    </td>
-                  </tr>
-                )}
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
+          {filteredPools.length === 0 ? (
+            <div style={{ padding: '48px', textAlign: 'center', color: theme.textMuted, fontSize: '14px' }}>
+              <div style={{ marginBottom: '8px', fontSize: '32px' }}>🌊</div>
+              No pools yet. Create your first pool →
+            </div>
+          ) : (
+            <>
+              {filteredPools.length > 0 && (
+                <div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ borderBottom: `1px solid ${theme.border}`, background: theme.bgSecondary }}>
+                        <th style={{ padding: '10px 16px', textAlign: 'left', color: theme.textSecondary, fontSize: '12px', fontWeight: '600', width: '260px' }}>Pool</th>
+                        <th style={{ padding: '10px 16px', textAlign: 'right', width: '120px' }}><SortableHeader label="TVL ↓" sortKey="liquidity" currentSort={sort} onSort={handleSort} /></th>
+                        <th style={{ padding: '10px 16px', textAlign: 'right', width: '120px' }}><SortableHeader label="Volume (24h)" sortKey="volume" currentSort={sort} onSort={handleSort} /></th>
+                        <th style={{ padding: '10px 16px', textAlign: 'right', width: '100px' }}><SortableHeader label="Fees (24h)" sortKey="fees" currentSort={sort} onSort={handleSort} /></th>
+                        <th style={{ padding: '10px 16px', textAlign: 'right', width: '80px' }}><SortableHeader label="APR" sortKey="yield" currentSort={sort} onSort={handleSort} /></th>
+                        <th style={{ padding: '10px 16px', width: '80px' }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredPools.map((pool, i) => {
+                        const globalIdx = filteredPools.indexOf(pool);
+                        return (
+                          <React.Fragment key={i}>
+                          <tr style={{ borderBottom: (expandedPool === globalIdx && pool.hook === 'Stable Protection') ? 'none' : `1px solid ${theme.border}`, cursor: pool.hook === 'Stable Protection' ? 'pointer' : 'default' }} onClick={() => pool.hook === 'Stable Protection' && setExpandedPool(expandedPool === globalIdx ? null : globalIdx)}>
+                            <td style={{ padding: '14px 16px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <TokenPairIcon token1={pool.token1} token2={pool.token2} size={28} />
+                                <div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ color: theme.textPrimary, fontWeight: '600', fontSize: '14px' }}>{pool.token1} / {pool.token2}</span>
+                                    <PoolTypeBadge type={pool.type} />
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                                    {pool.feeTier && <span style={{ padding: '1px 5px', borderRadius: '4px', background: theme.bgSecondary, color: theme.textSecondary, fontSize: '10px', fontWeight: '600' }}>{pool.feeTier === 0x800000 ? 'Dynamic' : `${(pool.feeTier/10000).toFixed(2)}%`}</span>}
+                                    {pool.hook !== 'None' && <HookBadge hook={pool.hook} />}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td style={{ padding: '14px 16px', textAlign: 'right' }}><span style={{ color: theme.textPrimary, fontSize: '13px', fontWeight: '500', fontFamily: 'SF Mono, Monaco, monospace' }}>{fmtPoolUSD(pool.liquidity)}</span></td>
+                            <td style={{ padding: '14px 16px', textAlign: 'right' }}><span style={{ color: theme.textPrimary, fontSize: '13px', fontWeight: '500', fontFamily: 'SF Mono, Monaco, monospace' }}>{fmtPoolUSD(pool.volume)}</span></td>
+                            <td style={{ padding: '14px 16px', textAlign: 'right' }}><span style={{ color: theme.textPrimary, fontSize: '13px', fontWeight: '500', fontFamily: 'SF Mono, Monaco, monospace' }}>{fmtPoolUSD(pool.fees)}</span></td>
+                            <td style={{ padding: '14px 16px', textAlign: 'right' }}><YieldBadge value={pool.yield} /></td>
+                            <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                              <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                                <button onClick={(e) => { e.stopPropagation(); onAddLiquidity(pool); }} style={{ padding: '6px 10px', borderRadius: '8px', border: `1px solid ${theme.accent}40`, background: `${theme.accent}10`, color: theme.accent, fontSize: '12px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }} data-testid={`button-add-liquidity-${globalIdx}`}>+ Add</button>
+                                {pool.txHash && <a href={getExplorerLink(pool.txHash, pool.chainId)} target="_blank" rel="noopener noreferrer" style={{ padding: '6px 8px', borderRadius: '8px', border: `1px solid ${theme.border}`, background: 'transparent', color: theme.textSecondary, fontSize: '12px', textDecoration: 'none', display: 'flex', alignItems: 'center' }} data-testid={`link-pool-tx-${globalIdx}`}>↗</a>}
+                              </div>
+                            </td>
+                          </tr>
+                          {expandedPool === globalIdx && pool.hook === 'Stable Protection' && (
+                            <tr style={{ borderBottom: `1px solid ${theme.border}` }}>
+                              <td colSpan={6} style={{ padding: '0 16px 14px 16px' }}>
+                                <StableProtectionHookInfo theme={theme} hookAddress={pool.hookAddress} />
+                              </td>
+                            </tr>
+                          )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -3770,7 +3703,7 @@ const ChainSelector = ({ selectedChain, chains, onSelect, theme, isDark }) => {
                   color: theme.textMuted,
                   fontSize: '12px',
                 }}>
-                  Testnet
+                  {chain.name}
                 </div>
               </div>
               {selectedChain === chainId && (
@@ -3866,6 +3799,7 @@ export default function MantuaApp() {
   const [showSwap, setShowSwap] = useState(false);
   const [showLiquidity, setShowLiquidity] = useState(false);
   const [liquidityRefreshKey, setLiquidityRefreshKey] = useState(0);
+  const [portfolioRefreshKey, setPortfolioRefreshKey] = useState(0);
   const [showAgentBuilder, setShowAgentBuilder] = useState(false);
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const [showAddLiquidityModal, setShowAddLiquidityModal] = useState(false);
@@ -3881,7 +3815,7 @@ export default function MantuaApp() {
   const [voiceParsedCommand, setVoiceParsedCommand] = useState(null);
   const isVoiceSubmitRef = useRef(false);
   // Persistent chat state from useChat hook — pass chainId for context-aware AI responses
-  const { messages: chatMessages, sendMessage, updateSessionTitle, startNewSession, isSending, isLoading: chatIsLoading, userId: chatUserId } = useChat({ chainId: currentChainId });
+  const { messages: chatMessages, sendMessage, persistLocalExchange, updateSessionTitle, startNewSession, isSending, isLoading: chatIsLoading, userId: chatUserId } = useChat({ chainId: currentChainId });
   const [analyticsMessages, setAnalyticsMessages] = useState<any[]>([]);
   const allMessages = useMemo(() => {
     const combined = [...chatMessages, ...analyticsMessages];
@@ -4107,6 +4041,8 @@ export default function MantuaApp() {
 
     if (command.type === 'addLiquidity') {
        resetModals();
+       setSelectedPool(null);
+       setAddLiquidityMode('add');
        if (command.params?.tokenA || command.params?.tokenB) {
          setLiquidityInitialTokens({ tokenA: command.params.tokenA, tokenB: command.params.tokenB });
        } else {
@@ -4189,6 +4125,32 @@ export default function MantuaApp() {
           },
         ]);
         setHasInteracted(true);
+        persistLocalExchange(inputValue, balanceSummary);
+        updateSessionTitle('Check wallet balance');
+        loadRecentChats();
+        return;
+    }
+
+    if (command.type === 'faucet') {
+        resetModals();
+        const chainName = 'Base Sepolia';
+        const faucetLines = [
+          `Here's where to get testnet tokens on **${chainName}**:`,
+          ``,
+          `• [Coinbase CDP Faucet](https://portal.cdp.coinbase.com/products/faucet) — ETH, USDC, cbBTC, and EURC`,
+          `• [Optimism Faucet](https://console.optimism.io/faucet) — ETH`,
+          `• [Circle Faucet](https://faucet.circle.com/) — USDC and EURC`,
+        ];
+        const faucetContent = faucetLines.join('\n');
+        setAnalyticsMessages(prev => [
+          ...prev,
+          { id: 'user-faucet-' + Date.now(), sessionId: '', role: 'user' as const, content: inputValue, createdAt: new Date().toISOString() },
+          { id: 'asst-faucet-' + Date.now(), sessionId: '', role: 'assistant' as const, content: faucetContent, createdAt: new Date().toISOString() },
+        ]);
+        setHasInteracted(true);
+        persistLocalExchange(inputValue, faucetContent);
+        updateSessionTitle(`Testnet faucets — ${chainName}`);
+        loadRecentChats();
         return;
     }
 
@@ -4423,6 +4385,7 @@ export default function MantuaApp() {
                   isDark={isDark}
                   isConnected={isConnected}
                   currentChain={currentChain}
+                  refreshKey={portfolioRefreshKey}
                   onRemoveLiquidity={(pool) => {
                     setSelectedPool({ token1: pool.token1, token2: pool.token2 });
                     setAddLiquidityMode('remove');
@@ -4476,7 +4439,7 @@ export default function MantuaApp() {
                         swapDetails={swapDetails}
                         theme={theme}
                         isDark={isDark}
-                        onActionComplete={async (title) => { await updateSessionTitle(title); loadRecentChats(); }}
+                        onActionComplete={async (title) => { setPortfolioRefreshKey(k => k + 1); await updateSessionTitle(title); loadRecentChats(); }}
                       />
                     </div>
                   )}
@@ -4517,16 +4480,17 @@ export default function MantuaApp() {
                         initialTokenA={liquidityInitialTokens?.tokenA}
                         initialTokenB={liquidityInitialTokens?.tokenB}
                         initialHook={liquidityInitialHook}
-                        onActionComplete={async (title) => {
-                          await updateSessionTitle(title);
-                          loadRecentChats();
-                          // Navigate back to pool list and refresh it
+                        onActionComplete={(title) => {
+                          // Navigate back to pool list and refresh it FIRST (synchronous)
                           setShowAddLiquidityModal(false);
                           setSelectedPool(null);
                           setLiquidityInitialTokens(null);
                           setLiquidityInitialHook('');
                           setLiquidityRefreshKey(k => k + 1);
+                          setPortfolioRefreshKey(k => k + 1);
                           setShowLiquidity(true);
+                          // Update session title in background (non-blocking)
+                          updateSessionTitle(title).then(() => loadRecentChats()).catch(() => {});
                         }}
                       />
                     </div>
@@ -4569,17 +4533,6 @@ export default function MantuaApp() {
                     disabled={isSending}
                   />
 
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
-                    <ChainSelector
-                      selectedChain={selectedChain}
-                      chains={SUPPORTED_CHAINS}
-                      onSelect={handleChainSwitch}
-                      theme={theme}
-                      isDark={isDark}
-                    />
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} />
-                  </div>
                 </div>
               </div>
 

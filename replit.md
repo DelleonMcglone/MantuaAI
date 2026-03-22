@@ -77,7 +77,7 @@ Preferred communication style: Simple, everyday language.
 - **Migrations**: Generated to `./migrations` directory using `drizzle-kit push`
 
 ### On-Chain Analytics (The Graph)
-- **Subgraph Schemas**: Dual-chain GraphQL subgraphs for Base Sepolia and Unichain Sepolia (`subgraph/base-sepolia/`, `subgraph/unichain-sepolia/`)
+- **Subgraph Schemas**: Base Sepolia GraphQL subgraph (`subgraph/base-sepolia/`)
 - **18 Entity Types**: Pool, Swap, Token, Position, Vault, VaultDeposit, VaultWithdrawal, VaultDayData, SwapHourData, PredictionMarket, PredictionBet, PredictionClaim, Protocol, ProtocolDayData
 - **GraphQL Client**: `client/src/lib/graphql.ts` — multi-chain federated query client with auto-merge
 - **Query Hooks**: `client/src/hooks/useSubgraphData.ts` — 8 pre-built hooks (useProtocolStats, useSwapVolume, usePoolTvl, usePoolLeaderboard, useUserPositions, usePredictionMarkets, useRecentSwaps, useVaultTvl)
@@ -85,7 +85,7 @@ Preferred communication style: Simple, everyday language.
 - **Data Normalizer**: `client/src/lib/normalizeSubgraphData.ts` — transforms raw subgraph results into chart-ready arrays
 - **Chart Components**: `client/src/components/analytics/ChartMessage.tsx` (line/bar/pie/table/stat) + `QueryLibrary.tsx` (quick-query chips)
 - **Subgraph Deployment**: Placeholder contract addresses in subgraph.yaml; replace after deploying contracts. Deploy with: `graph auth --studio <KEY>`, `graph codegen`, `graph build`, `graph deploy --studio`
-- **Environment Variables**: Set `VITE_SUBGRAPH_BASE_SEPOLIA` and `VITE_SUBGRAPH_UNICHAIN` after subgraph deployment
+- **Environment Variables**: Set `VITE_SUBGRAPH_BASE_SEPOLIA` after subgraph deployment
 
 ### Key Design Patterns
 - **Chat-First UX**: The chatbot is always visible; DeFi modals layer on top without unmounting chat

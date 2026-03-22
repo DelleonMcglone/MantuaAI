@@ -7,7 +7,7 @@
 
 import { encodePacked, encodeAbiParameters, keccak256, type Address } from 'viem';
 import { NATIVE_ETH } from '../config/tokens';
-import { getV4Address } from '../config/contracts';
+import { getV4Address, getStableProtectionHookAddress } from '../config/contracts';
 
 export function getPoolSwapTestAddress(chainId: number): Address {
   return getV4Address(chainId, 'poolSwapTest');
@@ -52,11 +52,19 @@ export const HOOK_ADDRESSES: { [hookId: string]: Address } = {
   'df': '0x0000000000000000000000000000000000000000' as Address,   // Dynamic Fee
   'twamm': '0x0000000000000000000000000000000000000000' as Address, // TWAMM Rebalance
   'ym': '0x0000000000000000000000000000000000000000' as Address,   // Yield Maximizer
-  'stable-protection': '0xB5faDA071CD56b3F56632F6771356C3e3834a0C0' as Address, // Stable Protection Hook (Base Sepolia)
+  'stable-protection': '0x1510926ba6986cb3c93BFFF25839C0ef740820c0' as Address, // Stable Protection Hook placeholder (Base Sepolia)
   'none': '0x0000000000000000000000000000000000000000' as Address,  // No hook (standard swap)
 };
 
-export function getHookAddress(hookId: string): Address {
+/**
+ * Get hook address, optionally scoped to a specific chain.
+ * For 'stable-protection', uses the chain-specific deployed address from contracts.ts.
+ * Without chainId, falls back to the static HOOK_ADDRESSES map.
+ */
+export function getHookAddress(hookId: string, chainId?: number): Address {
+  if (hookId === 'stable-protection' && chainId !== undefined) {
+    return getStableProtectionHookAddress(chainId);
+  }
   return HOOK_ADDRESSES[hookId] || HOOK_ADDRESSES['none'];
 }
 

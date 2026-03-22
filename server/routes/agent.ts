@@ -47,13 +47,6 @@ function getExplorerAddressUrl(address: string, chainId?: number): string {
   return `${getExplorerBase(chainId)}/address/${address}`;
 }
 
-function generateMockAddress(): `0x${string}` {
-  const hex = Array.from({ length: 40 }, () =>
-    Math.floor(Math.random() * 16).toString(16)
-  ).join('');
-  return `0x${hex}`;
-}
-
 async function fetchCoinGeckoPrice(id: string): Promise<number> {
   try {
     const r = await fetch(
@@ -66,7 +59,7 @@ async function fetchCoinGeckoPrice(id: string): Promise<number> {
   }
 }
 
-const DUNE_API_KEY = process.env.DUNE_API_KEY || 'gKezRWgqcIZKII5VMDZ5ItBb9SoDGy1G';
+const DUNE_API_KEY = process.env.DUNE_API_KEY ?? '';
 const DUNE_BASE = 'https://api.dune.com/api/v1';
 
 // Curated Dune query IDs — public queries that work on the free tier
@@ -180,24 +173,21 @@ export function registerAgentRoutes(app: Express): void {
         // Table may not exist yet — continue to create
       }
 
-      // Try CDP SDK first, fall back to deterministic mock for demo
-      let address: string;
-      let walletId: string;
-
-      try {
-        const { CdpClient } = await import('@coinbase/cdp-sdk');
-        const cdp = new CdpClient({
-          apiKeyId: process.env.CDP_API_KEY_ID!,
-          apiKeySecret: process.env.CDP_API_KEY_SECRET!,
+      if (!process.env.CDP_API_KEY_ID || !process.env.CDP_API_KEY_SECRET) {
+        return res.status(503).json({
+          error: 'CDP wallet creation is not configured',
+          detail: 'Set CDP_API_KEY_ID and CDP_API_KEY_SECRET in the server environment.',
         });
-        const wallet = await cdp.evm.createAccount({});
-        address = wallet.address;
-        walletId = `cdp_${wallet.address.slice(2, 10)}_${Date.now()}`;
-      } catch {
-        // CDP not configured — use mock for demo
-        address = generateMockAddress();
-        walletId = `agent_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       }
+
+      const { CdpClient } = await import('@coinbase/cdp-sdk');
+      const cdp = new CdpClient({
+        apiKeyId: process.env.CDP_API_KEY_ID!,
+        apiKeySecret: process.env.CDP_API_KEY_SECRET!,
+      });
+      const wallet = await cdp.evm.createAccount({});
+      const address = wallet.address;
+      const walletId = `cdp_${wallet.address.slice(2, 10)}_${Date.now()}`;
 
       // Persist to DB
       try {

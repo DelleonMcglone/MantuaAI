@@ -12,7 +12,7 @@ P1-054, P1-055, P1-056, P1-057, P1-058
 ## Success Criteria
 - [ ] MantuaPredictionMarket.sol compiles with zero warnings
 - [ ] Contract deployed and verified on Base Sepolia
-- [ ] Contract deployed and verified on Unichain Sepolia
+- [ ] Contract deployed and verified on Base Sepolia
 - [ ] Predictions sidebar item renders full-page view
 - [ ] Markets tab shows unified grid (our markets + Polymarket + Kalshi)
 - [ ] Category and venue filters work

@@ -11,9 +11,7 @@ remappings = [
 ]
 
 [rpc_endpoints]
-base_sepolia    = "${BASE_SEPOLIA_RPC}"
-unichain_sepolia = "${UNICHAIN_SEPOLIA_RPC}"
+base_sepolia = "${BASE_SEPOLIA_RPC}"
 
 [etherscan]
 base_sepolia = { key = "${BASESCAN_API_KEY}", url = "https://api-sepolia.basescan.org/api", chain = 84532 }
-unichain_sepolia = { key = "${UNISCAN_API_KEY}", url = "https://api-sepolia.uniscan.xyz/api", chain = 1301 }

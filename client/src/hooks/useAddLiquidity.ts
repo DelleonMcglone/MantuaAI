@@ -4,8 +4,9 @@ import {
   useWaitForTransactionReceipt,
   useChainId,
 } from 'wagmi';
-import { parseEther, type Address } from 'viem';
+import { parseEther, type Address, zeroAddress } from 'viem';
 import { type PoolKey } from '../lib/swap-utils';
+import { validateHookConnection } from '../lib/hook-validator';
 
 export { computeSqrtPriceX96 } from '../lib/liquidityMath';
 
@@ -45,10 +46,22 @@ export function useAddLiquidity() {
     setSetupError(null);
     setStep(0);
     setStepLabel('');
-    setTotalSteps(1);
+
+    const hookAddress = params.poolKey?.hooks as Address | undefined;
+    const hasStableHook =
+      hookAddress &&
+      hookAddress.toLowerCase() !== zeroAddress.toLowerCase();
+
+    setTotalSteps(hasStableHook ? 2 : 1);
 
     try {
-      setStep(1);
+      if (hasStableHook) {
+        setStep(1);
+        setStepLabel('Validating Stable Protection Hook...');
+        await validateHookConnection(hookAddress, chainId);
+      }
+
+      setStep(hasStableHook ? 2 : 1);
       setStepLabel('Creating pool & adding liquidity...');
 
       const hash = await sendTransactionAsync({

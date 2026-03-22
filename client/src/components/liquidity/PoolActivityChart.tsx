@@ -9,6 +9,7 @@ interface PoolActivityChartProps {
   isDark: boolean;
   tokenA?: string;
   tokenB?: string;
+  chartMode?: 'volume' | 'tvl';
 }
 
 // ── Module-level cache (shared with SwapPriceChart) ────────────────────────
@@ -49,7 +50,7 @@ const RANGE_DAYS: Record<string, number> = { '1D': 1, '7D': 7, '30D': 30 };
 
 // ── Component ──────────────────────────────────────────────────────────────
 
-const PoolActivityChart: React.FC<PoolActivityChartProps> = ({ theme, isDark, tokenA, tokenB }) => {
+const PoolActivityChart: React.FC<PoolActivityChartProps> = ({ theme, isDark, tokenA, tokenB, chartMode = 'volume' }) => {
   const [range, setRange] = useState<'1D' | '7D' | '30D'>('7D');
   const [chartData, setChartData] = useState<{ name: string; price: number }[]>([]);
   const [isMock, setIsMock] = useState(false);
@@ -59,17 +60,32 @@ const PoolActivityChart: React.FC<PoolActivityChartProps> = ({ theme, isDark, to
 
   // Fallback mock data seeded by pair
   const mockData = useMemo(() => {
-    const rand = seedRandom(pairKey + range);
+    const rand = seedRandom(pairKey + range + chartMode);
     const pts = range === '1D' ? 24 : range === '7D' ? 28 : 30;
+    if (chartMode === 'tvl') {
+      // Generate simulated TVL data (grows over time with some variance)
+      const baseTvl = 50_000 + (rand() * 200_000);
+      return Array.from({ length: pts }, (_, i) => ({
+        name: `${i + 1}`,
+        price: baseTvl * (1 + i * 0.01 + (rand() - 0.5) * 0.05),
+      }));
+    }
     return Array.from({ length: pts }, (_, i) => ({
       name: `${i + 1}`,
       price: 1.0 + (rand() - 0.5) * 0.02,
     }));
-  }, [pairKey, range]);
+  }, [pairKey, range, chartMode]);
 
   useEffect(() => {
     let cancelled = false;
     const days = RANGE_DAYS[range];
+
+    // TVL mode: always use simulated data (no on-chain TVL indexer for testnet)
+    if (chartMode === 'tvl') {
+      setChartData(mockData);
+      setIsMock(true);
+      return;
+    }
 
     const symA = tokenA ?? 'ETH';
     const symB = tokenB ?? 'USDC';
@@ -124,7 +140,7 @@ const PoolActivityChart: React.FC<PoolActivityChartProps> = ({ theme, isDark, to
     });
 
     return () => { cancelled = true; };
-  }, [pairKey, range]);
+  }, [pairKey, range, chartMode]);
 
   const accent = theme.accent ?? '#8b5cf6';
   const gradId = `pool-chart-grad-${pairKey.replace(/\W/g, '')}`;
@@ -134,7 +150,7 @@ const PoolActivityChart: React.FC<PoolActivityChartProps> = ({ theme, isDark, to
       {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <div style={{ fontSize: 11, color: theme.textSecondary, display: 'flex', alignItems: 'center', gap: 6 }}>
-          {pairKey} Price
+          {pairKey} {chartMode === 'tvl' ? 'TVL' : 'Price'}
           {isMock && (
             <span style={{ background: 'rgba(107,114,128,0.2)', color: '#9ca3af', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3 }}>
               Demo Data
@@ -186,7 +202,7 @@ const PoolActivityChart: React.FC<PoolActivityChartProps> = ({ theme, isDark, to
             />
             <Tooltip
               contentStyle={{ backgroundColor: theme.bgCard, borderColor: theme.border, borderRadius: 8, fontSize: 12, color: theme.textPrimary }}
-              formatter={(v: number) => [`${v >= 1000 ? v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : v.toFixed(4)}`, `${pairKey} Price`]}
+              formatter={(v: number) => [`${chartMode === 'tvl' ? '$' : ''}${v >= 1000 ? v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : v.toFixed(4)}`, `${pairKey} ${chartMode === 'tvl' ? 'TVL' : 'Price'}`]}
             />
             <Area type="monotone" dataKey="price" stroke={accent} strokeWidth={1.5} fill={`url(#${gradId})`} dot={false} activeDot={{ r: 3, fill: accent }} />
           </AreaChart>

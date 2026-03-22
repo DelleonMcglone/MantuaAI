@@ -31,9 +31,7 @@ const metadata = {
   icons: ['https://mantua.ai/favicon.png'],
 };
 
-const networks: [AppKitNetwork, ...AppKitNetwork[]] = [
-  baseSepolia,
-];
+const networks: [AppKitNetwork, ...AppKitNetwork[]] = [baseSepolia];
 
 const wagmiAdapter = new WagmiAdapter({
   networks,

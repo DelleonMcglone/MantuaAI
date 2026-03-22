@@ -5,7 +5,7 @@ pragma solidity ^0.8.26;
  * @title MantuaPredictionMarket
  * @notice Binary prediction market settling in mock USDC.
  *         Markets resolve to YES (true) or NO (false) by an admin.
- * @dev Deployed on Base Sepolia (84532) and Unichain Sepolia (1301).
+ * @dev Deployed on Base Sepolia (84532).
  */
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";

@@ -5,6 +5,7 @@ import type { Address } from 'viem';
 import { parseEther } from 'viem';
 import { trackEvent } from '../lib/trackEvent';
 import { getExplorerTxUrl } from '../config/contracts';
+import { validateHookConnection } from '../lib/hook-validator';
 
 export type SwapStatus = 'idle' | 'pending' | 'simulating' | 'confirming' | 'confirmed' | 'failed';
 
@@ -41,6 +42,7 @@ export function useSwapExecution(): UseSwapExecutionReturn {
 
   const { isLoading: isConfirming, isSuccess: isConfirmed, isError: isTxError } = useWaitForTransactionReceipt({
     hash: txHash,
+    confirmations: 1,
   });
 
   useEffect(() => {
@@ -50,7 +52,7 @@ export function useSwapExecution(): UseSwapExecutionReturn {
   }, [isConfirming, status]);
 
   useEffect(() => {
-    if (isConfirmed && status === 'confirming' && !hasShownConfirmToast.current) {
+    if (isConfirmed && status !== 'confirmed' && !hasShownConfirmToast.current) {
       hasShownConfirmToast.current = true;
       setStatus('confirmed');
       if (lastParams) {
@@ -70,10 +72,10 @@ export function useSwapExecution(): UseSwapExecutionReturn {
         duration: 5000,
       });
     }
-  }, [isConfirmed, status, txHash]);
+  }, [isConfirmed, status, txHash, lastParams, userAddress, chainId]);
 
   useEffect(() => {
-    if (isTxError && status === 'confirming' && !hasShownErrorToast.current) {
+    if (isTxError && status !== 'failed' && !hasShownErrorToast.current) {
       hasShownErrorToast.current = true;
       setStatus('failed');
       setError(new Error('Transaction failed on-chain'));
@@ -82,7 +84,7 @@ export function useSwapExecution(): UseSwapExecutionReturn {
         duration: 0,
       });
     }
-  }, [isTxError, status]);
+  }, [isTxError, status, txHash, chainId]);
 
   const execute = useCallback(async (params: SwapExecutionParams) => {
     hasShownConfirmToast.current = false;
@@ -100,7 +102,18 @@ export function useSwapExecution(): UseSwapExecutionReturn {
     try {
       toast.loading('Preparing swap...', { id: 'swap-simulate' });
 
-      toast.dismiss('swap-simulate');
+      // If Stable Protection hook is active, validate the connection first
+      if (params.hookId === 'stable-protection' && params.hookAddress) {
+        const hookResult = await validateHookConnection(params.hookAddress, chainId);
+        toast.dismiss('swap-simulate');
+        toast.success(`${hookResult.label} Connected`, {
+          description: hookResult.detail,
+          duration: 3000,
+        });
+      } else {
+        toast.dismiss('swap-simulate');
+      }
+
       toast.loading('Submitting swap...', { id: 'swap-pending' });
       setStatus('pending');
 

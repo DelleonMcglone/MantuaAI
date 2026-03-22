@@ -11,7 +11,7 @@
  */
 
 import { Router } from "express";
-import { runAgent } from "../lib/agentkit";
+import { runAgent, getAgentWalletInfo } from "../lib/agentkit";
 import { createStableProtectionPool, swapViaStablePool, getStablePoolId } from "../services/poolService";
 import { detectIntent } from "../services/intentRouter";
 
@@ -20,6 +20,14 @@ const router = Router();
 // ── GET /api/agent/wallet ─────────────────────────────────────────────────────
 // Returns wallet address and ETH balance via AgentKit ReAct agent.
 router.get("/wallet", async (req, res) => {
+  // DIAGNOSTIC — remove after confirming env vars are present
+  console.log('[AgentKit] ENV check:', {
+    CDP_API_KEY_ID:     !!process.env.CDP_API_KEY_ID,
+    CDP_API_KEY_SECRET: !!process.env.CDP_API_KEY_SECRET,
+    CDP_WALLET_SECRET:  !!process.env.CDP_WALLET_SECRET,
+    ANTHROPIC_API_KEY:  !!process.env.ANTHROPIC_API_KEY,
+  });
+
   try {
     const response = await runAgent(
       "Get my wallet details including address and ETH balance. " +
@@ -27,8 +35,46 @@ router.get("/wallet", async (req, res) => {
     );
     return res.json({ success: true, response });
   } catch (err: any) {
-    console.error("[agentkit] GET /wallet error:", err.message);
-    return res.status(500).json({ success: false, error: err.message });
+    const msg = err?.message ?? 'Unknown error';
+    console.error("[agentkit] GET /wallet error:", JSON.stringify({
+      message: err?.message,
+      stack: err?.stack,
+      name: err?.name,
+    }));
+
+    if (msg.includes('not configured') || msg.includes('Missing required')) {
+      return res.status(503).json({
+        success: false,
+        error: 'Agent not configured',
+        message: 'CDP API keys are missing from the server environment.',
+        action: 'Add CDP_API_KEY_ID, CDP_API_KEY_SECRET, CDP_WALLET_SECRET, ' +
+                'and ANTHROPIC_API_KEY to your .env file.',
+      });
+    }
+
+    if (msg.includes('Invalid') || msg.includes('401') || msg.includes('unauthorized')) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid API credentials',
+        message: msg,
+      });
+    }
+
+    return res.status(500).json({ success: false, error: msg });
+  }
+});
+
+// ── GET /api/agent/wallet-info ────────────────────────────────────────────────
+// Lightweight wallet info without LLM call.
+router.get("/wallet-info", async (_req, res) => {
+  try {
+    const info = await getAgentWalletInfo();
+    return res.json(info);
+  } catch (err: any) {
+    return res.status(500).json({
+      error: 'Failed to get wallet info',
+      message: err?.message,
+    });
   }
 });
 
@@ -50,8 +96,22 @@ router.post("/chat", async (req, res) => {
     const response = await runAgent(contextualMessage);
     return res.json({ success: true, response });
   } catch (err: any) {
-    console.error("[agentkit] POST /chat error:", err.message);
-    return res.status(500).json({ success: false, error: err.message });
+    const msg = err?.message ?? 'Unknown error';
+    console.error("[agentkit] POST /chat error:", JSON.stringify({
+      message: err?.message,
+      stack: err?.stack,
+      name: err?.name,
+    }));
+
+    if (msg.includes('not configured') || msg.includes('Missing required')) {
+      return res.status(503).json({
+        success: false,
+        error: 'Agent not configured',
+        message: 'CDP API keys are missing. Add them to your .env file.',
+      });
+    }
+
+    return res.status(500).json({ success: false, error: msg });
   }
 });
 
@@ -126,8 +186,10 @@ router.post("/autonomous", async (req, res) => {
       break;
     case "get-funds":
       enrichedMessage =
-        "Request testnet ETH from the faucet for my wallet. " +
-        "Show the transaction hash and the full BaseScan link.";
+        "The user is asking about getting testnet tokens. " +
+        "Try to request testnet ETH from the faucet for my wallet using request_faucet_funds. " +
+        "Also show the user all available faucet links for the current chain. " +
+        "Show the transaction hash and the full BaseScan link if successful.";
       break;
     case "swap":
     case "send":
@@ -142,8 +204,12 @@ router.post("/autonomous", async (req, res) => {
     const response = await runAgent(enrichedMessage);
     return res.json({ success: true, intent: intent.type, response });
   } catch (err: any) {
-    console.error("[agentkit] POST /autonomous error:", err.message);
-    return res.status(500).json({ success: false, error: err.message });
+    console.error("[agentkit] POST /autonomous error:", JSON.stringify({
+      message: err?.message,
+      stack: err?.stack,
+      name: err?.name,
+    }));
+    return res.status(500).json({ success: false, error: err?.message ?? 'Unknown error' });
   }
 });
 
@@ -154,8 +220,12 @@ router.post("/create-pool", async (req, res) => {
     const result = await createStableProtectionPool();
     return res.json({ success: true, ...result });
   } catch (err: any) {
-    console.error("[agentkit] POST /create-pool error:", err.message);
-    return res.status(500).json({ success: false, error: err.message });
+    console.error("[agentkit] POST /create-pool error:", JSON.stringify({
+      message: err?.message,
+      stack: err?.stack,
+      name: err?.name,
+    }));
+    return res.status(500).json({ success: false, error: err?.message ?? 'Unknown error' });
   }
 });
 

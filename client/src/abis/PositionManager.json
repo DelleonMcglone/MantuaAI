@@ -2,7 +2,7 @@
   {
     "name": "initializePool",
     "type": "function",
-    "stateMutability": "nonpayable",
+    "stateMutability": "payable",
     "inputs": [
       {
         "name": "key",
@@ -15,7 +15,8 @@
           { "name": "hooks",       "type": "address" }
         ]
       },
-      { "name": "sqrtPriceX96", "type": "uint160" }
+      { "name": "sqrtPriceX96", "type": "uint160" },
+      { "name": "hookData",     "type": "bytes"   }
     ],
     "outputs": [{ "name": "tick", "type": "int24" }]
   },

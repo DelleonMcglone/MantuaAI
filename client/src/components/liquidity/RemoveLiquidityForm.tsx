@@ -39,7 +39,7 @@ export const RemoveLiquidityForm: React.FC<Props> = ({
     try {
       const poolKey = createPoolKey(
         tokenA.address, tokenB.address, 3000,
-        getHookAddress(HOOK_MAP[selectedHook] ?? 'none'),
+        getHookAddress(HOOK_MAP[selectedHook] ?? 'none', chainId),
       );
       writeContract({
         address: poolKey.hooks, abi: [], functionName: 'modifyLiquidity',

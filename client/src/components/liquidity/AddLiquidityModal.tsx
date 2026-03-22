@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useChainId } from 'wagmi';
 import { SwapIcon, ShieldIcon } from '../icons';
 import { getTokenBySymbol, type Token } from '../../config/tokens';
 import PoolActivityChart from './PoolActivityChart';
@@ -82,12 +83,14 @@ const PairTokenIcon = ({ token, size = 36 }: { token: Token | null; size?: numbe
 const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
   onClose, theme, isDark, pool, mode = 'add', initialTokenA, initialTokenB, initialHook, onActionComplete,
 }) => {
+  const chainId = useChainId();
   const [selectedHook, setSelectedHook] = useState('none');
   const [isHookModalOpen, setIsHookModalOpen] = useState(false);
   const [tokenSelectorTarget, setTokenSelectorTarget] = useState<'A' | 'B' | null>(null);
   const [tokenA, setTokenA] = useState<Token | null>(null);
   const [tokenB, setTokenB] = useState<Token | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [chartTab, setChartTab] = useState<'Volume' | 'TVL'>('Volume');
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 900);
@@ -97,16 +100,18 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
   }, []);
 
   useEffect(() => {
-    if ((mode === 'add' || mode === 'remove') && pool) {
-      setTokenA(getTokenBySymbol(pool.token1) ?? null);
-      setTokenB(getTokenBySymbol(pool.token2) ?? null);
+    if (initialTokenA || initialTokenB) {
+      if (initialTokenA) setTokenA(getTokenBySymbol(initialTokenA, chainId) ?? null);
+      if (initialTokenB) setTokenB(getTokenBySymbol(initialTokenB, chainId) ?? null);
+      if (!initialTokenA) setTokenA(null);
+      if (!initialTokenB) setTokenB(null);
+    } else if ((mode === 'add' || mode === 'remove') && pool) {
+      setTokenA(getTokenBySymbol(pool.token1, chainId) ?? null);
+      setTokenB(getTokenBySymbol(pool.token2, chainId) ?? null);
       if (pool.hook && pool.hook !== 'None') {
         const matched = HOOKS.find(h => h.name.toLowerCase().includes(pool.hook!.toLowerCase()));
         if (matched) setSelectedHook(matched.id);
       }
-    } else if (initialTokenA || initialTokenB) {
-      if (initialTokenA) setTokenA(getTokenBySymbol(initialTokenA) ?? null);
-      if (initialTokenB) setTokenB(getTokenBySymbol(initialTokenB) ?? null);
     } else {
       setTokenA(null);
       setTokenB(null);
@@ -119,7 +124,7 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
       );
       if (matched) setSelectedHook(matched.id);
     }
-  }, [pool, mode, initialTokenA, initialTokenB, initialHook]);
+  }, [pool, mode, initialTokenA, initialTokenB, initialHook, chainId]);
 
   const hookObj = HOOKS.find((h) => h.id === selectedHook) ?? HOOKS[0];
   const hookColor = hookObj.color;
@@ -170,8 +175,8 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px' }}>
                     <span style={{ color: '#10b981', fontSize: '13px', fontWeight: '600' }}>↗ 0.029% Fee</span>
-                    <span style={{ color: theme.textSecondary, fontSize: '13px' }}>TVL <span style={{ color: '#9ca3af', fontWeight: '600' }}>—</span> <span style={{ background: 'rgba(107,114,128,0.2)', color: '#9ca3af', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, verticalAlign: 'middle' }}>Testnet</span></span>
-                    <span style={{ color: theme.textSecondary, fontSize: '13px' }}>APY <span style={{ color: '#9ca3af', fontWeight: '600' }}>—</span> <span style={{ background: 'rgba(107,114,128,0.2)', color: '#9ca3af', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3, verticalAlign: 'middle' }}>Testnet</span></span>
+                    <span style={{ color: theme.textSecondary, fontSize: '13px' }}>TVL <span style={{ color: '#9ca3af', fontWeight: '600' }}>—</span></span>
+                    <span style={{ color: theme.textSecondary, fontSize: '13px' }}>APY <span style={{ color: '#9ca3af', fontWeight: '600' }}>—</span></span>
                   </div>
                 </div>
               </div>
@@ -180,12 +185,12 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
 
           <div style={{ flex: 1, padding: '24px', display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', gap: '4px', marginBottom: '20px' }}>
-              {['Volume', 'TVL'].map((tab, i) => (
-                <button key={tab} style={{ padding: '6px 12px', borderRadius: '8px', background: i === 0 ? theme.bgSecondary : 'transparent', color: i === 0 ? theme.textPrimary : theme.textSecondary, border: 'none', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>{tab}</button>
+              {(['Volume', 'TVL'] as const).map((tab) => (
+                <button key={tab} onClick={() => setChartTab(tab)} style={{ padding: '6px 12px', borderRadius: '8px', background: chartTab === tab ? theme.bgSecondary : 'transparent', color: chartTab === tab ? theme.textPrimary : theme.textSecondary, border: 'none', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>{tab}</button>
               ))}
             </div>
             <div style={{ flex: 1, minHeight: '250px' }}>
-              <PoolActivityChart theme={theme} isDark={isDark} tokenA={displayA} tokenB={displayB} />
+              <PoolActivityChart theme={theme} isDark={isDark} tokenA={displayA} tokenB={displayB} chartMode={chartTab.toLowerCase() as 'volume' | 'tvl'} />
             </div>
           </div>
         </div>

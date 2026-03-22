@@ -103,7 +103,17 @@
       "Bash(psql -c \"SELECT COUNT\\(*\\) as pools FROM pools;\")",
       "Bash(grep '\"\"version\"\"')",
       "Bash(fuser 5000/tcp)",
-      "Bash(ss -tlnp)"
+      "Bash(ss -tlnp)",
+      "Bash(npm list:*)",
+      "Bash(find /Users/delleonmcglone/MantuaAI -maxdepth 2 -type f \\\\\\(-name *.config.* -o -name mcp* -o -name .clauderc* -o -name *mcp*.ts -o -name *mcp*.js \\\\\\))",
+      "WebFetch(domain:www.npmjs.com)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(Liquidity tab first.\" when pool is not initialized:*)",
+      "Bash(find /Users/delleonmcglone/MantuaAI/public -name *.js -o -name *.mjs)",
+      "Bash(git checkout:*)",
+      "Bash(git stash:*)",
+      "Bash(git push:*)"
     ]
   }
 }

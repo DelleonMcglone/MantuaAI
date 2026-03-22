@@ -24,7 +24,7 @@ export const BASE_SEPOLIA_ERC20_TOKENS: Token[] = [
   {
     symbol: 'cbBTC',
     name: 'Coinbase Wrapped BTC',
-    address: '0xcbb7c0006f23900c38eb856149f799620fcb8a4a',
+    address: '0xcbB7C0006F23900c38EB856149F799620fcb8A4a',
     decimals: 8,
     chainId: 84532,
     logoURI: 'https://assets.coingecko.com/coins/images/40143/small/cbbtc.webp',
@@ -89,17 +89,22 @@ export const MOCK_TOKEN_FACTORY: `0x${string}` = '0x0000000000000000000000000000
 export type TokenSymbol = 'ETH' | 'cbBTC' | 'USDC' | 'EURC';
 
 export const TOKEN_BY_SYMBOL: Record<string, Token> = Object.fromEntries(
-  SUPPORTED_TOKENS.map(t => [t.symbol, t])
+  ALL_CHAIN_TOKENS.map(t => [t.symbol, t])
 );
 
 export const TOKEN_BY_ADDRESS: Record<string, Token> = Object.fromEntries(
-  SUPPORTED_TOKENS.map(t => [t.address.toLowerCase(), t])
+  ALL_CHAIN_TOKENS.map(t => [t.address.toLowerCase(), t])
 );
 
-export function getTokenBySymbol(symbol: string): Token | undefined {
-  return TOKEN_BY_SYMBOL[symbol] ?? SUPPORTED_TOKENS.find(
-    t => t.symbol.toLowerCase() === symbol.toLowerCase()
-  );
+/**
+ * Look up a token by symbol, optionally scoped to a specific chain.
+ * When chainId is provided, returns the token for that chain (critical for
+ * tokens like USDC/ETH that exist on multiple chains with different addresses).
+ * Without chainId, returns the first match across all chains.
+ */
+export function getTokenBySymbol(symbol: string, chainId?: number): Token | undefined {
+  const pool = chainId ? getTokensForChain(chainId) : ALL_CHAIN_TOKENS;
+  return pool.find(t => t.symbol.toLowerCase() === symbol.toLowerCase());
 }
 
 export function getTokenByAddress(address: `0x${string}`): Token | undefined {
