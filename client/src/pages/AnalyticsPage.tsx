@@ -429,7 +429,7 @@ export default function AnalyticsPage() {
           )}
 
           {/* Agent thought process accordion */}
-          {response.thoughts.length > 0 && (
+          {(response.thoughts?.length ?? 0) > 0 && (
             <div
               style={{
                 borderRadius: 12,
@@ -454,18 +454,18 @@ export default function AnalyticsPage() {
                 }}
               >
                 <span style={{ fontSize: 10, transform: showThoughts ? "rotate(90deg)" : "none", transition: "transform 0.15s", display: "inline-block" }}>▶</span>
-                Agent reasoning ({response.thoughts.length} step{response.thoughts.length !== 1 ? "s" : ""})
+                Agent reasoning ({(response.thoughts ?? []).length} step{(response.thoughts ?? []).length !== 1 ? "s" : ""})
               </button>
               {showThoughts && (
                 <div style={{ padding: "12px 18px 16px", background: "#0a0f1a" }}>
-                  {response.thoughts.map((thought, i) => (
+                  {(response.thoughts ?? []).map((thought, i) => (
                     <div
                       key={i}
                       style={{
                         display: "flex",
                         gap: 12,
                         padding: "8px 0",
-                        borderBottom: i < response.thoughts.length - 1 ? "1px solid #1a2030" : "none",
+                        borderBottom: i < (response.thoughts ?? []).length - 1 ? "1px solid #1a2030" : "none",
                         fontSize: 13,
                         color: "#9ca3af",
                         lineHeight: 1.6,
