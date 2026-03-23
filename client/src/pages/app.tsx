@@ -17,7 +17,6 @@ import { ChatInput } from '../components/chat/ChatInput';
 import { useChat } from '../hooks/useChat';
 import AddLiquidityModal from '../components/liquidity/AddLiquidityModal';
 import { classifyQuery } from '../utils/queryClassifier';
-import { isDuneAnalyticsQuery } from '../lib/duneIntentDetector';
 // Heavy views loaded lazily for bundle splitting
 import { TxHistoryPanel }  from '../components/portfolio/TxHistoryPanel';
 import { useTxHistory }    from '../hooks/useTxHistory';
@@ -1161,26 +1160,30 @@ const RecentChatItem = ({ chat, theme, onDelete }) => {
         <MessageSquareIcon />
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayTitle}</span>
       </div>
-      {hovered && (
-        <div 
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          style={{
-            padding: 4,
-            borderRadius: 4,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginLeft: 4,
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.background = theme.bgPrimary; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = 'inherit'; e.currentTarget.style.background = 'transparent'; }}
-        >
-          <TrashIcon size={14} />
-        </div>
-      )}
+      <div 
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          onDelete();
+        }}
+        style={{
+          padding: 4,
+          borderRadius: 4,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginLeft: 4,
+          flexShrink: 0,
+          opacity: hovered ? 1 : 0,
+          pointerEvents: hovered ? 'auto' : 'none',
+          transition: 'opacity 0.15s ease',
+          color: theme.textMuted,
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.background = theme.bgCard; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = theme.textMuted; e.currentTarget.style.background = 'transparent'; }}
+      >
+        <TrashIcon size={14} />
+      </div>
     </button>
   );
 };
@@ -3973,42 +3976,32 @@ export default function MantuaApp() {
     }
     // ─────────────────────────────────────────────────────────────────────────
 
-    // ── Dune MCP Analytics Pipeline ──────────────────────────────────────────
-    // Handles all research, chart, and data queries via the Dune MCP agent.
-    // Runs BEFORE swap/liquidity intent detection.
-    if (isDuneAnalyticsQuery(inputValue)) {
-      updateSessionTitle(`Analyzed: ${inputValue.slice(0, 50)}`);
-      loadRecentChats();
-      const placeholderId = 'dune-mcp-' + Date.now();
+    // ── Price & Market Data Pipeline (CoinGecko via agent) ───────────────────
+    // Active when user opened the Analyze panel — routes to the agent which
+    // has coinGeckoTools (get_token_price, get_all_token_prices, etc.).
+    if (showAnalyticsSuggestions) {
+      setHasInteracted(true);
+      const placeholderId = 'price-' + Date.now();
       setAnalyticsMessages(prev => [...prev,
-        { id: 'user-dune-' + Date.now(), sessionId: '', role: 'user' as const, content: inputValue, createdAt: new Date().toISOString() },
-        { id: placeholderId, sessionId: '', role: 'assistant' as const, content: '', duneLoading: true, loadingText: 'Searching mainnet tables · Writing SQL · Fetching results…', createdAt: new Date().toISOString() },
+        { id: 'user-price-' + Date.now(), sessionId: '', role: 'user' as const, content: inputValue, createdAt: new Date().toISOString() },
+        { id: placeholderId, sessionId: '', role: 'assistant' as const, content: '', duneLoading: true, loadingText: 'Fetching price data…', createdAt: new Date().toISOString() },
       ]);
-      try {
-        const res = await fetch('/api/agent/analytics', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: inputValue }),
+      fetch('/api/agent/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: inputValue }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          setAnalyticsMessages(prev => prev.map(m => m.id === placeholderId ? {
+            ...m, duneLoading: false, content: data.response ?? data.error ?? 'No response.',
+          } : m));
+        })
+        .catch(err => {
+          setAnalyticsMessages(prev => prev.map(m => m.id === placeholderId ? {
+            ...m, duneLoading: false, content: `Price query failed: ${err.message}`, duneError: true,
+          } : m));
         });
-        const json = await res.json();
-        if (!res.ok) {
-          throw new Error(json.error ?? `HTTP ${res.status}`);
-        }
-        setAnalyticsMessages(prev => prev.map(m => m.id === placeholderId ? {
-          ...m,
-          duneLoading: false,
-          content: json.result ?? '',
-          visualization: json.visualization ?? null,
-          thoughts: json.thoughts ?? [],
-        } : m));
-      } catch (err) {
-        setAnalyticsMessages(prev => prev.map(m => m.id === placeholderId ? {
-          ...m,
-          duneLoading: false,
-          content: `Analytics query failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
-          duneError: true,
-        } : m));
-      }
       return;
     }
 
@@ -4432,16 +4425,16 @@ export default function MantuaApp() {
                       <p style={{ fontSize: 16, color: theme.textSecondary, marginBottom: showAnalyticsSuggestions ? 24 : 0 }}>What can I help you with today?</p>
                       {showAnalyticsSuggestions && (
                         <div style={{ textAlign: 'left' }}>
-                          <p style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em', color: theme.textMuted, marginBottom: 10 }}>Try asking about onchain data:</p>
+                          <p style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em', color: theme.textMuted, marginBottom: 10 }}>Try asking about prices:</p>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                             {[
-                              'Show daily swap volume on Base mainnet for the last 30 days',
-                              'How many unique wallets traded USDC on Base this month?',
-                              'Find USDC/EURC liquidity pool data on Base mainnet',
-                              'Show top 10 tokens by volume on Base mainnet',
-                              'Daily transaction count on Base mainnet for the last 7 days',
-                              'What blockchains does Dune index?',
-                              'Find decoded event tables for USDC on Base mainnet',
+                              'What is the current ETH price?',
+                              'Show me all 4 token prices',
+                              'How much is 0.5 ETH worth in USD?',
+                              'Show ETH price trend for the last 7 days',
+                              'What is the 24h price change for cbBTC?',
+                              'What is the EURC/USD price?',
+                              'How much is 1 cbBTC worth?',
                             ].map((suggestion) => (
                               <button
                                 key={suggestion}

@@ -23,7 +23,7 @@ import poolsRouter         from "./routes/pools";
 import portfolioRouter     from "./routes/portfolio";
 import duneRouter          from "./routes/dune";
 import agentKitRouter      from "./routes/agentRoutes";
-import analyticsAgentRouter from "./routes/analyticsAgent";
+import pricesRouter        from "./routes/prices";
 
 // ============ VOICE TRANSCRIPTION SETUP ============
 
@@ -97,8 +97,8 @@ export async function registerRoutes(
   // Register legacy AgentKit routes (wallet create, faucet, query, etc.)
   registerAgentRoutes(app);
 
-  // Analytics agent — must come before /api/agent catch-all
-  app.use('/api/agent/analytics', analyticsAgentRouter);
+  // Price data (CoinGecko)
+  app.use('/api/prices', pricesRouter);
 
   // Register new AgentKit v2 routes (chat, autonomous, create-pool)
   // Note: must come AFTER registerAgentRoutes to avoid GET /api/agent/wallet conflict

@@ -25,10 +25,79 @@ import {
   erc20ActionProvider,
   pythActionProvider,
 } from "@coinbase/agentkit";
-import { getLangChainTools } from "@coinbase/agentkit-langchain";
-import { createReactAgent }  from "@langchain/langgraph/prebuilt";
-import { ChatAnthropic }     from "@langchain/anthropic";
-import { HumanMessage }      from "@langchain/core/messages";
+import { getLangChainTools }       from "@coinbase/agentkit-langchain";
+import { createReactAgent }        from "@langchain/langgraph/prebuilt";
+import { ChatAnthropic }           from "@langchain/anthropic";
+import { HumanMessage }            from "@langchain/core/messages";
+import { DynamicStructuredTool }   from "@langchain/core/tools";
+import { z }                       from "zod";
+import {
+  getAllTokenPrices,
+  getTokenPrice,
+  getTokenPriceHistory,
+  getTokenValueUSD,
+  formatTokenPrice,
+  MantuaToken,
+} from "../services/coinGeckoService";
+
+// ── CoinGecko tools for the LangChain agent ───────────────────────────────────
+const coinGeckoTools = [
+  new DynamicStructuredTool({
+    name: "get_all_token_prices",
+    description: "Get current USD prices for all 4 Mantua tokens: ETH, USDC, cbBTC, EURC. Use this when the user asks about prices generally or wants a market overview.",
+    schema: z.object({}),
+    func: async () => {
+      const prices = await getAllTokenPrices();
+      return prices.map(formatTokenPrice).join("\n");
+    },
+  }),
+  new DynamicStructuredTool({
+    name: "get_token_price",
+    description: "Get the current USD price for a specific token. Use when the user asks about a single token price.",
+    schema: z.object({
+      token: z.enum(["ETH", "USDC", "cbBTC", "EURC"]).describe("Token symbol"),
+    }),
+    func: async ({ token }) => {
+      const price = await getTokenPrice(token as MantuaToken);
+      return formatTokenPrice(price);
+    },
+  }),
+  new DynamicStructuredTool({
+    name: "get_token_price_history",
+    description: "Get historical price data for a token to show trends over time.",
+    schema: z.object({
+      token: z.enum(["ETH", "USDC", "cbBTC", "EURC"]).describe("Token symbol"),
+      days: z.number().describe("Number of days of history: 1, 7, 14, 30, or 90"),
+    }),
+    func: async ({ token, days }) => {
+      const validDays = [1, 7, 14, 30, 90];
+      const d = (validDays.includes(days) ? days : 7) as 1 | 7 | 14 | 30 | 90;
+      const history = await getTokenPriceHistory(token as MantuaToken, d);
+      const first = history.prices[0]?.price ?? 0;
+      const last  = history.prices[history.prices.length - 1]?.price ?? 0;
+      const change = first > 0 ? (((last - first) / first) * 100).toFixed(2) : "0.00";
+      return (
+        `${token} price over last ${d} days:\n` +
+        `Start: $${first.toFixed(2)}\n` +
+        `Current: $${last.toFixed(2)}\n` +
+        `Change: ${Number(change) >= 0 ? "+" : ""}${change}%\n` +
+        `Data points: ${history.prices.length}`
+      );
+    },
+  }),
+  new DynamicStructuredTool({
+    name: "calculate_token_value",
+    description: "Calculate the USD value of a specific amount of a token. Use when the user asks 'how much is X ETH worth' or similar.",
+    schema: z.object({
+      token: z.enum(["ETH", "USDC", "cbBTC", "EURC"]).describe("Token symbol"),
+      amount: z.number().describe("Amount of the token"),
+    }),
+    func: async ({ token, amount }) => {
+      const result = await getTokenValueUSD(token as MantuaToken, amount);
+      return result.formatted;
+    },
+  }),
+];
 
 // Singleton instances — initialized once on first call
 let _agentKit: AgentKit | null = null;
@@ -135,7 +204,8 @@ export async function getAgent() {
   if (_agent) return _agent;
 
   const kit = await getAgentKit();
-  const tools = await getLangChainTools(kit);
+  const agentKitTools = await getLangChainTools(kit);
+  const tools = [...agentKitTools, ...coinGeckoTools];
 
   const llm = new ChatAnthropic({
     model: "claude-sonnet-4-6",
@@ -156,7 +226,15 @@ Your capabilities:
 - Swap tokens (swap_assets)
 - Send ETH (native_transfer)
 - Send ERC-20 tokens (transfer_erc20)
-- Get live prices (get_price)
+- Get live token prices via CoinGecko (get_token_price, get_all_token_prices)
+- Get price history and trends (get_token_price_history)
+- Calculate USD value of a token amount (calculate_token_value)
+
+PRICE DATA — powered by CoinGecko (real mainnet prices):
+Use get_token_price for single token, get_all_token_prices for a market overview.
+NOTE: You are on Base Sepolia testnet, but prices are real mainnet values from CoinGecko.
+When a user asks "what is the ETH price" or "how much is my balance worth", use the
+CoinGecko tools — this is correct behavior. Never say you don't have real-time prices.
 
 SWAP EXECUTION RULES (mandatory):
 1. amountSpecified MUST be NEGATIVE for exact-input swaps — always negate the user's amount.

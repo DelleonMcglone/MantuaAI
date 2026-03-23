@@ -5,7 +5,6 @@ import type { Message } from "../../types/chat";
 import CommandInterpretationCard from "./CommandInterpretationCard";
 import { ChartMessage } from "../analytics/ChartMessage";
 import { DuneResultTable } from "../DuneResultTable";
-import { DuneChartMessage } from "./DuneChartMessage";
 
 /**
  * Renders message content with:
@@ -258,16 +257,6 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
               <div style={{ padding: '12px 16px', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontSize: 13 }}>
                 ⚠ {msg.content}
               </div>
-            )}
-            {/* Dune MCP agent — visualization result */}
-            {msg.visualization && !msg.duneLoading && !msg.duneError && (
-              <DuneChartMessage
-                visualization={msg.visualization}
-                summary={msg.content ?? ''}
-                thoughts={msg.thoughts ?? []}
-                isDark={isDark}
-                theme={theme}
-              />
             )}
             {msg.metadata?.command && (
               <CommandInterpretationCard command={msg.metadata.command} isDark={isDark} />
