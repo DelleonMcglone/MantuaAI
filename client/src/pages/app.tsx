@@ -4358,6 +4358,14 @@ export default function MantuaApp() {
             <DropletsIcon /> Liquidity
           </button>
 
+          {/* Analytics */}
+          <a
+            href="/analytics"
+            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', background: 'transparent', borderRadius: 8, color: theme.textPrimary, fontSize: 14, fontWeight: 500, cursor: 'pointer', textDecoration: 'none' }}
+          >
+            <TrendIcon /> Analytics
+          </a>
+
           {/* Agent */}
           <button
             onClick={() => {

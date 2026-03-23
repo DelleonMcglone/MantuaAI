@@ -8,12 +8,14 @@ import { AppKitProvider } from "@/context/AppKitProvider";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import AppHome from "@/pages/app";
+import AnalyticsPage from "@/pages/AnalyticsPage";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/app" component={AppHome} />
+      <Route path="/analytics" component={AnalyticsPage} />
       <Route component={NotFound} />
     </Switch>
   );
