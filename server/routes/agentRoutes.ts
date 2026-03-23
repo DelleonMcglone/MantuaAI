@@ -17,16 +17,33 @@ import { detectIntent } from "../services/intentRouter";
 
 const router = Router();
 
+// ── Per-variable config check — returns specific missing var or null ───────────
+function configCheck(): string | null {
+  if (!process.env.CDP_API_KEY_ID)     return "CDP_API_KEY_ID is missing from environment";
+  if (!process.env.CDP_API_KEY_SECRET) return "CDP_API_KEY_SECRET is missing from environment";
+  if (!process.env.CDP_WALLET_SECRET)  return "CDP_WALLET_SECRET is missing from environment";
+  if (!process.env.ANTHROPIC_API_KEY)  return "ANTHROPIC_API_KEY is missing from environment";
+  return null;
+}
+
+function logEnvState(label: string) {
+  console.log(`[AgentKit] ${label}:`, {
+    CDP_API_KEY_ID:     process.env.CDP_API_KEY_ID     ? `SET (${process.env.CDP_API_KEY_ID.slice(0, 8)}...)` : 'MISSING',
+    CDP_API_KEY_SECRET: process.env.CDP_API_KEY_SECRET ? 'SET' : 'MISSING',
+    CDP_WALLET_SECRET:  process.env.CDP_WALLET_SECRET  ? 'SET' : 'MISSING',
+    ANTHROPIC_API_KEY:  process.env.ANTHROPIC_API_KEY  ? 'SET' : 'MISSING',
+  });
+}
+
 // ── GET /api/agent/wallet ─────────────────────────────────────────────────────
 // Returns wallet address and ETH balance via AgentKit ReAct agent.
 router.get("/wallet", async (req, res) => {
-  // DIAGNOSTIC — remove after confirming env vars are present
-  console.log('[AgentKit] ENV check:', {
-    CDP_API_KEY_ID:     !!process.env.CDP_API_KEY_ID,
-    CDP_API_KEY_SECRET: !!process.env.CDP_API_KEY_SECRET,
-    CDP_WALLET_SECRET:  !!process.env.CDP_WALLET_SECRET,
-    ANTHROPIC_API_KEY:  !!process.env.ANTHROPIC_API_KEY,
-  });
+  logEnvState('GET /wallet');
+  const cfgErr = configCheck();
+  if (cfgErr) {
+    console.error('[AgentKit] GET /wallet — config error:', cfgErr);
+    return res.status(503).json({ success: false, error: 'Agent not configured', details: cfgErr });
+  }
 
   try {
     const response = await runAgent(
@@ -36,30 +53,10 @@ router.get("/wallet", async (req, res) => {
     return res.json({ success: true, response });
   } catch (err: any) {
     const msg = err?.message ?? 'Unknown error';
-    console.error("[agentkit] GET /wallet error:", JSON.stringify({
-      message: err?.message,
-      stack: err?.stack,
-      name: err?.name,
-    }));
-
-    if (msg.includes('not configured') || msg.includes('Missing required')) {
-      return res.status(503).json({
-        success: false,
-        error: 'Agent not configured',
-        message: 'CDP API keys are missing from the server environment.',
-        action: 'Add CDP_API_KEY_ID, CDP_API_KEY_SECRET, CDP_WALLET_SECRET, ' +
-                'and ANTHROPIC_API_KEY to your .env file.',
-      });
-    }
-
+    console.error("[agentkit] GET /wallet error:", msg);
     if (msg.includes('Invalid') || msg.includes('401') || msg.includes('unauthorized')) {
-      return res.status(401).json({
-        success: false,
-        error: 'Invalid API credentials',
-        message: msg,
-      });
+      return res.status(401).json({ success: false, error: 'Invalid API credentials', message: msg });
     }
-
     return res.status(500).json({ success: false, error: msg });
   }
 });
@@ -82,35 +79,26 @@ router.get("/wallet-info", async (_req, res) => {
 // Main chat mode endpoint — agent handles any message.
 // Body: { message: string, action?: string }
 router.post("/chat", async (req, res) => {
+  logEnvState('POST /chat');
+  const cfgErr = configCheck();
+  if (cfgErr) {
+    console.error('[AgentKit] POST /chat — config error:', cfgErr);
+    return res.status(503).json({ success: false, error: 'Agent not configured', details: cfgErr });
+  }
+
   const { message, action } = req.body;
   if (!message?.trim()) {
     return res.status(400).json({ error: "message is required" });
   }
 
-  // Prepend action context if provided by chat mode card selection
-  const contextualMessage = action
-    ? `[Action: ${action}] ${message}`
-    : message;
+  const contextualMessage = action ? `[Action: ${action}] ${message}` : message;
 
   try {
     const response = await runAgent(contextualMessage);
     return res.json({ success: true, response });
   } catch (err: any) {
     const msg = err?.message ?? 'Unknown error';
-    console.error("[agentkit] POST /chat error:", JSON.stringify({
-      message: err?.message,
-      stack: err?.stack,
-      name: err?.name,
-    }));
-
-    if (msg.includes('not configured') || msg.includes('Missing required')) {
-      return res.status(503).json({
-        success: false,
-        error: 'Agent not configured',
-        message: 'CDP API keys are missing. Add them to your .env file.',
-      });
-    }
-
+    console.error("[agentkit] POST /chat error:", msg);
     return res.status(500).json({ success: false, error: msg });
   }
 });
@@ -119,6 +107,13 @@ router.post("/chat", async (req, res) => {
 // Autonomous mode — agent detects intent and acts without guided prompts.
 // Body: { message: string }
 router.post("/autonomous", async (req, res) => {
+  logEnvState('POST /autonomous');
+  const cfgErr = configCheck();
+  if (cfgErr) {
+    console.error('[AgentKit] POST /autonomous — config error:', cfgErr);
+    return res.status(503).json({ success: false, error: 'Agent not configured', details: cfgErr });
+  }
+
   const { message } = req.body;
   if (!message?.trim()) {
     return res.status(400).json({ error: "message is required" });

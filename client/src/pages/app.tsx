@@ -3462,102 +3462,20 @@ const AgentChatThreadPanel = ({ theme, isDark, actionId }) => {
   );
 };
 
-// ─── Agent v2: Autonomous Mode ────────────────────────────────────────────────
-const AgentAutonomousPanel = ({ theme, isDark, onNavigate }) => {
-  const [instruction, setInstruction] = useState('');
-  const [isExecuting, setIsExecuting] = useState(false);
-  const [messages, setMessages] = useState<Array<{role:'agent'|'user';text:string}>>([]);
-
-  const suggestions = [
-    'Create a wallet for me',
-    'Get me testnet ETH',
-    'Swap 0.00001 ETH for USDC',
-    'What is the current ETH price?',
-    'Show my wallet balance',
-    'Create a pool with the Stable Protection Hook',
-  ];
-
-  const execute = async (cmd?: string) => {
-    const text = cmd ?? instruction;
-    if (!text.trim()) return;
-    setMessages(prev => [...prev, { role: 'user', text }]);
-    setInstruction('');
-    setIsExecuting(true);
-    try {
-      const res = await fetch('/api/agent/autonomous', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text }),
-      });
-      const data = await res.json();
-      const responseText = data.response ?? data.error ?? 'No response from agent.';
-      setMessages(prev => [...prev, { role: 'agent', text: responseText }]);
-    } catch {
-      setMessages(prev => [...prev, { role: 'agent', text: '❌ Agent request failed. Please try again.' }]);
-    } finally {
-      setIsExecuting(false);
-    }
-  };
-
-  return (
-    <div style={{ padding: '24px', background: theme.bgCard, borderRadius: '14px', border: `1px solid ${theme.border}` }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-        <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🤖</div>
-        <div>
-          <div style={{ color: theme.textPrimary, fontWeight: '700', fontSize: '16px' }}>Autonomous Mode</div>
-          <div style={{ color: theme.textMuted, fontSize: '12px' }}>Powered by AgentKit · Real on-chain execution</div>
-        </div>
-      </div>
-
-      {/* Message history */}
-      {messages.length > 0 && (
-        <div style={{ marginBottom: '16px', maxHeight: '240px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {messages.map((m, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-              <div style={{ maxWidth: '85%', padding: '10px 14px', borderRadius: m.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', background: m.role === 'user' ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'), color: m.role === 'user' ? 'white' : theme.textPrimary, fontSize: '13px', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
-                {m.role === 'agent' ? renderAgentText(m.text) : m.text}
-              </div>
-            </div>
-          ))}
-          {isExecuting && (
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', padding: '10px 14px', borderRadius: '14px 14px 14px 4px', background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', width: 'fit-content' }}>
-              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#8b5cf6', animation: 'pulse 1s infinite' }} />
-              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#8b5cf6', animation: 'pulse 1s 0.2s infinite' }} />
-              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#8b5cf6', animation: 'pulse 1s 0.4s infinite' }} />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Suggestions */}
-      {messages.length === 0 && (
-        <div style={{ marginBottom: '16px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-          {suggestions.map(s => (
-            <button key={s} onClick={() => execute(s)}
-              style={{ padding: '6px 14px', borderRadius: '14px', border: `1px solid ${theme.border}`, background: 'transparent', color: theme.textSecondary, fontSize: '12px', cursor: 'pointer' }}>
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div style={{ display: 'flex', gap: '10px' }}>
-        <input value={instruction} onChange={e => setInstruction(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && execute()}
-          placeholder="Type your instruction..."
-          style={{ flex: 1, padding: '12px 16px', background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)', border: `1px solid ${theme.border}`, borderRadius: '10px', color: theme.textPrimary, fontSize: '14px', outline: 'none' }} />
-        <button onClick={() => execute()} disabled={!instruction.trim() || isExecuting}
-          style={{ padding: '12px 20px', background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', border: 'none', borderRadius: '10px', color: 'white', fontSize: '14px', fontWeight: '600', cursor: (!instruction.trim() || isExecuting) ? 'not-allowed' : 'pointer', opacity: (!instruction.trim() || isExecuting) ? 0.6 : 1 }}>
-          Execute
-        </button>
-      </div>
+// ─── Agent v2: Autonomous Mode — header card only ────────────────────────────
+// Input and responses are handled by the shared bottom chat bar and ChatMessageList.
+const AgentAutonomousPanel = ({ theme }: { theme: any }) => (
+  <div style={{ padding: '20px 24px', background: theme.bgCard, borderRadius: '14px', border: `1px solid ${theme.border}`, display: 'flex', alignItems: 'center', gap: '14px' }}>
+    <div style={{ width: '40px', height: '40px', flexShrink: 0, borderRadius: '12px', background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🤖</div>
+    <div>
+      <div style={{ color: theme.textPrimary, fontWeight: '700', fontSize: '15px' }}>Autonomous Mode</div>
+      <div style={{ color: theme.textMuted, fontSize: '12px', marginTop: 2 }}>Powered by AgentKit · Type any instruction below ↓</div>
     </div>
-  );
-};
+  </div>
+);
 
 // ─── Main AgentBuilderInterface (v2) ─────────────────────────────────────────
-const AgentBuilderInterface = ({ onClose, theme, isDark, onNavigate }) => {
-  const [mode, setMode] = useState<'select' | 'chat' | 'autonomous'>('select');
+const AgentBuilderInterface = ({ onClose, theme, isDark, onNavigate, mode, setMode }) => {
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const { address } = useAccount();
   const { data: balance } = useBalance({ address });
@@ -3607,7 +3525,7 @@ const AgentBuilderInterface = ({ onClose, theme, isDark, onNavigate }) => {
         <button onClick={() => setMode('select')} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'transparent', border: 'none', color: theme.textSecondary, fontSize: '13px', cursor: 'pointer', marginBottom: '16px', padding: '4px 0' }}>
           ← Back to mode selection
         </button>
-        <AgentAutonomousPanel theme={theme} isDark={isDark} onNavigate={onNavigate} />
+        <AgentAutonomousPanel theme={theme} />
       </div>
     );
   }
@@ -3910,6 +3828,7 @@ export default function MantuaApp() {
   const [liquidityRefreshKey, setLiquidityRefreshKey] = useState(0);
   const [portfolioRefreshKey, setPortfolioRefreshKey] = useState(0);
   const [showAgentBuilder, setShowAgentBuilder] = useState(false);
+  const [agentBuilderMode, setAgentBuilderMode] = useState<'select' | 'chat' | 'autonomous'>('select');
   const [showAnalyticsSuggestions, setShowAnalyticsSuggestions] = useState(false);
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const [showAddLiquidityModal, setShowAddLiquidityModal] = useState(false);
@@ -4023,6 +3942,36 @@ export default function MantuaApp() {
     isVoiceSubmitRef.current = false;
 
     setHasInteracted(true);
+
+    // ── Autonomous Agent Pipeline ─────────────────────────────────────────────
+    // When the Agent Builder is open in autonomous mode, route ALL input here.
+    if (showAgentBuilder && agentBuilderMode === 'autonomous') {
+      const placeholderId = 'agent-auto-' + Date.now();
+      setAnalyticsMessages(prev => [...prev,
+        { id: 'user-agent-' + Date.now(), sessionId: '', role: 'user' as const, content: inputValue, createdAt: new Date().toISOString() },
+        { id: placeholderId, sessionId: '', role: 'assistant' as const, content: '', duneLoading: true, loadingText: 'Agent executing…', createdAt: new Date().toISOString() },
+      ]);
+      setHasInteracted(true);
+      fetch('/api/agent/autonomous', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: inputValue }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          const responseText = data.response ?? data.error ?? 'No response from agent.';
+          setAnalyticsMessages(prev => prev.map(m => m.id === placeholderId ? {
+            ...m, duneLoading: false, content: responseText,
+          } : m));
+        })
+        .catch(err => {
+          setAnalyticsMessages(prev => prev.map(m => m.id === placeholderId ? {
+            ...m, duneLoading: false, content: `Agent error: ${err.message}`, duneError: true,
+          } : m));
+        });
+      return;
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     // ── Dune MCP Analytics Pipeline ──────────────────────────────────────────
     // Handles all research, chart, and data queries via the Dune MCP agent.
@@ -4234,6 +4183,7 @@ export default function MantuaApp() {
               setShowSwap(false);
               setShowLiquidity(false);
               setShowAgentBuilder(false);
+              setAgentBuilderMode('select');
               setShowAnalyticsSuggestions(false);
               setShowPortfolioModal(false);
               setShowAddLiquidityModal(false);
@@ -4313,6 +4263,7 @@ export default function MantuaApp() {
           <button
             onClick={() => {
               setShowAgentBuilder(true);
+              setAgentBuilderMode('select');
               setShowSwap(false);
               setShowLiquidity(false);
               setShowAnalyticsSuggestions(false);
@@ -4609,6 +4560,8 @@ export default function MantuaApp() {
                         onClose={() => setShowAgentBuilder(false)}
                         theme={theme}
                         isDark={isDark}
+                        mode={agentBuilderMode}
+                        setMode={setAgentBuilderMode}
                         onNavigate={(view) => {
                           setShowAgentBuilder(false);
                           setHasInteracted(true);

@@ -69,6 +69,15 @@ export async function getAgentKit(): Promise<AgentKit> {
   if (_initPromise) return _initPromise;
 
   _initPromise = (async () => {
+    // Verbose diagnostic — shows exactly which vars are present at runtime
+    console.log('[AgentKit] ENV diagnostic:', {
+      CDP_API_KEY_ID:     process.env.CDP_API_KEY_ID     ? `SET (${process.env.CDP_API_KEY_ID.slice(0, 8)}...)` : 'MISSING',
+      CDP_API_KEY_SECRET: process.env.CDP_API_KEY_SECRET ? 'SET' : 'MISSING',
+      CDP_WALLET_SECRET:  process.env.CDP_WALLET_SECRET  ? 'SET' : 'MISSING',
+      ANTHROPIC_API_KEY:  process.env.ANTHROPIC_API_KEY  ? `SET (${process.env.ANTHROPIC_API_KEY.slice(0, 8)}...)` : 'MISSING',
+      NODE_ENV:           process.env.NODE_ENV,
+    });
+
     validateEnvVars();
 
     console.log('[AgentKit] Initializing CDP wallet provider...');
@@ -117,6 +126,7 @@ export async function getAgentKit(): Promise<AgentKit> {
     return await _initPromise;
   } catch (err) {
     _initPromise = null;
+    _agent = null; // reset so next call re-creates with fresh kit
     throw err;
   }
 }
