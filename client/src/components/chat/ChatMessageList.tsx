@@ -5,6 +5,7 @@ import type { Message } from "../../types/chat";
 import CommandInterpretationCard from "./CommandInterpretationCard";
 import { ChartMessage } from "../analytics/ChartMessage";
 import { DuneResultTable } from "../DuneResultTable";
+import { DuneChartMessage } from "./DuneChartMessage";
 
 /**
  * Renders message content with:
@@ -243,6 +244,30 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
               ) : (
                 <DuneResultTable data={msg.dune} isDark={isDark} />
               )
+            )}
+            {/* Dune MCP agent — loading state */}
+            {msg.duneLoading && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: isDark ? 'rgba(99,102,241,0.08)' : 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.2)', color: '#818cf8', fontSize: 13 }}>
+                <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid #6366f1', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite', flexShrink: 0 }} />
+                {msg.loadingText ?? 'Searching mainnet tables · Writing SQL · Fetching results…'}
+                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+              </div>
+            )}
+            {/* Dune MCP agent — error state */}
+            {msg.duneError && !msg.duneLoading && (
+              <div style={{ padding: '12px 16px', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontSize: 13 }}>
+                ⚠ {msg.content}
+              </div>
+            )}
+            {/* Dune MCP agent — visualization result */}
+            {msg.visualization && !msg.duneLoading && !msg.duneError && (
+              <DuneChartMessage
+                visualization={msg.visualization}
+                summary={msg.content ?? ''}
+                thoughts={msg.thoughts ?? []}
+                isDark={isDark}
+                theme={theme}
+              />
             )}
             {msg.metadata?.command && (
               <CommandInterpretationCard command={msg.metadata.command} isDark={isDark} />

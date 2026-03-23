@@ -17,9 +17,7 @@ import { ChatInput } from '../components/chat/ChatInput';
 import { useChat } from '../hooks/useChat';
 import AddLiquidityModal from '../components/liquidity/AddLiquidityModal';
 import { classifyQuery } from '../utils/queryClassifier';
-import { isAnalyticsQuery, generateAnalyticsQuery } from '../lib/analyticsEngine';
-import { gqlQuery } from '../lib/graphql';
-import { normalizeForChart } from '../lib/normalizeSubgraphData';
+import { isDuneAnalyticsQuery } from '../lib/duneIntentDetector';
 // Heavy views loaded lazily for bundle splitting
 import { TxHistoryPanel }  from '../components/portfolio/TxHistoryPanel';
 import { useTxHistory }    from '../hooks/useTxHistory';
@@ -4025,108 +4023,40 @@ export default function MantuaApp() {
 
     setHasInteracted(true);
 
-    // ── Dune Analytics detection ─────────────────────────────────────────────
-    const duneKeywords = ['volume', 'tvl', 'liquidity pool', 'on-chain', 'onchain', 'dune',
-      'analytics', 'nft marketplace', 'opensea', 'blur', 'dex volume', 'uniswap v4',
-      'holders', 'gas fee', 'gas trend', 'defi protocol'];
-    const isDuneMessage = duneKeywords.some(kw => inputValue.toLowerCase().includes(kw));
-
-    if (isDuneMessage) {
+    // ── Dune MCP Analytics Pipeline ──────────────────────────────────────────
+    // Handles all research, chart, and data queries via the Dune MCP agent.
+    // Runs BEFORE swap/liquidity intent detection.
+    if (isDuneAnalyticsQuery(inputValue)) {
       updateSessionTitle(`Analyzed: ${inputValue.slice(0, 50)}`);
       loadRecentChats();
-      const placeholderId = 'dune-' + Date.now();
-      const userMsgId = 'user-dune-' + Date.now();
+      const placeholderId = 'dune-mcp-' + Date.now();
       setAnalyticsMessages(prev => [...prev,
-        { id: userMsgId, sessionId: '', role: 'user' as const, content: inputValue, createdAt: new Date().toISOString() },
-        { id: placeholderId, sessionId: '', role: 'assistant' as const, content: '', dune: { rows: [], columns: [], rowCount: 0, label: 'Querying Dune...', isLoading: true }, createdAt: new Date().toISOString() },
+        { id: 'user-dune-' + Date.now(), sessionId: '', role: 'user' as const, content: inputValue, createdAt: new Date().toISOString() },
+        { id: placeholderId, sessionId: '', role: 'assistant' as const, content: '', duneLoading: true, loadingText: 'Searching mainnet tables · Writing SQL · Fetching results…', createdAt: new Date().toISOString() },
       ]);
       try {
-        const res = await fetch('/api/dune/query', {
+        const res = await fetch('/api/agent/analytics', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: inputValue }),
         });
         const json = await res.json();
-        if (json.success && json.data) {
-          setAnalyticsMessages(prev => prev.map(m => m.id === placeholderId ? {
-            ...m,
-            content: '',
-            dune: { ...json.data, isLoading: false },
-          } : m));
-        } else {
-          const msg = json.message || 'No matching Dune query found.';
-          setAnalyticsMessages(prev => prev.map(m => m.id === placeholderId ? {
-            ...m,
-            content: msg,
-            dune: null,
-          } : m));
+        if (!res.ok) {
+          throw new Error(json.error ?? `HTTP ${res.status}`);
         }
-      } catch {
         setAnalyticsMessages(prev => prev.map(m => m.id === placeholderId ? {
           ...m,
-          content: 'Failed to query on-chain data. Please try again.',
-          dune: null,
+          duneLoading: false,
+          content: json.result ?? '',
+          visualization: json.visualization ?? null,
+          thoughts: json.thoughts ?? [],
         } : m));
-      }
-      return;
-    }
-
-    if (isAnalyticsQuery(inputValue)) {
-      const placeholderId = 'chart-' + Date.now();
-      const chartMsg = {
-        id: placeholderId,
-        sessionId: '',
-        role: 'assistant' as const,
-        content: '',
-        chart: {
-          chartType: 'stat' as const,
-          title: 'Querying on-chain data...',
-          description: inputValue,
-          data: [],
-          isLoading: true,
-          error: null,
-        },
-        createdAt: new Date().toISOString(),
-      };
-      setAnalyticsMessages(prev => [...prev, {
-        id: 'user-' + Date.now(),
-        sessionId: '',
-        role: 'user' as const,
-        content: inputValue,
-        createdAt: new Date().toISOString(),
-      }, chartMsg]);
-
-      try {
-        const analyticsResult = await generateAnalyticsQuery(inputValue);
-        if (analyticsResult) {
-          const subgraphResult = await gqlQuery(analyticsResult.graphql, analyticsResult.variables ?? {});
-          const normalized = normalizeForChart(subgraphResult.merged ?? {}, analyticsResult.chartType);
-          setAnalyticsMessages(prev => prev.map(m => m.id === placeholderId ? {
-            ...m,
-            chart: {
-              chartType: analyticsResult.chartType,
-              title: analyticsResult.title,
-              description: analyticsResult.description,
-              data: normalized,
-              isLoading: false,
-              error: null,
-            },
-          } : m));
-        } else {
-          setAnalyticsMessages(prev => prev.map(m => m.id === placeholderId ? {
-            ...m,
-            content: "I couldn't generate a query for that. Try rephrasing your question.",
-            chart: null,
-          } : m));
-        }
       } catch (err) {
         setAnalyticsMessages(prev => prev.map(m => m.id === placeholderId ? {
           ...m,
-          chart: {
-            ...m.chart!,
-            isLoading: false,
-            error: 'Failed to query subgraph. The subgraph may not be deployed yet.',
-          },
+          duneLoading: false,
+          content: `Analytics query failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+          duneError: true,
         } : m));
       }
       return;
