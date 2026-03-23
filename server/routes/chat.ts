@@ -6,6 +6,26 @@ import { storage } from "../storage";
 import { parseVoiceCommand } from "../../shared/voiceCommandParser";
 import { duneService } from "../services/duneService";
 import { matchDuneQuery, matchSQLTemplate, fillTemplateParams, getAllQueries, getAllSQLTemplates } from "../services/duneQueries";
+import { parseSwapIntent } from "../agent/parseSwapIntent";
+import { parseLiquidityIntent } from "../agent/parseLiquidityIntent";
+import type { SwapIntent } from "../agent/parseSwapIntent";
+import type { LiquidityIntent } from "../agent/parseLiquidityIntent";
+
+// ── Intent router — swap checked before liquidity ────────────────────────────
+interface RoutedIntent {
+  type: "swap" | "liquidity" | "unknown";
+  intent: SwapIntent | LiquidityIntent | null;
+}
+
+function routeIntent(userMessage: string): RoutedIntent {
+  const swapIntent = parseSwapIntent(userMessage);
+  if (swapIntent) return { type: "swap", intent: swapIntent };
+
+  const liquidityIntent = parseLiquidityIntent(userMessage);
+  if (liquidityIntent) return { type: "liquidity", intent: liquidityIntent };
+
+  return { type: "unknown", intent: null };
+}
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY,
@@ -223,9 +243,13 @@ export function registerChatRoutes(app: Express): void {
     try {
       const { sessionId, message, chainId } = aiChatSchema.parse(req.body);
       const parsed = parseVoiceCommand(message);
-      const metadata = parsed ? { command: parsed } : undefined;
+      const routed = routeIntent(message);
+      const metadata = {
+        ...(parsed ? { command: parsed } : {}),
+        ...(routed.type !== "unknown" ? { intent: routed } : {}),
+      };
       const content = await generateResponse(message, parsed, chainId);
-      res.json({ content, metadata, sessionId });
+      res.json({ content, metadata: Object.keys(metadata).length ? metadata : undefined, sessionId });
     } catch (err) {
       if (err instanceof z.ZodError) {
         res.status(400).json({ error: err.errors[0]?.message ?? "Invalid request" });

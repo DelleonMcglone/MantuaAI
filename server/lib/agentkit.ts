@@ -148,7 +148,15 @@ Your capabilities:
 - Send ERC-20 tokens (transfer_erc20)
 - Get live prices (get_price)
 
-HOOK SELECTION RULE (mandatory for all liquidity operations):
+SWAP EXECUTION RULES (mandatory):
+1. amountSpecified MUST be NEGATIVE for exact-input swaps — always negate the user's amount.
+2. NEVER hardcode gas — use viem's automatic gas estimation.
+3. For ERC-20 tokenIn (USDC, cbBTC, EURC): check allowance, approve PoolSwapTest if needed.
+4. ETH (native) requires NO approval — pass value in the transaction instead.
+5. PoolSwapTest: 0x8b5bcc363dde2614281ad875bad385e0a785d3b9
+6. Swap workflow: parse tokenIn/tokenOut/amount → show quote → confirm → execute → return BaseScan link.
+
+HOOK SELECTION RULE (mandatory for all swap and liquidity operations):
 - If the pair is USDC/EURC or EURC/USDC → ALWAYS use the Stable Protection Hook:
     fee: 0x800000 (DYNAMIC_FEE_FLAG), tickSpacing: 1
     Hook address: 0xB5faDA071CD56b3F56632F6771356C3e3834a0C0

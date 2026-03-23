@@ -27,8 +27,62 @@ const normalizeTokenSymbol = (sym: string): string => {
 const extractHookFromMessage = (msg: string): string => {
   const hookMatch = msg.match(/(?:with|using)\s+(stable\s*protection|limit\s*order|twamm|dynamic\s*fee|no\s*hook)/i);
   if (hookMatch) return hookMatch[1].trim();
+  // Additional stable hook keywords from corpus
+  if (/stable\s+protection|stable\s+hook|stable\s+protect|peg\s+protection|circuit\s+breaker/i.test(msg)) {
+    return 'stable protection';
+  }
   return '';
 };
+
+// Stable pair auto-detection: USDC/EURC always uses Stable Protection Hook
+const STABLE_PAIRS = new Set(['USDC-EURC', 'EURC-USDC']);
+const isStablePair = (a: string, b: string) => STABLE_PAIRS.has(`${a}-${b}`);
+
+// Liquidity intent patterns — covers all 50 corpus entries
+const ADD_LIQUIDITY_PATTERNS: RegExp[] = [
+  // "add liquidity" in any form
+  /\badd\s+(liquidity|lp)\b/i,
+  /\badd\s+\S+\s+and\s+\S+\s+to\s+(a\s+|the\s+)?pool/i,
+  /\badd\s+funds?\s+to\s+.+pool/i,
+  // "provide ... liquidity" or "provide X and Y"
+  /\bprovide\s+liquidity\b/i,
+  /\bprovide\s+\w+\s+(and|&)\s+\w+(\s+liquidity)?\b/i,
+  /\bprovide\s+\w+\/\w+\s+liquidity\b/i,
+  // "supply liquidity" / "supply X and Y" / "supply X to pool"
+  /\bsupply\s+liquidity\b/i,
+  /\bsupply\s+\S+\s+\S+\b/i,
+  /\bsupply\s+.+to\s+(a\s+|the\s+)?pool/i,
+  // "deposit ... into ... pool"
+  /\bdeposit\s+.*(into|to)\s+(a\s+|the\s+)?(\w+\/)?\w+\s*pool/i,
+  /\bdeposit\s+(into|cbbtc|eth|usdc|eurc)\b/i,
+  // "add [amount/tokens] to a/the pool" (handles "Uniswap v4 pool", etc.)
+  /\badd\s+.+\bpool\b/i,
+  // "LP into", "LP cbBTC", "I'd like to LP", "I want to LP"
+  /\blp\s+(into|to|eth|usdc|cbbtc|eurc|\w+\/\w+)\b/i,
+  /\bi'?d\s+like\s+to\s+lp\b/i,
+  /\bi\s+want\s+to\s+lp\b/i,
+  /\bi'?d\s+like\s+to\s+provide\b/i,
+  // "open a (liquidity) position"
+  /\bopen\s+(a\s+|an\s+)?(new\s+)?(\w+[\/\s]\w+\s+)?(liquidity\s+)?position\b/i,
+  /\bopen\s+lp\s+position\b/i,
+  // "create a (liquidity) position"
+  /\bcreate\s+(a\s+)?(new\s+)?(liquidity\s+)?position\b/i,
+  // "become a liquidity provider"
+  /\bbecome\s+(a\s+)?liquidity\s+provider\b/i,
+  // "stake X and Y in a pool"
+  /\bstake\s+\w+\s+(and\s+)?\w+\s+in\s+(a\s+)?pool\b/i,
+  // "put ... into ... pool"
+  /\bput\s+.*(into|in)\s+(a\s+|the\s+)?(\w+\/)?\w*\s*pool\b/i,
+  /\bput\s+(some\s+)?\w+\s+\w+\s+liquidity\b/i,
+  /\bput\s+my\s+\w+\s+and\s+\w+\s+to\s+work\b/i,
+  // "drop ... into a pool"
+  /\bdrop\s+.+into\s+(a\s+)?pool\b/i,
+  // "earn fees on/with [tokens]"
+  /\bearn\s+fees?\s+(on|with)\b/i,
+  // explicit hook phrases paired with tokens
+  /\b(usdc|eurc).*(stable\s+protection|stable\s+hook|peg\s+protection|circuit\s+breaker)\b/i,
+  /\b(stable\s+protection|stable\s+hook|peg\s+protection|circuit\s+breaker).*(usdc|eurc)\b/i,
+];
 
 const KNOWN_TOKENS_LOWER = ['eth', 'ether', 'ethereum', 'usdc', 'usdcoin', 'eurc', 'euro', 'eurocoin', 'cbbtc', 'btc', 'wbtc', 'weth', 'usd', 'eur', 'coinbasebtc', 'coinbasewrappedbtc'];
 
@@ -115,13 +169,13 @@ export const classifyQuery = (input: string): ClassifiedQuery => {
     chartType: 'line'
   };
 
-  if (
-    msg.match(/^add\s+(liquidity|lp)/) ||
-    msg.match(/add\s+(liquidity|lp)\s+to/) ||
-    msg.includes('add liquidity')
-  ) {
+  if (ADD_LIQUIDITY_PATTERNS.some(re => re.test(msg))) {
     result.type = 'addLiquidity';
-    result.params = extractPoolFromMessage(canonicalMsg);
+    const poolInfo = extractPoolFromMessage(canonicalMsg);
+    if (poolInfo && isStablePair(poolInfo.tokenA, poolInfo.tokenB)) {
+      poolInfo.hook = 'stable protection';
+    }
+    result.params = poolInfo;
     return result;
   }
   
