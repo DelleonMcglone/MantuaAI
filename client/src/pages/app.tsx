@@ -4328,11 +4328,14 @@ export default function MantuaApp() {
                       chat={chat}
                       theme={theme}
                       onDelete={async () => {
+                        // Optimistic update — remove immediately
+                        setRecentChats(prev => prev.filter((c: any) => c.id !== chat.id));
                         try {
-                          await fetch(`/api/chat/sessions/${chat.id}`, { method: 'DELETE' });
-                          loadRecentChats();
+                          const res = await fetch(`/api/chat/sessions/${chat.id}`, { method: 'DELETE' });
+                          if (!res.ok) loadRecentChats(); // revert on server error
                         } catch (error) {
                           console.error('Failed to delete chat:', error);
+                          loadRecentChats(); // revert on network error
                         }
                       }}
                     />
