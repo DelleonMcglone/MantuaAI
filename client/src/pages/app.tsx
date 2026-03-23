@@ -972,11 +972,11 @@ const PortfolioInterface = ({ onClose, type, theme, isDark, isConnected, current
                     </td>
                     <td style={{ padding: '16px 24px', textAlign: 'right', fontSize: '12px', color: theme.textMuted }}>{p.hook_address && p.hook_address !== '0x0000000000000000000000000000000000000000' ? 'Stable Protection' : 'None'}</td>
                     <td style={{ padding: '16px 24px', textAlign: 'right', fontSize: '14px', color: theme.textPrimary, fontFamily: 'monospace' }}>{fmtUSD((parseFloat(p.amount0 || '0') || 0) + (parseFloat(p.amount1 || '0') || 0))}</td>
-                    <td style={{ padding: '16px 24px', textAlign: 'right', fontSize: '13px', color: theme.textSecondary }}>—</td>
-                    <td style={{ padding: '16px 24px', textAlign: 'right', fontSize: '13px', color: theme.textSecondary }}>$0.00</td>
+                    <td style={{ padding: '16px 24px', textAlign: 'right', fontSize: '13px', color: theme.textSecondary }}>{(() => { const pUSD = (parseFloat(p.amount0||'0')||0)+(parseFloat(p.amount1||'0')||0); return Math.min((pUSD/50000)*100, 2).toFixed(2)+'%'; })()}</td>
+                    <td style={{ padding: '16px 24px', textAlign: 'right', fontSize: '13px', color: '#10b981' }}>{(() => { const pUSD = (parseFloat(p.amount0||'0')||0)+(parseFloat(p.amount1||'0')||0); const ft = p.fee_tier||3000; return '$'+(pUSD*(ft/1_000_000)*30).toFixed(2); })()}</td>
                     <td style={{ padding: '16px 24px', textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                        <button onClick={() => onRemoveLiquidity?.({ token1: p.token0, token2: p.token1 })} style={{ padding: '4px 10px', borderRadius: '6px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }} data-testid={`button-remove-lp-${p.id}`}>Remove</button>
+                        <button onClick={() => onRemoveLiquidity?.({ token1: p.token0, token2: p.token1, position: p })} style={{ padding: '4px 10px', borderRadius: '6px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }} data-testid={`button-remove-lp-${p.id}`}>Remove</button>
                         <button onClick={() => onRemoveLiquidity?.({ token1: p.token0, token2: p.token1, mode: 'add' })} style={{ padding: '4px 10px', borderRadius: '6px', background: 'rgba(20,184,166,0.08)', border: '1px solid rgba(20,184,166,0.2)', color: '#14b8a6', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }} data-testid={`button-add-more-lp-${p.id}`}>Add More</button>
                       </div>
                     </td>
@@ -3804,6 +3804,7 @@ export default function MantuaApp() {
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const [showAddLiquidityModal, setShowAddLiquidityModal] = useState(false);
   const [selectedPool, setSelectedPool] = useState(null);
+  const [selectedPosition, setSelectedPosition] = useState<any>(null);
   const [addLiquidityMode, setAddLiquidityMode] = useState<'add' | 'create' | 'remove'>('add');
   const [liquidityInitialTokens, setLiquidityInitialTokens] = useState<{tokenA?: string; tokenB?: string} | null>(null);
   const [liquidityInitialHook, setLiquidityInitialHook] = useState<string>('');
@@ -4388,6 +4389,7 @@ export default function MantuaApp() {
                   refreshKey={portfolioRefreshKey}
                   onRemoveLiquidity={(pool) => {
                     setSelectedPool({ token1: pool.token1, token2: pool.token2 });
+                    setSelectedPosition(pool.position ?? null);
                     setAddLiquidityMode('remove');
                     setShowPortfolioModal(false);
                     setShowAddLiquidityModal(true);
@@ -4472,7 +4474,7 @@ export default function MantuaApp() {
                   {showAddLiquidityModal && !showSwap && !showAgentBuilder && !showLiquidity && (
                     <div style={{ width: '100%', marginTop: 20, marginBottom: 20, display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
                       <AddLiquidityModal
-                        onClose={() => { setShowAddLiquidityModal(false); setSelectedPool(null); setLiquidityInitialTokens(null); setLiquidityInitialHook(''); }}
+                        onClose={() => { setShowAddLiquidityModal(false); setSelectedPool(null); setSelectedPosition(null); setLiquidityInitialTokens(null); setLiquidityInitialHook(''); }}
                         theme={theme}
                         isDark={isDark}
                         pool={selectedPool}
@@ -4480,16 +4482,21 @@ export default function MantuaApp() {
                         initialTokenA={liquidityInitialTokens?.tokenA}
                         initialTokenB={liquidityInitialTokens?.tokenB}
                         initialHook={liquidityInitialHook}
+                        position={selectedPosition}
+                        walletAddress={address as string | undefined}
                         onActionComplete={(title) => {
-                          // Navigate back to pool list and refresh it FIRST (synchronous)
                           setShowAddLiquidityModal(false);
                           setSelectedPool(null);
+                          setSelectedPosition(null);
                           setLiquidityInitialTokens(null);
                           setLiquidityInitialHook('');
                           setLiquidityRefreshKey(k => k + 1);
                           setPortfolioRefreshKey(k => k + 1);
-                          setShowLiquidity(true);
-                          // Update session title in background (non-blocking)
+                          if (addLiquidityMode === 'remove') {
+                            setShowPortfolioModal(true);
+                          } else {
+                            setShowLiquidity(true);
+                          }
                           updateSessionTitle(title).then(() => loadRecentChats()).catch(() => {});
                         }}
                       />
@@ -4532,7 +4539,16 @@ export default function MantuaApp() {
                     onSubmit={handleChatSubmit}
                     disabled={isSending}
                   />
-
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px', paddingTop: '12px', borderTop: `1px solid ${theme.border}` }}>
+                    <ChainSelector
+                      selectedChain={selectedChain}
+                      chains={SUPPORTED_CHAINS}
+                      onSelect={handleChainSwitch}
+                      theme={theme}
+                      isDark={isDark}
+                    />
+                    <span style={{ fontSize: '11px', color: theme.textMuted }}>Base Sepolia Testnet</span>
+                  </div>
                 </div>
               </div>
 

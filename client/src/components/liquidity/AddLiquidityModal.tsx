@@ -25,6 +25,8 @@ interface AddLiquidityModalProps {
   initialTokenB?: string;
   initialHook?: string;
   onActionComplete?: (title: string) => void;
+  position?: { id: string; token0: string; token1: string; amount0: string; amount1: string; fee_tier: number; status: string; hook_address?: string } | null;
+  walletAddress?: string;
 }
 
 const HOOKS = [
@@ -81,7 +83,7 @@ const PairTokenIcon = ({ token, size = 36 }: { token: Token | null; size?: numbe
 };
 
 const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
-  onClose, theme, isDark, pool, mode = 'add', initialTokenA, initialTokenB, initialHook, onActionComplete,
+  onClose, theme, isDark, pool, mode = 'add', initialTokenA, initialTokenB, initialHook, onActionComplete, position, walletAddress,
 }) => {
   const chainId = useChainId();
   const [selectedHook, setSelectedHook] = useState('none');
@@ -207,6 +209,9 @@ const AddLiquidityModal: React.FC<AddLiquidityModalProps> = ({
             hookColor={hookColor}
             onOpenHookSelector={() => setIsHookModalOpen(true)}
             isMobile={isMobile}
+            position={position}
+            walletAddress={walletAddress}
+            onActionComplete={onActionComplete}
           />
         ) : (
           <AddLiquidityForm
