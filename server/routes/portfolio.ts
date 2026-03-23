@@ -205,6 +205,18 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
+router.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    await ensurePortfolioSchema();
+    const { id } = req.params;
+    await dbPool.query('DELETE FROM pools WHERE id = $1', [id]);
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to delete pool', detail: msg });
+  }
+});
+
 router.post('/backfill-pool', async (req: Request, res: Response) => {
   try {
     await ensurePortfolioSchema();
