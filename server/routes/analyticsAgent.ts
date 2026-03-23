@@ -44,6 +44,17 @@ router.post("/", async (req: Request, res: Response): Promise<void> => {
 
   try {
     const result = await runAnalyticsAgent(parsed.data.message);
+
+    if (!result.result || result.result.trim().length === 0) {
+      res.status(500).json({
+        error: "Analytics agent returned an empty response",
+        details:
+          "The Dune MCP tools may not have connected correctly. Check DUNE_API_KEY.",
+        thoughts: result.thoughts,
+      });
+      return;
+    }
+
     res.status(200).json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

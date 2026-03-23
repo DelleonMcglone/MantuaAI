@@ -47,13 +47,13 @@ interface AnalyticsResponse {
 // ── Suggested queries ─────────────────────────────────────────────────────────
 
 const SUGGESTED_QUERIES = [
-  "Show me daily swap volume on Base Sepolia for the last 30 days",
-  "How many unique wallets have interacted with PoolManager 0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408?",
-  "Find tables with USDC and EURC liquidity data on Base",
+  "Show daily swap volume on Base mainnet for the last 30 days",
+  "How many unique wallets traded USDC on Base mainnet this month?",
+  "Find USDC/EURC liquidity pool data on Base mainnet",
   "What blockchains does Dune index?",
-  "Show current Dune API credit usage",
-  "Create a query for daily transaction count on Base Sepolia",
-  "Find decoded event tables for contract 0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408",
+  "Show top 10 tokens by volume on Base mainnet",
+  "Daily transaction count on Base mainnet for the last 7 days",
+  "Find decoded event tables for USDC on Base mainnet",
 ];
 
 const CHART_COLORS = ["#6366f1", "#8b5cf6", "#a78bfa", "#c4b5fd", "#ddd6fe"];
@@ -232,13 +232,37 @@ export default function AnalyticsPage() {
       }}
     >
       {/* Header */}
-      <div style={{ marginBottom: 36 }}>
+      <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontSize: 28, fontWeight: 700, margin: "0 0 8px", letterSpacing: "-0.02em" }}>
           Onchain Analytics
         </h1>
         <p style={{ fontSize: 14, color: "#9ca3af", margin: 0 }}>
           Powered by Dune Analytics · Query any onchain data in plain English
         </p>
+      </div>
+
+      {/* Mainnet notice banner */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 10,
+          padding: "11px 16px",
+          borderRadius: 10,
+          border: "1px solid #1d3a2a",
+          background: "#0d1f17",
+          color: "#6ee7b7",
+          fontSize: 13,
+          marginBottom: 28,
+          lineHeight: 1.5,
+        }}
+      >
+        <span style={{ flexShrink: 0, marginTop: 1 }}>ℹ</span>
+        <span>
+          <strong style={{ color: "#a7f3d0" }}>Mainnet data only.</strong>{" "}
+          Dune Analytics does not index testnets (Base Sepolia, Goerli, etc.).
+          All queries run against Base mainnet and Ethereum mainnet.
+        </span>
       </div>
 
       {/* Suggested queries — shown only on empty state */}
@@ -344,7 +368,7 @@ export default function AnalyticsPage() {
               flexShrink: 0,
             }}
           />
-          Querying Dune Analytics — this may take 15–30 seconds…
+          Searching mainnet tables · Writing SQL · Fetching results — this may take 15–30 seconds…
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
       )}

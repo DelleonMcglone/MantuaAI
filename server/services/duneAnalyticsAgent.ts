@@ -44,42 +44,100 @@ export interface AnalyticsAgentResult {
 
 // ── System prompt ─────────────────────────────────────────────────────────────
 
-const ANALYTICS_SYSTEM_PROMPT = `You are an onchain analytics agent for Mantua.AI,
-a DeFi platform on Base Sepolia. You have direct access to Dune Analytics via MCP tools.
+const ANALYTICS_SYSTEM_PROMPT = `You are an onchain analytics agent for Mantua.AI.
+You have direct access to Dune Analytics via MCP tools.
 
-YOUR CAPABILITIES:
-- searchTables: Find the right Dune tables for any protocol or chain
-- listBlockchains: Show available chains (always include Base Sepolia: chain_id = 84532)
-- searchTablesByContractAddress: Find decoded events for a specific contract
-- createDuneQuery: Write and save SQL queries for onchain data
-- executeQueryById: Run a saved query and get an execution ID
-- getExecutionResults: Fetch results from an execution (poll until complete)
-- generateVisualization: Turn query results into charts the UI can render
-- getDuneQuery / updateDuneQuery: Manage existing queries
-- getUsage: Check API credit consumption
-- searchDocs: Look up Dune documentation
+══════════════════════════════════════════════════════════════
+CRITICAL RULE — MAINNET DATA ONLY
+══════════════════════════════════════════════════════════════
+Dune Analytics does NOT index testnets (Base Sepolia, Goerli, Sepolia, Mumbai, etc.).
+ALL queries MUST target mainnet chains only:
 
-MANTUA-SPECIFIC CONTEXT:
-- Primary chain: Base Sepolia (chainId: 84532)
-- Tokens: ETH (native), USDC, cbBTC, EURC
-- Stable pair: USDC/EURC — uses Stable Protection Hook
-- PoolManager: 0x05E73354cFDd6745C338b50BcFDfA3Aa6fA03408
-- PoolSwapTest: 0x8b5bcc363dde2614281ad875bad385e0a785d3b9
-- PoolModifyLiquidityTest: 0x37429cd17cb1454c34e7f50b09725202fd533039
+  - Base mainnet       → use tables prefixed with:  base.
+  - Ethereum mainnet   → use tables prefixed with:  ethereum.
+  - Uniswap v4 (Base)  → search for:               uniswap_v4_base.*
 
-WORKFLOW FOR DATA QUERIES:
-1. Use searchTables or searchTablesByContractAddress to find the right table
-2. Create or reference an existing query with appropriate SQL
-3. Execute the query with executeQueryById
-4. Poll getExecutionResults until state = "QUERY_STATE_COMPLETED"
+When a user asks about a Mantua testnet action (e.g. "USDC/EURC liquidity on Base Sepolia"),
+translate it to the equivalent mainnet query automatically. Do NOT tell the user you
+cannot find testnet data — just query mainnet instead and note this in your response.
+══════════════════════════════════════════════════════════════
+
+MANDATORY BEHAVIOR — ALWAYS CALL A TOOL FIRST:
+You must NEVER respond with plain text without first calling at least one Dune MCP tool.
+If you are unsure which table to use, call searchTables first. No exceptions.
+
+YOUR TOOLS AND WHEN TO USE THEM:
+
+1. searchTables(query, filters?)
+   → Use FIRST for any data request. Search with keywords like:
+     "uniswap v4 base liquidity", "USDC EURC base pool", "base transactions"
+   → If first search returns nothing, try broader terms (e.g. "uniswap base" instead of
+     "uniswap v4 base USDC EURC")
+
+2. listBlockchains()
+   → Call when user asks what chains are available, or to confirm Base mainnet is indexed
+
+3. searchTablesByContractAddress(address, chain?)
+   → Use when user provides a contract address to find decoded event tables
+   → For Mantua contracts, search on chain = "base" (mainnet)
+
+4. createDuneQuery(sql, title, description?)
+   → Use to write fresh SQL when searchTables doesn't find a pre-existing table
+   → Always query mainnet tables (base.*, ethereum.*)
+
+5. executeQueryById(queryId)
+   → Use immediately after createDuneQuery or getDuneQuery to run the query
+
+6. getExecutionResults(executionId)
+   → Poll after executeQueryById — call up to 5 times with 3s between polls
+   → Stop polling when state = "QUERY_STATE_COMPLETED" or "QUERY_STATE_FAILED"
+
+7. generateVisualization(data, vizType, title, xKey?, yKey?)
+   → Call after getExecutionResults returns completed data
+   → Choose vizType based on data shape:
+       time series data    → "line"
+       category comparison → "bar"
+       share/distribution  → "pie"
+       single metric       → "counter"
+       raw rows            → "table"
+
+8. getDuneQuery(queryId) / updateDuneQuery(queryId, updates)
+   → Use to inspect or modify an existing saved query
+
+9. getUsage()
+   → Call only when user explicitly asks about API credit usage
+
+10. searchDocs(query)
+    → Use when you need to look up Dune SQL syntax or table schemas
+
+MAINNET TABLE REFERENCE (use these as starting points):
+  - base.transactions          → Base mainnet transactions
+  - base.traces                → Base mainnet internal transactions
+  - base.logs                  → Base mainnet event logs
+  - uniswap_v4_base.Pool*      → Uniswap v4 pool events on Base (search to confirm exact name)
+  - tokens_base.erc20          → ERC-20 token metadata on Base
+  - dex.trades                 → Cross-DEX trade data (filter by blockchain = 'base')
+  - uniswap_v3_base.*          → Uniswap v3 data on Base (useful for USDC/EURC comps)
+
+MANTUA CONTRACT ADDRESSES (mainnet equivalents — search by address on base chain):
+  Uniswap v4 PoolManager (Base mainnet): search Dune for the canonical v4 deployment
+  USDC on Base mainnet:  0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+  EURC on Base mainnet:  0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42
+  cbBTC on Base mainnet: 0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf
+
+WORKFLOW FOR EVERY REQUEST:
+1. Call searchTables with relevant keywords (always start here)
+2. If a useful table is found → call executeQueryById with appropriate SQL
+3. If no table found → call createDuneQuery with hand-written SQL on mainnet tables
+4. Execute the query → poll getExecutionResults until complete
 5. Call generateVisualization with the results
-6. Return a clear summary with key insights highlighted
+6. Respond with: chart title, key insights (peak/min/trend), and note that data is from mainnet
 
-IMPORTANT:
-- Always confirm what data you are fetching before executing queries
-- Surface key insights (peak values, trends, anomalies) in your response
-- Keep SQL queries focused — SELECT only needed columns with LIMIT clauses
-- If a query takes >30 seconds, inform the user it is still running`;
+RESPONSE FORMAT:
+- Lead with the key insight (e.g. "Base mainnet processed 2.1M transactions yesterday")
+- Note: "Showing mainnet data — Dune does not index testnets"
+- Highlight peak values, trends, and anomalies
+- Keep SQL concise — SELECT only needed columns, LIMIT 100 unless user asks for more`;
 
 // ── MCP tool names Dune exposes ───────────────────────────────────────────────
 
@@ -137,9 +195,7 @@ async function buildLangChainTools(client: Client): Promise<DynamicStructuredToo
       continue;
     }
 
-    // Build a Zod schema from the MCP JSON Schema input definition.
-    // Use z.record(z.unknown()) as a permissive catch-all so that any tool
-    // argument shape is accepted without needing to hand-code every schema.
+    // Use a permissive catch-all schema so any tool argument shape is accepted.
     const inputSchema = z.record(z.unknown()).optional().default({});
 
     const tool = new DynamicStructuredTool({
@@ -156,7 +212,11 @@ async function buildLangChainTools(client: Client): Promise<DynamicStructuredToo
           const content = result.content;
           if (Array.isArray(content)) {
             return content
-              .map((c) => (typeof c === "object" && c !== null && "text" in c ? (c as { text: string }).text : JSON.stringify(c)))
+              .map((c) =>
+                typeof c === "object" && c !== null && "text" in c
+                  ? (c as { text: string }).text
+                  : JSON.stringify(c)
+              )
               .join("\n");
           }
           return typeof content === "string" ? content : JSON.stringify(content);
@@ -180,14 +240,20 @@ export async function runAnalyticsAgent(
   const client = await createDuneClient();
 
   try {
+    // 1. Load tools FIRST so we can bind them to the LLM
     const tools = await buildLangChainTools(client);
 
-    const llm = new ChatAnthropic({
+    // 2. Bind LLM to tools AFTER loading them.
+    //    tool_choice: "any" forces at least one tool call on the first turn,
+    //    preventing the model from answering purely from training data.
+    const baseLlm = new ChatAnthropic({
       model: "claude-sonnet-4-5-20251001",
       temperature: 0,
       apiKey: process.env.ANTHROPIC_API_KEY,
     });
+    const llm = baseLlm.bindTools(tools, { tool_choice: "any" });
 
+    // 3. Create agent with bound LLM
     const agent = createReactAgent({
       llm,
       tools,
@@ -198,38 +264,68 @@ export async function runAnalyticsAgent(
     let finalResult = "";
     let visualization: VisualizationData | undefined;
 
-    const stream = await agent.stream(
-      { messages: [new HumanMessage(userMessage)] },
-      { streamMode: "values" }
-    );
-
-    for await (const chunk of stream) {
-      for (const msg of (chunk.messages ?? []) as Array<{ _getType(): string; content: unknown; name?: string }>) {
-        if (msg._getType() === "ai") {
-          const text = typeof msg.content === "string"
-            ? msg.content.trim()
-            : Array.isArray(msg.content)
-              ? msg.content.map((c: unknown) => (typeof c === "object" && c !== null && "text" in c ? (c as { text: string }).text : "")).join("").trim()
-              : "";
-          if (text) {
-            thoughts.push(text);
-            finalResult = text;
-          }
+    try {
+      const stream = await agent.stream(
+        { messages: [new HumanMessage(userMessage)] },
+        {
+          recursionLimit: 20, // allows polling loops (poll up to ~5x + surrounding steps)
+          streamMode: "values",
         }
+      );
 
-        // Extract visualization from generateVisualization tool response
-        if (msg._getType() === "tool" && msg.name === "generateVisualization") {
-          try {
-            const raw = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content);
-            const parsed = JSON.parse(raw);
-            if (parsed?.type && Array.isArray(parsed?.data)) {
-              visualization = parsed as VisualizationData;
+      for await (const chunk of stream) {
+        for (const msg of (chunk.messages ?? []) as Array<{
+          _getType(): string;
+          content: unknown;
+          name?: string;
+        }>) {
+          if (msg._getType() === "ai") {
+            const text =
+              typeof msg.content === "string"
+                ? msg.content.trim()
+                : Array.isArray(msg.content)
+                  ? msg.content
+                      .map((c: unknown) =>
+                        typeof c === "object" && c !== null && "text" in c
+                          ? (c as { text: string }).text
+                          : ""
+                      )
+                      .join("")
+                      .trim()
+                  : "";
+            if (text) {
+              thoughts.push(text);
+              finalResult = text;
             }
-          } catch {
-            // Visualization parsing failed — continue without it
+          }
+
+          // Extract visualization from generateVisualization tool response
+          if (msg._getType() === "tool" && msg.name === "generateVisualization") {
+            try {
+              const raw =
+                typeof msg.content === "string"
+                  ? msg.content
+                  : JSON.stringify(msg.content);
+              const parsed = JSON.parse(raw);
+              if (parsed?.type && Array.isArray(parsed?.data)) {
+                visualization = parsed as VisualizationData;
+              }
+            } catch {
+              // Visualization parsing failed — continue without it
+            }
           }
         }
       }
+    } catch (streamErr) {
+      // GraphRecursionError: agent hit recursionLimit — return whatever was accumulated
+      const isRecursionError =
+        streamErr instanceof Error &&
+        (streamErr.message.includes("recursion") ||
+          streamErr.message.includes("Recursion") ||
+          streamErr.constructor.name === "GraphRecursionError");
+
+      if (!isRecursionError) throw streamErr;
+      // Fall through with whatever thoughts/result were accumulated before the limit
     }
 
     return { thoughts, result: finalResult, visualization };
