@@ -115,7 +115,9 @@
       "Bash(git stash:*)",
       "Bash(git push:*)",
       "Bash(npm info:*)",
-      "Bash(pnpm add:*)"
+      "Bash(pnpm add:*)",
+      "Bash(find /home/runner/workspace -name package.json -maxdepth 2 -exec grep -l wouter {})",
+      "Bash(find /home/runner/workspace -name tsconfig*.json -not -path */node_modules/* -maxdepth 4)"
     ]
   }
 }

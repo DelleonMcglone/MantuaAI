@@ -3910,6 +3910,7 @@ export default function MantuaApp() {
   const [liquidityRefreshKey, setLiquidityRefreshKey] = useState(0);
   const [portfolioRefreshKey, setPortfolioRefreshKey] = useState(0);
   const [showAgentBuilder, setShowAgentBuilder] = useState(false);
+  const [showAnalyticsSuggestions, setShowAnalyticsSuggestions] = useState(false);
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const [showAddLiquidityModal, setShowAddLiquidityModal] = useState(false);
   const [selectedPool, setSelectedPool] = useState(null);
@@ -4069,6 +4070,7 @@ export default function MantuaApp() {
        setShowSwap(false);
        setShowLiquidity(false);
        setShowAgentBuilder(false);
+       setShowAnalyticsSuggestions(false);
        setShowAddLiquidityModal(false);
        setShowPortfolioModal(false);
     };
@@ -4232,6 +4234,7 @@ export default function MantuaApp() {
               setShowSwap(false);
               setShowLiquidity(false);
               setShowAgentBuilder(false);
+              setShowAnalyticsSuggestions(false);
               setShowPortfolioModal(false);
               setShowAddLiquidityModal(false);
               setHasInteracted(false);
@@ -4263,6 +4266,7 @@ export default function MantuaApp() {
               setShowSwap(true);
               setShowLiquidity(false);
               setShowAgentBuilder(false);
+              setShowAnalyticsSuggestions(false);
               setShowPortfolioModal(false);
               setShowAddLiquidityModal(false);
               setSwapDetails(null);
@@ -4279,6 +4283,7 @@ export default function MantuaApp() {
               setShowLiquidity(true);
               setShowSwap(false);
               setShowAgentBuilder(false);
+              setShowAnalyticsSuggestions(false);
               setShowPortfolioModal(false);
               setShowAddLiquidityModal(false);
               setHasInteracted(true);
@@ -4288,13 +4293,21 @@ export default function MantuaApp() {
             <DropletsIcon /> Liquidity
           </button>
 
-          {/* Analytics */}
-          <a
-            href="/analytics"
-            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', background: 'transparent', borderRadius: 8, color: theme.textPrimary, fontSize: 14, fontWeight: 500, cursor: 'pointer', textDecoration: 'none' }}
+          {/* Analyze */}
+          <button
+            onClick={() => {
+              setShowAnalyticsSuggestions(true);
+              setShowSwap(false);
+              setShowLiquidity(false);
+              setShowAgentBuilder(false);
+              setShowPortfolioModal(false);
+              setShowAddLiquidityModal(false);
+              setHasInteracted(false);
+            }}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 12px', background: showAnalyticsSuggestions ? `${theme.accent}20` : 'transparent', border: 'none', borderRadius: 8, color: showAnalyticsSuggestions ? theme.accent : theme.textPrimary, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
           >
-            <TrendIcon /> Analytics
-          </a>
+            <TrendIcon /> Analyze
+          </button>
 
           {/* Agent */}
           <button
@@ -4302,6 +4315,7 @@ export default function MantuaApp() {
               setShowAgentBuilder(true);
               setShowSwap(false);
               setShowLiquidity(false);
+              setShowAnalyticsSuggestions(false);
               setShowPortfolioModal(false);
               setShowAddLiquidityModal(false);
               setHasInteracted(true);
@@ -4462,9 +4476,45 @@ export default function MantuaApp() {
               }}>
                 <div style={{ width: '100%', maxWidth: (showSwap || showLiquidity || showAddLiquidityModal) ? '1200px' : 700, transition: 'max-width 0.3s ease', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 32 }}>
                   {!hasInteracted && !showSwap && !showLiquidity && !showAgentBuilder && (
-                    <div style={{ textAlign: 'center' }}>
+                    <div style={{ textAlign: 'center', width: '100%', maxWidth: 600 }}>
                       <h1 style={{ fontFamily: '"Outfit", sans-serif', fontSize: 'clamp(28px, 4vw, 40px)', fontWeight: 600, marginBottom: 12, letterSpacing: '-0.02em' }}>Hi, {truncatedAddress || 'there'}</h1>
-                      <p style={{ fontSize: 16, color: theme.textSecondary }}>What can I help you with today?</p>
+                      <p style={{ fontSize: 16, color: theme.textSecondary, marginBottom: showAnalyticsSuggestions ? 24 : 0 }}>What can I help you with today?</p>
+                      {showAnalyticsSuggestions && (
+                        <div style={{ textAlign: 'left' }}>
+                          <p style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em', color: theme.textMuted, marginBottom: 10 }}>Try asking about onchain data:</p>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                            {[
+                              'Show daily swap volume on Base mainnet for the last 30 days',
+                              'How many unique wallets traded USDC on Base this month?',
+                              'Find USDC/EURC liquidity pool data on Base mainnet',
+                              'Show top 10 tokens by volume on Base mainnet',
+                              'Daily transaction count on Base mainnet for the last 7 days',
+                              'What blockchains does Dune index?',
+                              'Find decoded event tables for USDC on Base mainnet',
+                            ].map((suggestion) => (
+                              <button
+                                key={suggestion}
+                                onClick={() => handleChatSubmit(suggestion)}
+                                style={{
+                                  background: 'transparent',
+                                  border: `1px solid ${theme.border}`,
+                                  borderRadius: 20,
+                                  padding: '6px 14px',
+                                  fontSize: 13,
+                                  color: theme.textSecondary,
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
+                                  transition: 'border-color 0.15s, color 0.15s',
+                                }}
+                                onMouseEnter={e => { (e.target as HTMLElement).style.borderColor = '#6366f1'; (e.target as HTMLElement).style.color = theme.textPrimary; }}
+                                onMouseLeave={e => { (e.target as HTMLElement).style.borderColor = theme.border; (e.target as HTMLElement).style.color = theme.textSecondary; }}
+                              >
+                                {suggestion}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
