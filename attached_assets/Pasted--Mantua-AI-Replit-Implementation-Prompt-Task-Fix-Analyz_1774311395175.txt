@@ -1,0 +1,318 @@
+# Mantua.AI — Replit Implementation Prompt
+## Task: Fix Analyze Empty State Label + "Agent not configured" Error
+
+---
+
+## PROBLEM SUMMARY
+
+**Issue 1 — "TRY ASKING ABOUT PRICES:" label in Analyze empty state**
+The chat empty state when "Analyze" is selected shows a label "TRY ASKING ABOUT PRICES:"
+above the suggestion chips. This label must be removed. Only the 6 suggestion chips should
+appear — no section label, no header text above them.
+
+**Issue 2 — "Agent not configured" response**
+When any suggestion chip is clicked (e.g. "What is the current ETH price?"), the chat
+responds with "Agent not configured." This means the backend agent is not initializing
+correctly. The fix must make the agent actually respond to user queries.
+
+---
+
+## FIX 1 — REMOVE "TRY ASKING ABOUT PRICES:" LABEL
+
+### Step 1a — Find the label
+
+```bash
+grep -r "TRY ASKING\|try asking\|PRICES\|suggestions-label\|suggestions_label\|suggestionsLabel" \
+  src/ --include="*.tsx" --include="*.ts" --include="*.css" --include="*.scss" -l
+```
+
+Also search for the label in JSX:
+```bash
+grep -rn "TRY ASKING\|asking about prices\|PRICES:" src/ --include="*.tsx"
+```
+
+### Step 1b — Delete the label element
+
+In the file found above, locate and DELETE the JSX element that renders this label.
+It will look like one of these patterns:
+
+```tsx
+// Pattern A — paragraph tag
+<p className="chat-suggestions-label">TRY ASKING ABOUT PRICES:</p>
+
+// Pattern B — span
+<span className="suggestions-header">TRY ASKING ABOUT PRICES:</span>
+
+// Pattern C — div
+<div className="label">Try asking about prices:</div>
+
+// Pattern D — inline text node above chips
+<p className="...">TRY ASKING ABOUT PRICES:</p>
+```
+
+**DELETE the entire element**. Do NOT use `display: none` or `visibility: hidden`.
+Remove the JSX node completely.
+
+### Step 1c — Remove the CSS class if it only styles the label
+
+```bash
+grep -rn "chat-suggestions-label\|suggestions-label\|suggestionsLabel" \
+  src/ --include="*.css" --include="*.scss" --include="*.tsx"
+```
+
+If the CSS class only styles the label that was deleted, delete the CSS rule too.
+If the class is shared with other elements, leave it alone.
+
+### Step 1d — Replace chip content with the correct 6 chips
+
+Find the array or list of suggestion chip strings in the component. It will look like:
+
+```bash
+grep -rn "current ETH price\|24h price\|suggestion\|SUGGESTIONS\|quickPrompts\|chips" \
+  src/ --include="*.tsx" --include="*.ts" -l
+```
+
+Replace the entire chip array with exactly these 6 strings, in this order:
+
+```typescript
+const SUGGESTIONS = [
+  "What is the current price of ETH?",
+  "What's the 24h price change for ETH and cbBTC?",
+  "Is EURC trading above or below its peg",
+  "Show EURC/USDC price deviation over the last 24h",
+  "What's the liquidity and volume in the ETH/USDC pool?",
+  "Where is the best yield for stablecoin liquidity right now?",
+] as const;
+```
+
+The variable name may differ (`ANALYTICS_SUGGESTIONS`, `quickPrompts`, `chips`, etc.) —
+replace the array values regardless of what the variable is named.
+
+### Step 1e — Verify
+
+After the change, the chat empty state must show:
+- Greeting (e.g. "Hi, 0xbaac...DC87") ✓ keep
+- Subheading (e.g. "What can I help you with today?") ✓ keep
+- Exactly 6 suggestion chips with the text above — NO label above them ✓ required
+- Chat input at the bottom ✓ keep
+
+---
+
+## FIX 2 — RESOLVE "AGENT NOT CONFIGURED" ERROR
+
+### Step 2a — Find where "Agent not configured" is returned
+
+```bash
+grep -rn "Agent not configured\|agent not configured\|agentNotConfigured\|not_configured" \
+  server/ src/server/ backend/ --include="*.ts" --include="*.js"
+```
+
+This string is returned from a guard check. Find the exact file and line number.
+
+### Step 2b — Understand the guard check
+
+The guard will look like one of these patterns:
+
+```typescript
+// Pattern A — missing env var
+if (!process.env.ANTHROPIC_API_KEY) {
+  return res.json({ response: "Agent not configured" });
+}
+
+// Pattern B — failed initialization
+if (!agent || !agentExecutor) {
+  return res.json({ response: "Agent not configured" });
+}
+
+// Pattern C — missing CDP credentials
+if (!process.env.CDP_API_KEY_NAME || !process.env.CDP_API_KEY_PRIVATE_KEY) {
+  return res.json({ response: "Agent not configured" });
+}
+```
+
+### Step 2c — Fix the initialization
+
+**Run this to check which env vars are present in the process:**
+```bash
+grep -rn "ANTHROPIC_API_KEY\|CDP_API\|WALLET_SECRET\|apiKeyId\|apiKeySecret\|walletSecret" \
+  server/ --include="*.ts" --include="*.js" | head -40
+```
+
+**Then check the .env file has all required vars:**
+```bash
+# List keys in .env (do NOT print values)
+grep -E "^[A-Z_]+=" .env | cut -d= -f1
+```
+
+Required environment variables for the agent to initialize:
+- `ANTHROPIC_API_KEY` — for the LangChain ReAct agent (Claude)
+- `CDP_API_KEY_ID` (or `CDP_API_KEY_NAME`) — Coinbase AgentKit credential
+- `CDP_API_KEY_SECRET` (or `CDP_API_KEY_PRIVATE_KEY`) — Coinbase AgentKit credential
+- `CDP_WALLET_SECRET` (or `WALLET_SECRET`) — wallet data encryption
+
+**Find the agent initialization file:**
+```bash
+grep -rn "createReactAgent\|AgentExecutor\|CdpEvmWalletProvider\|AgentKit\|langchain" \
+  server/ --include="*.ts" -l
+```
+
+Open that file. Look for the initialization function. It typically looks like:
+
+```typescript
+async function initializeAgent() {
+  const wallet = await CdpEvmWalletProvider.configureWithWallet({
+    apiKeyId: process.env.CDP_API_KEY_ID!,
+    apiKeySecret: process.env.CDP_API_KEY_SECRET!,
+    walletSecret: process.env.CDP_WALLET_SECRET!,
+    networkId: "base-sepolia",
+  });
+  // ...
+}
+```
+
+### Step 2d — Fix: make general chat work WITHOUT AgentKit
+
+**The core problem:** The chat route is guarded by AgentKit initialization. If AgentKit
+fails (missing CDP credentials), ALL chat — including simple price queries — returns
+"Agent not configured."
+
+**The fix:** Split the chat handler into two paths:
+
+```
+User sends message
+       │
+       ▼
+Is this an AgentKit action? (fund wallet, autonomous LP, etc.)
+       │
+    YES │                              NO
+       ▼                               ▼
+Check AgentKit configured         Use Anthropic directly
+Return error if not               (ANTHROPIC_API_KEY only)
+       │                               │
+       ▼                               ▼
+AgentKit response              LangChain ReAct with
+                               price/DeFi tools
+```
+
+**Find the chat API route:**
+```bash
+grep -rn "router.post.*chat\|app.post.*chat\|router.post.*message\|app.post.*message" \
+  server/ --include="*.ts" --include="*.js"
+```
+
+**In that route handler, apply this fix pattern:**
+
+```typescript
+// server/routes/chat.ts (or wherever the route lives)
+
+router.post("/api/chat", async (req, res) => {
+  const { message, walletAddress } = req.body;
+
+  if (!message?.trim()) {
+    return res.status(400).json({ error: "Message is required" });
+  }
+
+  // Check if ANTHROPIC_API_KEY is present — this is the ONLY requirement
+  // for basic chat. CDP credentials are only needed for autonomous agent actions.
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res.status(500).json({
+      response: "AI not configured. Please set ANTHROPIC_API_KEY.",
+    });
+  }
+
+  try {
+    // Use the existing LangChain agent or direct Anthropic call
+    const response = await runChatAgent(message, walletAddress);
+    return res.json({ response });
+  } catch (err) {
+    console.error("Chat agent error:", err);
+    return res.status(500).json({ response: "Something went wrong. Please try again." });
+  }
+});
+```
+
+### Step 2e — Verify ANTHROPIC_API_KEY is set in Replit Secrets
+
+In Replit, open **Tools → Secrets** and confirm:
+- `ANTHROPIC_API_KEY` is present and starts with `sk-ant-`
+
+If it is missing, add it. This is the only key required for general chat responses.
+
+### Step 2f — Verify the agent is initialized before the server starts
+
+Find the server startup file:
+```bash
+grep -rn "app.listen\|server.listen\|createServer" server/ --include="*.ts" | head -5
+```
+
+The agent should be initialized before `app.listen`. Pattern:
+
+```typescript
+async function main() {
+  await initializeAgent(); // Must complete before accepting requests
+  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+}
+
+main().catch((err) => {
+  console.error("Failed to start server:", err);
+  process.exit(1);
+});
+```
+
+If `initializeAgent()` throws (e.g. because CDP credentials are missing), the server
+must still start and serve basic chat — only AgentKit-specific routes should fail.
+
+**Fix pattern for resilient initialization:**
+
+```typescript
+async function main() {
+  // Initialize AgentKit — but don't crash the server if it fails
+  try {
+    await initializeAgent();
+    console.log("AgentKit initialized successfully");
+  } catch (err) {
+    console.warn("AgentKit initialization failed — autonomous agent features disabled:", err);
+    // Basic chat (Anthropic only) still works
+  }
+
+  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+}
+```
+
+---
+
+## SUCCESS CRITERIA
+
+**Issue 1 — Label removed, chips updated:**
+- [ ] "TRY ASKING ABOUT PRICES:" text does not appear anywhere in the Analyze empty state
+- [ ] "TRY ASKING ABOUT PRICES:" does not appear in ANY other view
+- [ ] Exactly 6 suggestion chips appear with the correct text (see chip list in Step 1d)
+- [ ] No old chip text remains (no "Show me all 4 token prices", "How much is 0.5 ETH worth in USD?", etc.)
+- [ ] No layout shift or broken styling from the label removal
+
+**Issue 2 — Agent responds:**
+- [ ] Clicking "What is the current price of ETH?" returns an actual price response
+- [ ] Clicking any other suggestion chip returns a real response
+- [ ] Typing a custom message in the chat input and pressing Enter returns a response
+- [ ] The response is NOT "Agent not configured"
+- [ ] Server logs show no crash on startup even if CDP credentials are missing
+- [ ] `ANTHROPIC_API_KEY` is confirmed set in Replit Secrets
+
+---
+
+## FAILURE CONDITIONS
+
+- "Agent not configured" still appears after the fix → CDP guard was not separated from Anthropic guard
+- Label is hidden with CSS instead of removed from JSX → must be deleted from JSX
+- Chips disappear after label removal → chips and label are in separate elements; only the label element should be deleted
+- Server crashes on startup because AgentKit fails → initializeAgent must be wrapped in try/catch
+
+---
+
+## DO NOT CHANGE
+
+- The 6 suggestion chips content or behavior (after Step 1d replaces them)
+- The chat input bar, send button, or voice button
+- The swap, liquidity, or AgentKit route handlers
+- Any database schemas or API routes unrelated to chat
+- The greeting ("Hi, 0xbaac...DC87") and subheading ("What can I help you with today?")

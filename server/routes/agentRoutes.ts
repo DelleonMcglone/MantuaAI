@@ -5,15 +5,23 @@
  *
  * Endpoints:
  *   GET  /api/agent/wallet          — get agent wallet address + balance (AgentKit)
- *   POST /api/agent/chat            — send a message to the ReAct agent (chat mode)
+ *   POST /api/agent/chat            — price/market chat via OpenAI + CoinGecko (no CDP needed)
  *   POST /api/agent/autonomous      — send a message, agent detects intent and acts
  *   POST /api/agent/create-pool     — create Stable Protection pool on Base Sepolia
  */
 
 import { Router } from "express";
+import OpenAI from "openai";
 import { runAgent, getAgentWalletInfo } from "../lib/agentkit";
 import { createStableProtectionPool, swapViaStablePool, getStablePoolId } from "../services/poolService";
 import { detectIntent } from "../services/intentRouter";
+import { getAllTokenPrices, formatTokenPrice } from "../services/coinGeckoService";
+
+// OpenAI client using Replit AI integration (same as main chat)
+const openai = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+});
 
 const router = Router();
 
@@ -76,29 +84,66 @@ router.get("/wallet-info", async (_req, res) => {
 });
 
 // ── POST /api/agent/chat ──────────────────────────────────────────────────────
-// Main chat mode endpoint — agent handles any message.
-// Body: { message: string, action?: string }
+// Price & market analysis chat — uses OpenAI + live CoinGecko data.
+// Does NOT require CDP or ANTHROPIC_API_KEY — works with Replit AI integration.
+// Body: { message: string }
 router.post("/chat", async (req, res) => {
-  logEnvState('POST /chat');
-  const cfgErr = configCheck();
-  if (cfgErr) {
-    console.error('[AgentKit] POST /chat — config error:', cfgErr);
-    return res.status(503).json({ success: false, error: 'Agent not configured', details: cfgErr });
-  }
-
-  const { message, action } = req.body;
+  const { message } = req.body;
   if (!message?.trim()) {
     return res.status(400).json({ error: "message is required" });
   }
 
-  const contextualMessage = action ? `[Action: ${action}] ${message}` : message;
+  const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return res.status(503).json({ success: false, error: "AI not configured. Please set OPENAI_API_KEY." });
+  }
+
+  // Fetch live prices to inject as context
+  let priceContext = "";
+  try {
+    const prices = await getAllTokenPrices();
+    priceContext =
+      "Current live market data (from CoinGecko, mainnet pricing):\n" +
+      prices.map(formatTokenPrice).join("\n") + "\n\n" +
+      "Additional context:\n" +
+      "- EURC is a EUR-pegged stablecoin. Its USD peg is approximately 1 EUR ≈ 1.06–1.10 USD depending on FX.\n" +
+      "- USDC is a USD stablecoin, target price $1.00.\n" +
+      "- Mantua.AI runs on Base Sepolia testnet with a USDC/EURC Stable Protection pool using Uniswap v4 hooks.\n" +
+      "- The Stable Protection Hook adjusts fees based on EURC peg deviation (0.5 bps healthy → circuit breaker at >5% deviation).";
+  } catch (err: any) {
+    console.warn("[agent/chat] CoinGecko price fetch failed:", err?.message);
+    priceContext =
+      "Live price data is temporarily unavailable (CoinGecko API error). Use your best knowledge of approximate current crypto market prices.\n" +
+      "For reference, approximate price ranges as of early 2025: ETH ~$2,000–3,500, cbBTC ~$60,000–95,000, USDC = $1.00, EURC ≈ $1.06–1.10.\n" +
+      "Always note that prices may be outdated and users should verify on-chain or on an exchange.\n\n" +
+      "Mantua.AI context: USDC/EURC Stable Protection pool on Base Sepolia with Uniswap v4 hooks.\n" +
+      "The Stable Protection Hook adjusts fees dynamically based on EURC peg deviation.";
+  }
 
   try {
-    const response = await runAgent(contextualMessage);
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are the Mantua.AI market analysis assistant. You specialize in DeFi price data, stablecoin analysis, and Uniswap v4 liquidity insights.\n\n" +
+            priceContext + "\n\n" +
+            "Answer user questions about prices, market trends, and DeFi yields concisely and accurately. " +
+            "Format numbers with commas and 2 decimal places. Use markdown for clarity. " +
+            "If asked about on-chain actions (swap, add liquidity, create wallet), explain what Mantua.AI can do but note those require the Agent panel.",
+        },
+        { role: "user", content: message },
+      ],
+      max_tokens: 600,
+      temperature: 0.3,
+    });
+
+    const response = completion.choices[0]?.message?.content ?? "No response generated.";
     return res.json({ success: true, response });
   } catch (err: any) {
-    const msg = err?.message ?? 'Unknown error';
-    console.error("[agentkit] POST /chat error:", msg);
+    const msg = err?.message ?? "Unknown error";
+    console.error("[agent/chat] OpenAI error:", msg);
     return res.status(500).json({ success: false, error: msg });
   }
 });

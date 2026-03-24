@@ -4428,16 +4428,14 @@ export default function MantuaApp() {
                       <p style={{ fontSize: 16, color: theme.textSecondary, marginBottom: showAnalyticsSuggestions ? 24 : 0 }}>What can I help you with today?</p>
                       {showAnalyticsSuggestions && (
                         <div style={{ textAlign: 'left' }}>
-                          <p style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em', color: theme.textMuted, marginBottom: 10 }}>Try asking about prices:</p>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                             {[
-                              'What is the current ETH price?',
-                              'Show me all 4 token prices',
-                              'How much is 0.5 ETH worth in USD?',
-                              'Show ETH price trend for the last 7 days',
-                              'What is the 24h price change for cbBTC?',
-                              'What is the EURC/USD price?',
-                              'How much is 1 cbBTC worth?',
+                              'What is the current price of ETH?',
+                              "What's the 24h price change for ETH and cbBTC?",
+                              'Is EURC trading above or below its peg',
+                              'Show EURC/USDC price deviation over the last 24h',
+                              "What's the liquidity and volume in the ETH/USDC pool?",
+                              'Where is the best yield for stablecoin liquidity right now?',
                             ].map((suggestion) => (
                               <button
                                 key={suggestion}
