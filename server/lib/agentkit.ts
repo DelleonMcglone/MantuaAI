@@ -27,7 +27,7 @@ import {
 } from "@coinbase/agentkit";
 import { getLangChainTools }       from "@coinbase/agentkit-langchain";
 import { createReactAgent }        from "@langchain/langgraph/prebuilt";
-import { ChatAnthropic }           from "@langchain/anthropic";
+import { ChatOpenAI }              from "@langchain/openai";
 import { HumanMessage }            from "@langchain/core/messages";
 import { DynamicStructuredTool }   from "@langchain/core/tools";
 import { z }                       from "zod";
@@ -120,13 +120,16 @@ function validateEnvVars(): void {
   if (!isConfiguredValue(process.env.CDP_API_KEY_ID))     missing.push('CDP_API_KEY_ID');
   if (!isConfiguredValue(process.env.CDP_API_KEY_SECRET)) missing.push('CDP_API_KEY_SECRET');
   if (!isConfiguredValue(process.env.CDP_WALLET_SECRET))  missing.push('CDP_WALLET_SECRET');
-  if (!isConfiguredValue(process.env.ANTHROPIC_API_KEY))  missing.push('ANTHROPIC_API_KEY');
+
+  const hasOpenAI = isConfiguredValue(process.env.AI_INTEGRATIONS_OPENAI_API_KEY) ||
+                    isConfiguredValue(process.env.OPENAI_API_KEY);
+  const hasAnthropic = isConfiguredValue(process.env.ANTHROPIC_API_KEY);
+  if (!hasOpenAI && !hasAnthropic) missing.push('OPENAI_API_KEY (or ANTHROPIC_API_KEY)');
 
   if (missing.length > 0) {
     throw new Error(
       `Missing required environment variables: ${missing.join(', ')}. ` +
-      `Get CDP keys at https://portal.cdp.coinbase.com/ | ` +
-      `Get Anthropic key at https://console.anthropic.com/`
+      `Get CDP keys at https://portal.cdp.coinbase.com/`
     );
   }
 }
@@ -140,11 +143,12 @@ export async function getAgentKit(): Promise<AgentKit> {
   _initPromise = (async () => {
     // Verbose diagnostic — shows exactly which vars are present at runtime
     console.log('[AgentKit] ENV diagnostic:', {
-      CDP_API_KEY_ID:     process.env.CDP_API_KEY_ID     ? `SET (${process.env.CDP_API_KEY_ID.slice(0, 8)}...)` : 'MISSING',
-      CDP_API_KEY_SECRET: process.env.CDP_API_KEY_SECRET ? 'SET' : 'MISSING',
-      CDP_WALLET_SECRET:  process.env.CDP_WALLET_SECRET  ? 'SET' : 'MISSING',
-      ANTHROPIC_API_KEY:  process.env.ANTHROPIC_API_KEY  ? `SET (${process.env.ANTHROPIC_API_KEY.slice(0, 8)}...)` : 'MISSING',
-      NODE_ENV:           process.env.NODE_ENV,
+      CDP_API_KEY_ID:                    process.env.CDP_API_KEY_ID                    ? `SET (${process.env.CDP_API_KEY_ID.slice(0, 8)}...)` : 'MISSING',
+      CDP_API_KEY_SECRET:                process.env.CDP_API_KEY_SECRET                ? 'SET' : 'MISSING',
+      CDP_WALLET_SECRET:                 process.env.CDP_WALLET_SECRET                 ? 'SET' : 'MISSING',
+      AI_INTEGRATIONS_OPENAI_API_KEY:    process.env.AI_INTEGRATIONS_OPENAI_API_KEY    ? 'SET' : 'MISSING',
+      OPENAI_API_KEY:                    process.env.OPENAI_API_KEY                    ? 'SET' : 'MISSING',
+      NODE_ENV:                          process.env.NODE_ENV,
     });
 
     validateEnvVars();
@@ -207,10 +211,15 @@ export async function getAgent() {
   const agentKitTools = await getLangChainTools(kit);
   const tools = [...agentKitTools, ...coinGeckoTools];
 
-  const llm = new ChatAnthropic({
-    model: "claude-sonnet-4-6",
+  const llm = new ChatOpenAI({
+    model: "gpt-4o-mini",
     temperature: 0,
-    anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+    openAIApiKey:
+      process.env.AI_INTEGRATIONS_OPENAI_API_KEY ??
+      process.env.OPENAI_API_KEY,
+    configuration: {
+      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+    },
   });
 
   _agent = createReactAgent({
@@ -368,8 +377,7 @@ export async function runAgent(message: string): Promise<string> {
     if (msg.includes('CDP_API_KEY_ID') || msg.includes('not set') || msg.includes('Missing required')) {
       throw new Error(
         'Agent not configured: CDP API keys are missing. ' +
-        'Add CDP_API_KEY_ID, CDP_API_KEY_SECRET, CDP_WALLET_SECRET, ' +
-        'and ANTHROPIC_API_KEY to your .env file.'
+        'Add CDP_API_KEY_ID, CDP_API_KEY_SECRET, and CDP_WALLET_SECRET to your .env file.'
       );
     }
 

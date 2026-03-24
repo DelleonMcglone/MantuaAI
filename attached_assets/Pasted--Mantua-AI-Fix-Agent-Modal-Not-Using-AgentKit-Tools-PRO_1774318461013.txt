@@ -1,0 +1,580 @@
+# Mantua.AI — Fix: Agent Modal Not Using AgentKit Tools
+
+## PROBLEM
+
+When the Agent modal is opened and an action tile is selected (e.g. "Create & Manage
+Wallet"), the follow-up chat sends a user message. The agent responds with generic LLM
+knowledge ("I can help with DeFi insights but I can't access wallet details...") instead
+of actually calling AgentKit tools like `get_wallet_details` or `get_balance`.
+
+**Root cause — one or more of these is broken:**
+
+1. The frontend is POSTing to the wrong endpoint (e.g. `/api/chat` instead of
+   `/api/agent`)
+2. The `action` field sent in the request body doesn't match the `AgentAction` enum
+   key in `agentkit.ts` (e.g. frontend sends `"create_wallet"`, server expects `"wallet"`)
+3. The agent route exists but silently falls through to the general chat handler on error
+4. `PROVIDER_MAP` in `agentkit.ts` is initialized at module load time using
+   `process.env` values that aren't set yet — causing providers to fail silently and
+   the agent to fall back to raw LLM with no tools
+
+---
+
+## DIAGNOSTIC STEPS — RUN THESE FIRST
+
+### Step 1 — Find what the frontend actually sends
+
+```bash
+grep -r "api/agent\|/agent\|action.*wallet\|action.*transfer\|action.*swap" \
+  client/src --include="*.ts" --include="*.tsx" -n | head -40
+```
+
+Look for the fetch/axios/POST call inside the Agent modal component. Note:
+- The URL being POSTed to
+- The exact `action` value being sent (the string, not the UI label)
+
+### Step 2 — Find the server route
+
+```bash
+grep -r "router\.\|app\.\|agent\|/api/agent" server/src server/routes \
+  --include="*.ts" -n | head -40
+```
+
+Confirm the route exists and is mounted correctly.
+
+### Step 3 — Check the AgentAction type and PROVIDER_MAP keys
+
+```bash
+cat server/lib/agentkit.ts | head -80
+```
+
+List every key in `PROVIDER_MAP` and every value in the `AgentAction` union type.
+
+### Step 4 — Cross-reference
+
+Create a mapping table of:
+| UI Tile Label        | Frontend `action` value | Server AgentAction key | Match? |
+|----------------------|------------------------|------------------------|--------|
+| Create & Manage Wallet | ???                  | "wallet"               | ???    |
+| Send Tokens          | ???                    | "transfer"             | ???    |
+| Swap Tokens          | ???                    | "swap"                 | ???    |
+| Liquidity            | ???                    | "liquidity"            | ???    |
+| Query On-Chain Data  | ???                    | "query"                | ???    |
+| Get Testnet Funds    | ???                    | "wallet" (faucet)      | ???    |
+
+Any mismatch = agent gets an unrecognized action and falls back to LLM.
+
+---
+
+## FIX A — If the frontend sends to wrong endpoint
+
+### File: wherever the agent chat POST is made (likely `useAgentChat.ts` or similar)
+
+Change the fetch URL from whatever it currently is to:
+
+```typescript
+const response = await fetch('/api/agent', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ action, message }),
+});
+```
+
+---
+
+## FIX B — If action values don't match the server enum
+
+### File: wherever AgentConfig / tile config is defined (likely `AgentConfig.ts`)
+
+The `action` string on each tile MUST exactly match the `AgentAction` union type in
+`agentkit.ts`. Fix the config to use the correct string literals:
+
+```typescript
+// AgentConfig.ts
+export const AGENT_ACTIONS = [
+  {
+    id: 'wallet',           // ← MUST match AgentAction in agentkit.ts
+    label: 'Create & Manage Wallet',
+    description: 'Create agent wallet via CDP',
+    icon: '🔒',
+  },
+  {
+    id: 'transfer',
+    label: 'Send Tokens',
+    description: 'Transfer tokens to any address',
+    icon: '📤',
+  },
+  {
+    id: 'swap',
+    label: 'Swap Tokens',
+    description: 'Exchange between ETH/cbBTC/USDC/EURC',
+    icon: '🔄',
+  },
+  {
+    id: 'liquidity',
+    label: 'Liquidity',
+    description: 'Add/remove liquidity from a pool',
+    icon: '💧',
+  },
+  {
+    id: 'query',
+    label: 'Query On-Chain Data',
+    description: 'Fetch any crypto data',
+    icon: '🔍',
+  },
+  {
+    id: 'wallet',           // faucet reuses wallet agent — it has faucet tool
+    label: 'Get Testnet Funds',
+    description: 'Request tokens from CDP Faucet',
+    icon: '🚰',
+  },
+] as const;
+
+export type AgentActionId = typeof AGENT_ACTIONS[number]['id'];
+```
+
+---
+
+## FIX C — If PROVIDER_MAP initializes at module load time (most common silent failure)
+
+The PROVIDER_MAP object must NOT be initialized at the top level of the module. If
+`cdpApiActionProvider({ apiKeyId: process.env.CDP_API_KEY_ID! })` is called at module
+load time, it runs before dotenv loads the env vars, resulting in `undefined` being
+passed and the provider failing silently.
+
+### File: `server/lib/agentkit.ts`
+
+**WRONG — providers instantiated at module load time:**
+```typescript
+const PROVIDER_MAP: Record<AgentAction, any[]> = {
+  wallet:   [walletActionProvider()],                    // ← runs at import
+  transfer: [walletActionProvider(), erc20ActionProvider()],
+  swap:     [walletActionProvider(), cdpApiActionProvider({
+    apiKeyId:     process.env.CDP_API_KEY_ID!,           // ← undefined at module load
+    apiKeySecret: process.env.CDP_API_KEY_SECRET!,
+  })],
+  // ...
+};
+```
+
+**CORRECT — use a factory function called at request time:**
+```typescript
+function buildProviders(action: AgentAction): ActionProvider<WalletProvider>[] {
+  const cdp = {
+    apiKeyId:     process.env.CDP_API_KEY_ID!,
+    apiKeySecret: process.env.CDP_API_KEY_SECRET!,
+  };
+  switch (action) {
+    case 'wallet':    return [walletActionProvider()];
+    case 'transfer':  return [walletActionProvider(), erc20ActionProvider()];
+    case 'swap':      return [walletActionProvider(), cdpApiActionProvider(cdp)];
+    case 'liquidity': return [walletActionProvider(), erc20ActionProvider()];
+    case 'query':     return [pythActionProvider()];
+    default:          throw new Error(`Unknown action: ${action}`);
+  }
+}
+```
+
+Then inside `runAgentAction` (or `createAgentForAction`), call `buildProviders(action)`
+rather than `PROVIDER_MAP[action]`.
+
+---
+
+## FIX D — If the agent route swallows errors and falls through to chat
+
+### File: `server/routes/agent.ts`
+
+The route MUST return a 400/500 error, NOT silently redirect to the chat handler:
+
+```typescript
+import { Router, Request, Response } from 'express';
+import { z } from 'zod';
+import { runAgentAction, AgentAction } from '../lib/agentkit';
+
+const router = Router();
+
+const AgentRequestSchema = z.object({
+  action:  z.enum(['wallet', 'transfer', 'swap', 'liquidity', 'query']),
+  message: z.string().min(1).max(2000),
+});
+
+router.post('/', async (req: Request, res: Response) => {
+  const parsed = AgentRequestSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Invalid request', details: parsed.error.issues });
+  }
+
+  const { action, message } = parsed.data;
+
+  // Validate CDP credentials are present before attempting
+  if (!process.env.CDP_API_KEY_ID || !process.env.CDP_API_KEY_SECRET || !process.env.CDP_WALLET_SECRET) {
+    return res.status(503).json({
+      error: 'Agent not configured',
+      details: 'CDP_API_KEY_ID, CDP_API_KEY_SECRET, and CDP_WALLET_SECRET must be set',
+    });
+  }
+
+  try {
+    const result = await runAgentAction(action as AgentAction, message);
+    return res.json(result);
+  } catch (err) {
+    console.error('[agent route] runAgentAction failed:', err);
+    return res.status(500).json({
+      error: 'Agent execution failed',
+      details: err instanceof Error ? err.message : String(err),
+    });
+  }
+});
+
+export default router;
+```
+
+---
+
+## FIX E — Switch LLM from OpenAI to Anthropic
+
+The current `agentkit.ts` uses `ChatOpenAI` with `gpt-4o-mini`. Mantua's backend uses
+`ANTHROPIC_API_KEY` — there is no `OPENAI_API_KEY` env var configured. This would cause
+the agent to fail on every request with an auth error, and the error handler may swallow
+it.
+
+### File: `server/lib/agentkit.ts`
+
+Replace the LLM instantiation:
+
+```typescript
+// REMOVE THIS:
+import { ChatOpenAI } from '@langchain/openai';
+const llm = new ChatOpenAI({ model: 'gpt-4o-mini', temperature: 0 });
+
+// REPLACE WITH THIS:
+import { ChatAnthropic } from '@langchain/anthropic';
+const llm = new ChatAnthropic({
+  model:       'claude-sonnet-4-20250514',
+  temperature: 0,
+  apiKey:      process.env.ANTHROPIC_API_KEY,
+});
+```
+
+Install the dependency if missing:
+```bash
+npm install @langchain/anthropic@latest
+```
+
+---
+
+## COMPLETE REWRITE — `server/lib/agentkit.ts`
+
+If the file is broken in multiple ways, replace it entirely with this verified version:
+
+```typescript
+/**
+ * agentkit.ts
+ * LangChain ReAct agent factory using Coinbase AgentKit v2.
+ * Wires CDP action providers to an Anthropic LLM.
+ * All action providers are instantiated at request time (not module load)
+ * to ensure process.env values are fully loaded.
+ */
+
+import {
+  AgentKit,
+  CdpEvmWalletProvider,
+  walletActionProvider,
+  erc20ActionProvider,
+  cdpApiActionProvider,
+  pythActionProvider,
+} from '@coinbase/agentkit';
+import { getLangChainTools }   from '@coinbase/agentkit-langchain';
+import { ChatAnthropic }        from '@langchain/anthropic';
+import { createReactAgent }     from '@langchain/langgraph/prebuilt';
+import { HumanMessage }         from '@langchain/core/messages';
+import type { ActionProvider, WalletProvider } from '@coinbase/agentkit';
+
+// ── Types ────────────────────────────────────────────────────────────────────
+
+export type AgentAction = 'wallet' | 'transfer' | 'swap' | 'liquidity' | 'query';
+
+export interface AgentResult {
+  thoughts: string[];
+  result:   string;
+  txHash?:  string;
+}
+
+// ── System prompts ───────────────────────────────────────────────────────────
+
+const SYSTEM_PROMPTS: Record<AgentAction, string> = {
+  wallet: `You are Mantua's Wallet Agent on Base Sepolia (chainId 84532).
+You have tools to: get the agent wallet address, check ETH and ERC-20
+balances, and request testnet ETH from the CDP faucet.
+IMPORTANT: You MUST call tools to answer — never make up addresses or balances.
+After any action, always show: wallet address, network, ETH balance, and
+a BaseScan link: https://sepolia.basescan.org/address/{address}`,
+
+  transfer: `You are Mantua's Transfer Agent on Base Sepolia.
+You transfer ERC-20 tokens (ETH, USDC, cbBTC, EURC).
+ALWAYS confirm token, amount, and recipient before executing.
+After transfer, show the tx hash as: https://sepolia.basescan.org/tx/{hash}`,
+
+  swap: `You are Mantua's Swap Agent on Base Sepolia.
+ALWAYS fetch and show a quote first (output amount + price impact).
+Wait for user confirmation before executing any swap.
+Supported tokens: ETH, USDC, cbBTC, EURC.
+After execution, show: https://sepolia.basescan.org/tx/{hash}`,
+
+  liquidity: `You are Mantua's Liquidity Agent for Uniswap v4 on Base Sepolia.
+You help users add and remove liquidity from pools via PoolManager.
+Always confirm: pool pair, tick range, and liquidity delta before executing.
+After execution, show: https://sepolia.basescan.org/tx/{hash}`,
+
+  query: `You are Mantua's On-Chain Data Agent on Base Sepolia.
+You fetch live crypto prices via Pyth Network price feeds.
+Use the correct price feed IDs: ETH/USD, BTC/USD, etc.
+Always show the price, confidence interval, and timestamp.`,
+};
+
+// ── Provider factory (called at request time, NOT module load time) ───────────
+
+function buildProviders(action: AgentAction): ActionProvider<WalletProvider>[] {
+  const cdp = {
+    apiKeyId:     process.env.CDP_API_KEY_ID!,
+    apiKeySecret: process.env.CDP_API_KEY_SECRET!,
+  };
+  switch (action) {
+    case 'wallet':    return [walletActionProvider()];
+    case 'transfer':  return [walletActionProvider(), erc20ActionProvider()];
+    case 'swap':      return [walletActionProvider(), cdpApiActionProvider(cdp)];
+    case 'liquidity': return [walletActionProvider(), erc20ActionProvider()];
+    case 'query':     return [pythActionProvider()];
+    default:
+      throw new Error(`Unknown AgentAction: "${action}"`);
+  }
+}
+
+// ── Main export ───────────────────────────────────────────────────────────────
+
+/**
+ * Run a single-turn agent action.
+ * Initializes a fresh AgentKit instance per request for isolation.
+ *
+ * @param action     - One of the AgentAction union values
+ * @param userMessage - The user's raw input string
+ * @returns thoughts array, final result string, optional tx hash
+ */
+export async function runAgentAction(
+  action:      AgentAction,
+  userMessage: string,
+): Promise<AgentResult> {
+  // 1. Initialize wallet provider with CDP credentials
+  const walletProvider = await CdpEvmWalletProvider.configureWithWallet({
+    apiKeyId:     process.env.CDP_API_KEY_ID!,
+    apiKeySecret: process.env.CDP_API_KEY_SECRET!,
+    walletSecret: process.env.CDP_WALLET_SECRET!,
+    networkId:    process.env.CDP_AGENT_NETWORK_ID ?? 'base-sepolia',
+  });
+
+  // 2. Build AgentKit with action-specific providers
+  const agentKit = await AgentKit.from({
+    walletProvider,
+    actionProviders: buildProviders(action),
+  });
+
+  // 3. Get LangChain tool wrappers
+  const tools = await getLangChainTools(agentKit);
+
+  // 4. Create Anthropic LLM (uses ANTHROPIC_API_KEY from env)
+  const llm = new ChatAnthropic({
+    model:       'claude-sonnet-4-20250514',
+    temperature: 0,
+    apiKey:      process.env.ANTHROPIC_API_KEY,
+  });
+
+  // 5. Build ReAct agent with system prompt
+  const agent = createReactAgent({
+    llm,
+    tools,
+    messageModifier: SYSTEM_PROMPTS[action],
+  });
+
+  // 6. Stream the response and collect thoughts + final result
+  const thoughts: string[] = [];
+  let   finalResult = '';
+  let   txHash: string | undefined;
+
+  const stream = await agent.stream(
+    { messages: [new HumanMessage(userMessage)] },
+    { streamMode: 'values' },
+  );
+
+  for await (const chunk of stream) {
+    for (const msg of (chunk.messages ?? [])) {
+      const content = typeof msg.content === 'string'
+        ? msg.content
+        : JSON.stringify(msg.content);
+
+      if (msg._getType?.() === 'tool') {
+        thoughts.push(content);
+      } else if (msg._getType?.() === 'ai') {
+        finalResult = content;
+        // Extract tx hash if present
+        const match = content.match(/0x[a-fA-F0-9]{64}/);
+        if (match) txHash = match[0];
+      }
+    }
+  }
+
+  return { thoughts, result: finalResult, txHash };
+}
+```
+
+---
+
+## COMPLETE REWRITE — `server/routes/agent.ts`
+
+```typescript
+/**
+ * agent.ts
+ * POST /api/agent — runs an AgentKit ReAct agent for the given action.
+ * Returns { thoughts, result, txHash? } or an error response.
+ */
+
+import { Router, Request, Response } from 'express';
+import { z }                          from 'zod';
+import { runAgentAction }             from '../lib/agentkit';
+
+const router = Router();
+
+const AgentRequestSchema = z.object({
+  action:  z.enum(['wallet', 'transfer', 'swap', 'liquidity', 'query']),
+  message: z.string().min(1).max(2000),
+});
+
+router.post('/', async (req: Request, res: Response) => {
+  // Validate request body
+  const parsed = AgentRequestSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      error:   'Invalid request',
+      details: parsed.error.issues,
+    });
+  }
+
+  // Validate CDP credentials exist
+  const missingVars = [
+    'CDP_API_KEY_ID',
+    'CDP_API_KEY_SECRET',
+    'CDP_WALLET_SECRET',
+    'ANTHROPIC_API_KEY',
+  ].filter(v => !process.env[v]);
+
+  if (missingVars.length > 0) {
+    return res.status(503).json({
+      error:   'Agent not configured',
+      details: `Missing env vars: ${missingVars.join(', ')}`,
+    });
+  }
+
+  const { action, message } = parsed.data;
+
+  try {
+    const result = await runAgentAction(action, message);
+    return res.json(result);
+  } catch (err) {
+    console.error('[POST /api/agent] error:', err);
+    return res.status(500).json({
+      error:   'Agent execution failed',
+      details: err instanceof Error ? err.message : String(err),
+    });
+  }
+});
+
+export default router;
+```
+
+---
+
+## FRONTEND ACTION ID ALIGNMENT
+
+After fixing the backend, verify the frontend sends the correct `action` values.
+
+### File: wherever the Agent action tiles are defined
+
+```typescript
+// The `id` field MUST match the AgentAction enum exactly
+export const AGENT_TILES = [
+  { id: 'wallet',   label: 'Create & Manage Wallet', description: 'Create agent wallet via CDP' },
+  { id: 'transfer', label: 'Send Tokens',             description: 'Transfer tokens to any address' },
+  { id: 'swap',     label: 'Swap Tokens',             description: 'Exchange between ETH/cbBTC/USDC/EURC' },
+  { id: 'liquidity',label: 'Liquidity',               description: 'Add/remove liquidity from a pool' },
+  { id: 'query',    label: 'Query On-Chain Data',     description: 'Fetch any crypto data' },
+  { id: 'wallet',   label: 'Get Testnet Funds',       description: 'Request tokens from CDP Faucet' },
+] as const;
+```
+
+### File: the POST call in the Agent chat component
+
+```typescript
+// Ensure this hits /api/agent, NOT /api/chat
+const response = await fetch('/api/agent', {
+  method:  'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body:    JSON.stringify({
+    action:  selectedAction.id,   // e.g. "wallet"
+    message: userInput,
+  }),
+});
+
+if (!response.ok) {
+  const err = await response.json();
+  console.error('[Agent] request failed:', err);
+  throw new Error(err.details ?? err.error ?? 'Agent request failed');
+}
+
+const { thoughts, result, txHash } = await response.json();
+```
+
+---
+
+## VERIFICATION
+
+After applying fixes, test each action in the browser:
+
+**Test 1 — Wallet**
+```
+User: "Get my wallet details including address, network, and ETH balance. Show the BaseScan link."
+Expected: Agent calls get_wallet_details tool, returns real address + balance + https://sepolia.basescan.org/address/0x...
+```
+
+**Test 2 — Query**
+```
+User: "What is the current price of ETH?"
+Expected: Agent calls Pyth price feed tool, returns real price with confidence + timestamp
+```
+
+**Test 3 — Faucet (via wallet action)**
+```
+User: "Request testnet ETH from the faucet"
+Expected: Agent calls faucet tool, returns tx hash + BaseScan link
+```
+
+**If any test still returns "I can't access..." the agent is not using tools.**
+In that case, add this log immediately after `getLangChainTools`:
+
+```typescript
+console.log('[agentkit] tools loaded:', tools.map(t => t.name));
+```
+
+If this logs an empty array `[]`, the AgentKit provider is not registering actions —
+check that the CDP credentials are valid and the provider is being constructed correctly.
+
+---
+
+## SUCCESS CRITERIA
+
+- [ ] `GET /api/agent` returns 404 (route only accepts POST)
+- [ ] `POST /api/agent` with `{ action: "wallet", message: "..." }` returns `{ thoughts, result }`
+- [ ] `result` contains a real `0x...` wallet address (not a placeholder)
+- [ ] `result` contains a real ETH balance (not "I don't know")
+- [ ] `result` contains a clickable BaseScan link
+- [ ] `POST /api/agent` with unknown action returns `{ error: "Invalid request" }` (400)
+- [ ] `POST /api/agent` with missing CDP env vars returns `{ error: "Agent not configured" }` (503)
+- [ ] Console log confirms tools array is non-empty: `['get_wallet_details', 'get_balance', ...]`

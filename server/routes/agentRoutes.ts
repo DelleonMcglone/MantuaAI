@@ -84,18 +84,65 @@ router.get("/wallet-info", async (_req, res) => {
 });
 
 // ── POST /api/agent/chat ──────────────────────────────────────────────────────
-// Price & market analysis chat — uses OpenAI + live CoinGecko data.
-// Does NOT require CDP or ANTHROPIC_API_KEY — works with Replit AI integration.
-// Body: { message: string }
+// Action-aware chat endpoint.
+// - When `action` is present (from the Agent modal tile): routes through the
+//   AgentKit ReAct agent (runAgent) so CDP tools are actually called.
+// - When no action (from the Analytics panel): uses OpenAI + live CoinGecko data.
+// Body: { message: string, action?: string }
 router.post("/chat", async (req, res) => {
-  const { message } = req.body;
+  const { message, action } = req.body;
   if (!message?.trim()) {
     return res.status(400).json({ error: "message is required" });
   }
 
+  // ── Action-based requests → AgentKit ReAct agent ────────────────────────────
+  // Any tile-triggered chat (action present) MUST use the full AgentKit agent so
+  // that CDP tools (get_wallet_details, request_faucet_funds, swap_assets, etc.)
+  // are actually invoked. OpenAI does not have access to these tools.
+  if (action) {
+    const cfgErr = configCheck();
+    if (cfgErr) {
+      console.error('[AgentKit] POST /chat — config error:', cfgErr);
+      return res.status(503).json({ success: false, error: 'Agent not configured', details: cfgErr });
+    }
+
+    // Map action tokens to enriched messages matching intent-router behaviour
+    let enrichedMessage = message;
+    if (action === 'create-wallet') {
+      enrichedMessage =
+        "Get my wallet details including address, network, and ETH balance. " +
+        "Show the BaseScan link to the address.";
+    } else if (action === 'get-funds') {
+      enrichedMessage =
+        "Try to request testnet ETH from the faucet for my wallet using request_faucet_funds. " +
+        "Also show all available faucet links for the current chain. " +
+        "Show the transaction hash and the full BaseScan link if successful.";
+    }
+    // 'swap', 'send', 'query', 'create-pool' and anything else pass through as-is
+
+    try {
+      const response = await runAgent(enrichedMessage);
+      return res.json({ success: true, response });
+    } catch (err: any) {
+      const msg = err?.message ?? 'Unknown error';
+      console.error('[agent/chat] runAgent error:', msg);
+      return res.status(500).json({ success: false, error: msg });
+    }
+  }
+
+  // ── No action → market analysis via OpenAI (Analytics panel) ───────────────
   const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    return res.status(503).json({ success: false, error: "AI not configured. Please set OPENAI_API_KEY." });
+    // Fallback: if Anthropic is configured, use it for market queries too
+    if (process.env.ANTHROPIC_API_KEY) {
+      try {
+        const response = await runAgent(message);
+        return res.json({ success: true, response });
+      } catch (err: any) {
+        return res.status(500).json({ success: false, error: err?.message ?? 'Unknown error' });
+      }
+    }
+    return res.status(503).json({ success: false, error: "AI not configured. Please set OPENAI_API_KEY or ANTHROPIC_API_KEY." });
   }
 
   // Fetch live prices + EUR/USD FX + EURC 24h history — all in parallel
