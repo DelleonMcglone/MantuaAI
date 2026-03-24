@@ -30,16 +30,19 @@ function configCheck(): string | null {
   if (!process.env.CDP_API_KEY_ID)     return "CDP_API_KEY_ID is missing from environment";
   if (!process.env.CDP_API_KEY_SECRET) return "CDP_API_KEY_SECRET is missing from environment";
   if (!process.env.CDP_WALLET_SECRET)  return "CDP_WALLET_SECRET is missing from environment";
-  if (!process.env.ANTHROPIC_API_KEY)  return "ANTHROPIC_API_KEY is missing from environment";
+  const hasOpenAI = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+  const hasAnthropic = process.env.ANTHROPIC_API_KEY;
+  if (!hasOpenAI && !hasAnthropic) return "No LLM API key found (set OPENAI_API_KEY or ANTHROPIC_API_KEY)";
   return null;
 }
 
 function logEnvState(label: string) {
   console.log(`[AgentKit] ${label}:`, {
-    CDP_API_KEY_ID:     process.env.CDP_API_KEY_ID     ? `SET (${process.env.CDP_API_KEY_ID.slice(0, 8)}...)` : 'MISSING',
-    CDP_API_KEY_SECRET: process.env.CDP_API_KEY_SECRET ? 'SET' : 'MISSING',
-    CDP_WALLET_SECRET:  process.env.CDP_WALLET_SECRET  ? 'SET' : 'MISSING',
-    ANTHROPIC_API_KEY:  process.env.ANTHROPIC_API_KEY  ? 'SET' : 'MISSING',
+    CDP_API_KEY_ID:                 process.env.CDP_API_KEY_ID                 ? `SET (${process.env.CDP_API_KEY_ID.slice(0, 8)}...)` : 'MISSING',
+    CDP_API_KEY_SECRET:             process.env.CDP_API_KEY_SECRET             ? 'SET' : 'MISSING',
+    CDP_WALLET_SECRET:              process.env.CDP_WALLET_SECRET              ? 'SET' : 'MISSING',
+    AI_INTEGRATIONS_OPENAI_API_KEY: process.env.AI_INTEGRATIONS_OPENAI_API_KEY ? 'SET' : 'MISSING',
+    OPENAI_API_KEY:                 process.env.OPENAI_API_KEY                 ? 'SET' : 'MISSING',
   });
 }
 
@@ -62,7 +65,14 @@ router.get("/wallet", async (req, res) => {
   } catch (err: any) {
     const msg = err?.message ?? 'Unknown error';
     console.error("[agentkit] GET /wallet error:", msg);
-    if (msg.includes('Invalid') || msg.includes('401') || msg.includes('unauthorized')) {
+    if (msg.includes('Invalid key format') || msg.includes('PEM EC key') || msg.includes('Ed25519')) {
+      return res.status(503).json({
+        success: false,
+        error: 'CDP credentials need updating',
+        message: 'CDP API key is in v1 format. Regenerate at portal.cdp.coinbase.com and update CDP_API_KEY_SECRET.',
+      });
+    }
+    if (msg.includes('401') || msg.includes('unauthorized')) {
       return res.status(401).json({ success: false, error: 'Invalid API credentials', message: msg });
     }
     return res.status(500).json({ success: false, error: msg });
@@ -126,6 +136,33 @@ router.post("/chat", async (req, res) => {
     } catch (err: any) {
       const msg = err?.message ?? 'Unknown error';
       console.error('[agent/chat] runAgent error:', msg);
+
+      // Translate low-level CDP/LLM errors into user-readable chat responses
+      // so the Agent modal shows a helpful message rather than a raw error.
+      let friendlyResponse: string | null = null;
+
+      if (msg.includes('Invalid key format') || msg.includes('PEM EC key') || msg.includes('Ed25519')) {
+        friendlyResponse =
+          '⚠️ **CDP credentials need updating**\n\n' +
+          'Your CDP API key is in the v1 format, but the current AgentKit SDK (v2) requires a key in **PEM EC** or **base64 Ed25519** format.\n\n' +
+          '**To fix:**\n' +
+          '1. Go to [portal.cdp.coinbase.com](https://portal.cdp.coinbase.com/)\n' +
+          '2. Generate a new API key — download the JSON file\n' +
+          '3. Update `CDP_API_KEY_ID` and `CDP_API_KEY_SECRET` in your Replit Secrets with the new values\n\n' +
+          'In the meantime you can still use the **Analytics** panel for live price data.';
+      } else if (msg.includes('401') || msg.includes('unauthorized') || msg.includes('forbidden')) {
+        friendlyResponse =
+          '⚠️ **CDP authentication failed**\n\n' +
+          'The CDP API key was rejected. Please verify `CDP_API_KEY_ID` and `CDP_API_KEY_SECRET` are correct at [portal.cdp.coinbase.com](https://portal.cdp.coinbase.com/).';
+      } else if (msg.includes('Missing required') || msg.includes('not configured')) {
+        friendlyResponse =
+          '⚠️ **Agent not configured**\n\n' +
+          'CDP credentials are missing from environment. Set `CDP_API_KEY_ID`, `CDP_API_KEY_SECRET`, and `CDP_WALLET_SECRET` in Replit Secrets.';
+      }
+
+      if (friendlyResponse) {
+        return res.json({ success: true, response: friendlyResponse });
+      }
       return res.status(500).json({ success: false, error: msg });
     }
   }
