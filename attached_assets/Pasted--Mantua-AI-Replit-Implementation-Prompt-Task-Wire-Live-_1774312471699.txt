@@ -1,0 +1,477 @@
+# Mantua.AI — Replit Implementation Prompt
+## Task: Wire Live Price Data Into Chat Agent — Fix All 6 Suggestion Chip Answers
+
+---
+
+## PROBLEM
+
+When a user asks "What is the current price of ETH?" the agent responds with stale
+training data: "As of early 2025, the approximate price range for ETH is between
+$2,000.00 and $3,500.00."
+
+This is wrong. The app already has `coinGeckoService.ts` and `/api/prices` routes.
+The problem is the chat agent is NOT using those tools — it is falling through to a
+raw Anthropic LLM call with no price tools attached, so Claude answers from memory.
+
+The fix has two parts:
+1. Confirm `coinGeckoService.ts` and `/api/prices` exist and are working
+2. Register price + pool tools on the LangChain agent so ALL 6 chip queries
+   return real, live answers
+
+---
+
+## WHAT EACH OF THE 6 CHIPS NEEDS
+
+| Chip | Data Source | Expected Response Format |
+|------|-------------|--------------------------|
+| What is the current price of ETH? | CoinGecko `/simple/price` | ETH: $X,XXX.XX USD |
+| What's the 24h price change for ETH and cbBTC? | CoinGecko `/simple/price` (usd_24h_change) | ETH: +X.XX% / cbBTC: -X.XX% |
+| Is EURC trading above or below its peg | CoinGecko EURC price vs live EUR/USD FX rate | EURC: $X.XXXX — X% above/below $1.00 peg |
+| Show EURC/USDC price deviation over the last 24h | CoinGecko market_chart (days=1) for EURC | Narrative with min/max deviation |
+| What's the liquidity and volume in the ETH/USDC pool? | CoinGecko 24h volume for ETH+USDC; note testnet caveat | Volume + note about testnet |
+| Where is the best yield for stablecoin liquidity right now? | CoinGecko volume for stablecoin pairs + reasoned answer | Narrative recommendation |
+
+---
+
+## STEP 1 — VERIFY coinGeckoService.ts EXISTS AND WORKS
+
+```bash
+find server/ -name "coinGeckoService.ts" -o -name "coingecko*.ts" | head -5
+```
+
+If the file exists, verify it exports these functions:
+```bash
+grep -n "export" server/services/coinGeckoService.ts 2>/dev/null || \
+grep -rn "export.*getAllTokenPrices\|export.*getTokenPrice\|export.*getTokenPriceHistory" server/
+```
+
+If the file does NOT exist, create it now at `server/services/coinGeckoService.ts`:
+
+```typescript
+/**
+ * coinGeckoService.ts
+ * Live price data for ETH, USDC, cbBTC, EURC from CoinGecko API.
+ * Uses 60-second in-memory cache to respect 30 calls/min rate limit.
+ */
+
+export const COINGECKO_IDS = {
+  ETH:   "ethereum",
+  USDC:  "usd-coin",
+  cbBTC: "coinbase-wrapped-btc",
+  EURC:  "euro-coin",
+} as const;
+
+export type MantuaToken = keyof typeof COINGECKO_IDS;
+
+const BASE_URL = "https://api.coingecko.com/api/v3";
+const cache = new Map<string, { data: unknown; expiresAt: number }>();
+
+function getCached<T>(key: string): T | null {
+  const entry = cache.get(key);
+  if (entry && Date.now() < entry.expiresAt) return entry.data as T;
+  cache.delete(key);
+  return null;
+}
+
+function setCached(key: string, data: unknown, ttlMs = 60_000): void {
+  cache.set(key, { data, expiresAt: Date.now() + ttlMs });
+}
+
+async function cgFetch<T>(path: string, params: Record<string, string> = {}): Promise<T> {
+  const url = new URL(`${BASE_URL}${path}`);
+  const apiKey = process.env.COINGECKO_API_KEY;
+  if (apiKey) url.searchParams.set("x_cg_demo_api_key", apiKey);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+
+  const key = url.toString();
+  const hit = getCached<T>(key);
+  if (hit) return hit;
+
+  const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+  if (res.status === 429) throw new Error("CoinGecko rate limit — retry in 60s");
+  if (!res.ok) throw new Error(`CoinGecko HTTP ${res.status}`);
+  const data = (await res.json()) as T;
+  setCached(key, data);
+  return data;
+}
+
+export interface TokenPrice {
+  token: MantuaToken;
+  usd: number;
+  usd_24h_change: number;
+  usd_24h_vol: number;
+  usd_market_cap: number;
+}
+
+export async function getAllTokenPrices(): Promise<TokenPrice[]> {
+  const ids = Object.values(COINGECKO_IDS).join(",");
+  const data = await cgFetch<Record<string, Record<string, number>>>(
+    "/simple/price",
+    { ids, vs_currencies: "usd", include_24hr_change: "true", include_24hr_vol: "true", include_market_cap: "true" }
+  );
+  return (Object.entries(COINGECKO_IDS) as [MantuaToken, string][]).map(([token, id]) => ({
+    token,
+    usd: data[id]?.usd ?? 0,
+    usd_24h_change: data[id]?.usd_24h_change ?? 0,
+    usd_24h_vol: data[id]?.usd_24h_vol ?? 0,
+    usd_market_cap: data[id]?.usd_market_cap ?? 0,
+  }));
+}
+
+export async function getTokenPrice(token: MantuaToken): Promise<TokenPrice> {
+  const all = await getAllTokenPrices();
+  const found = all.find((p) => p.token === token);
+  if (!found) throw new Error(`Price not found for ${token}`);
+  return found;
+}
+
+export async function getTokenPriceHistory(
+  token: MantuaToken,
+  days: 1 | 7 | 30
+): Promise<{ token: MantuaToken; prices: Array<{ timestamp: number; price: number }>; days: number }> {
+  const id = COINGECKO_IDS[token];
+  const data = await cgFetch<{ prices: [number, number][] }>(
+    `/coins/${id}/market_chart`,
+    { vs_currency: "usd", days: String(days) }
+  );
+  return {
+    token,
+    days,
+    prices: data.prices.map(([timestamp, price]) => ({ timestamp, price })),
+  };
+}
+```
+
+---
+
+## STEP 2 — VERIFY /api/prices ROUTE EXISTS
+
+```bash
+grep -rn "prices\|/api/prices" server/routes/ server/index.ts server/app.ts --include="*.ts" | head -20
+```
+
+If the route is missing, create `server/routes/prices.ts`:
+
+```typescript
+/**
+ * prices.ts — REST endpoints for live token price data.
+ * GET /api/prices           — all 4 tokens
+ * GET /api/prices/:token    — single token (ETH, USDC, cbBTC, EURC)
+ */
+import { Router } from "express";
+import { getAllTokenPrices, getTokenPrice, getTokenPriceHistory, COINGECKO_IDS } from "../services/coinGeckoService";
+
+const router = Router();
+const VALID = Object.keys(COINGECKO_IDS);
+
+router.get("/", async (_req, res) => {
+  try { res.json(await getAllTokenPrices()); }
+  catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+router.get("/:token", async (req, res) => {
+  const token = req.params.token.toUpperCase() as any;
+  if (!VALID.includes(token)) return res.status(400).json({ error: `Invalid token. Use: ${VALID.join(", ")}` });
+  try { res.json(await getTokenPrice(token)); }
+  catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+router.get("/:token/history", async (req, res) => {
+  const token = req.params.token.toUpperCase() as any;
+  const days = parseInt(req.query.days as string) || 1;
+  if (!VALID.includes(token)) return res.status(400).json({ error: "Invalid token" });
+  if (![1, 7, 30].includes(days)) return res.status(400).json({ error: "days must be 1, 7, or 30" });
+  try { res.json(await getTokenPriceHistory(token, days as any)); }
+  catch (e) { res.status(500).json({ error: String(e) }); }
+});
+
+export default router;
+```
+
+Register it in the main server file (find it with `grep -rn "app.use\|router" server/index.ts server/app.ts`):
+```typescript
+import pricesRouter from "./routes/prices";
+app.use("/api/prices", pricesRouter);
+```
+
+---
+
+## STEP 3 — QUICK-TEST THE PRICE ENDPOINT
+
+After server restarts, verify the endpoint works:
+```bash
+curl -s http://localhost:5000/api/prices | head -c 300
+```
+
+Expected: JSON array with `token`, `usd`, `usd_24h_change` fields and real numbers.
+If it returns an error, check that `COINGECKO_API_KEY` is set in Replit Secrets.
+The free public CoinGecko API works WITHOUT a key — if `COINGECKO_API_KEY` is absent,
+the service must still work (the key is optional, not required):
+
+Confirm the `cgFetch` function does NOT throw when the key is missing:
+```typescript
+// CORRECT — key is optional
+const apiKey = process.env.COINGECKO_API_KEY;
+if (apiKey) url.searchParams.set("x_cg_demo_api_key", apiKey);
+
+// WRONG — do not do this
+if (!apiKey) throw new Error("COINGECKO_API_KEY is not set");
+```
+
+---
+
+## STEP 4 — FIND THE AGENT TOOL REGISTRATION
+
+Find the file where LangChain tools are registered for the chat agent:
+```bash
+grep -rn "DynamicTool\|tool(\|createReactAgent\|AgentExecutor\|tools:" \
+  server/ --include="*.ts" -l
+```
+
+Open that file. Look for an array like:
+```typescript
+const tools = [
+  new DynamicTool({ name: "...", func: async (input) => { ... } }),
+  // ...
+];
+```
+
+---
+
+## STEP 5 — REGISTER 4 PRICE TOOLS ON THE AGENT
+
+In the tools array found in Step 4, add these 4 tools. Import the service at the top:
+
+```typescript
+import {
+  getAllTokenPrices,
+  getTokenPrice,
+  getTokenPriceHistory,
+  MantuaToken,
+} from "../services/coinGeckoService";
+```
+
+Then add to the tools array:
+
+```typescript
+new DynamicTool({
+  name: "get_all_token_prices",
+  description:
+    "Get the current USD price, 24h price change percentage, and 24h volume for all " +
+    "4 Mantua tokens: ETH, USDC, cbBTC, EURC. Use this when the user asks about " +
+    "multiple token prices, 24h changes, or wants an overview of all prices.",
+  func: async () => {
+    const prices = await getAllTokenPrices();
+    return prices
+      .map((p) => {
+        const sign = p.usd_24h_change >= 0 ? "+" : "";
+        const arrow = p.usd_24h_change >= 0 ? "▲" : "▼";
+        return (
+          `${p.token}: $${p.usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 6 })} USD ` +
+          `${arrow} ${sign}${p.usd_24h_change.toFixed(2)}% (24h)`
+        );
+      })
+      .join("\n");
+  },
+}),
+
+new DynamicTool({
+  name: "get_token_price",
+  description:
+    "Get the current USD price and 24h change for a single token. " +
+    "Input must be one of: ETH, USDC, cbBTC, EURC. " +
+    "Use this when the user asks about a specific token's current price.",
+  func: async (token: string) => {
+    const t = token.trim().toUpperCase() as MantuaToken;
+    const p = await getTokenPrice(t);
+    const sign = p.usd_24h_change >= 0 ? "+" : "";
+    const arrow = p.usd_24h_change >= 0 ? "▲" : "▼";
+    return (
+      `${p.token}: $${p.usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 6 })} USD ` +
+      `${arrow} ${sign}${p.usd_24h_change.toFixed(2)}% (24h) | ` +
+      `24h Vol: $${(p.usd_24h_vol / 1_000_000).toFixed(1)}M`
+    );
+  },
+}),
+
+new DynamicTool({
+  name: "get_eurc_peg_status",
+  description:
+    "Check whether EURC is trading above or below its USD peg. " +
+    "EURC is a euro-backed stablecoin. Its fair value in USD equals the EUR/USD " +
+    "exchange rate (approx $1.08). Use this when the user asks about EURC's peg, " +
+    "deviation, or whether it is trading above or below peg.",
+  func: async () => {
+    const eurc = await getTokenPrice("EURC");
+    const usdc = await getTokenPrice("USDC");
+
+    // Approximate EUR/USD from EURC's intended 1:1 EUR backing
+    // EURC should equal ~EUR/USD rate. Fetch EUR/USD via free FX API.
+    let eurUsd = 1.085; // fallback approximation
+    try {
+      const fxRes = await fetch("https://open.er-api.com/v6/latest/EUR");
+      if (fxRes.ok) {
+        const fxData = await fxRes.json() as { rates: { USD: number } };
+        eurUsd = fxData.rates.USD;
+      }
+    } catch {
+      // use fallback
+    }
+
+    const deviation = ((eurc.usd - eurUsd) / eurUsd) * 100;
+    const direction = deviation >= 0 ? "above" : "below";
+    const abs = Math.abs(deviation);
+
+    return (
+      `EURC current price: $${eurc.usd.toFixed(4)} USD\n` +
+      `EUR/USD rate: $${eurUsd.toFixed(4)}\n` +
+      `EURC is trading ${direction} its peg by ${abs.toFixed(4)}% ` +
+      `(${abs < 0.1 ? "within normal range" : abs < 0.5 ? "slight deviation" : "significant deviation"})\n` +
+      `USDC for reference: $${usdc.usd.toFixed(4)}`
+    );
+  },
+}),
+
+new DynamicTool({
+  name: "get_price_history",
+  description:
+    "Get price history for a token over the last 1, 7, or 30 days. " +
+    "Input format: 'TOKEN,DAYS' e.g. 'ETH,7' or 'EURC,1'. " +
+    "Use this when the user asks about price trends, charts, or historical deviation.",
+  func: async (input: string) => {
+    const [tokenRaw, daysRaw] = input.split(",");
+    const token = (tokenRaw?.trim().toUpperCase() ?? "ETH") as MantuaToken;
+    const days = ([1, 7, 30].includes(parseInt(daysRaw)) ? parseInt(daysRaw) : 1) as 1 | 7 | 30;
+
+    const history = await getTokenPriceHistory(token, days);
+    if (!history.prices.length) return "No price history available.";
+
+    const prices = history.prices.map((p) => p.price);
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    const first = prices[0];
+    const last = prices[prices.length - 1];
+    const change = ((last - first) / first) * 100;
+    const sign = change >= 0 ? "+" : "";
+
+    return (
+      `${token} price over last ${days} day(s):\n` +
+      `Current: $${last.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}\n` +
+      `${days}d change: ${sign}${change.toFixed(2)}%\n` +
+      `Range: $${min.toFixed(4)} – $${max.toFixed(4)}\n` +
+      `Data points: ${prices.length}`
+    );
+  },
+}),
+```
+
+---
+
+## STEP 6 — UPDATE THE AGENT SYSTEM PROMPT
+
+Find the system prompt string passed to `createReactAgent` or `ChatAnthropic`:
+```bash
+grep -rn "systemPrompt\|system_prompt\|system:\|You are\|DeFi assistant\|Mantua" \
+  server/ --include="*.ts" | grep -v "node_modules" | head -20
+```
+
+Add this block to the system prompt (append to existing, do not replace):
+
+```
+You have access to live price tools. ALWAYS use these tools when answering
+price-related questions — NEVER answer from training data or memory.
+
+Tool usage rules:
+- "current price of ETH" or any single token → use get_token_price with input "ETH"
+- "price of ETH and cbBTC" or multiple tokens → use get_all_token_prices
+- "24h change" → use get_all_token_prices (includes usd_24h_change for all tokens)
+- "EURC peg", "EURC above/below peg", "EURC deviation" → use get_eurc_peg_status
+- "EURC price over last 24h", "EURC history" → use get_price_history with input "EURC,1"
+- "ETH/USDC pool liquidity or volume" → use get_all_token_prices for volume data, then
+  explain that pool-level TVL comes from on-chain Base Sepolia data and reference
+  the testnet nature of the pools
+- "best yield for stablecoins" → use get_all_token_prices to get USDC/EURC volume,
+  then provide a reasoned answer based on the data
+
+IMPORTANT: This app runs on Base Sepolia testnet. Prices shown are mainnet market
+prices from CoinGecko (real USD values). Pool TVL and liquidity are testnet values
+with no real monetary value.
+```
+
+---
+
+## STEP 7 — VERIFY AGENT TOOL CALL REACHES COINGECKO
+
+After restarting the server, open the browser chat and send:
+**"What is the current price of ETH?"**
+
+In the Replit server logs, you should see one of:
+- A fetch to `api.coingecko.com` (confirms tool was called)
+- A log line like `[tool] get_token_price called with: ETH`
+
+The response in chat must be:
+- A specific price: e.g. "ETH: $1,847.32 USD ▼ -2.14% (24h)"
+- NOT a range like "$2,000 to $3,500"
+- NOT "as of early 2025"
+- NOT "please verify on an exchange"
+
+---
+
+## STEP 8 — TEST ALL 6 CHIPS
+
+Send each of these messages in chat and confirm real responses:
+
+**Chip 1:** "What is the current price of ETH?"
+- ✅ Pass: Returns exact USD price with 2 decimal places
+- ❌ Fail: Returns a range, approximate value, or training data answer
+
+**Chip 2:** "What's the 24h price change for ETH and cbBTC?"
+- ✅ Pass: Returns signed percentage for BOTH tokens (e.g. ETH: +1.2%, cbBTC: -0.8%)
+- ❌ Fail: Returns only one token or no percentage
+
+**Chip 3:** "Is EURC trading above or below its peg"
+- ✅ Pass: Returns EURC price, EUR/USD rate, direction (above/below), and deviation %
+- ❌ Fail: Returns generic text with no numbers
+
+**Chip 4:** "Show EURC/USDC price deviation over the last 24h"
+- ✅ Pass: Returns EURC 24h min/max range and % change
+- ❌ Fail: Returns no data or training-data answer
+
+**Chip 5:** "What's the liquidity and volume in the ETH/USDC pool?"
+- ✅ Pass: Returns ETH and USDC 24h volume figures, notes testnet pool context
+- ❌ Fail: Returns "I don't have access to pool data" with no numbers
+
+**Chip 6:** "Where is the best yield for stablecoin liquidity right now?"
+- ✅ Pass: References actual USDC/EURC volume data and gives a reasoned recommendation
+- ❌ Fail: Returns generic advice with no live data
+
+---
+
+## SUCCESS CRITERIA
+
+- [ ] `coinGeckoService.ts` exists with `getAllTokenPrices`, `getTokenPrice`, `getTokenPriceHistory`
+- [ ] `/api/prices` endpoint returns real prices: `curl http://localhost:5000/api/prices`
+- [ ] CoinGecko fetch works without `COINGECKO_API_KEY` (key is optional)
+- [ ] 4 tools registered on the LangChain agent: `get_all_token_prices`, `get_token_price`, `get_eurc_peg_status`, `get_price_history`
+- [ ] Agent system prompt instructs tool use for price queries
+- [ ] All 6 chips return real, live data — no training-data answers
+- [ ] Server does not crash if CoinGecko is temporarily unreachable (catch errors, return friendly message)
+
+---
+
+## FAILURE CONDITIONS
+
+- Agent still answers from memory ("as of early 2025...") → tools not registered or system prompt not updated
+- `/api/prices` returns 500 → check that `COINGECKO_API_KEY` guard was removed (key is optional)
+- EURC peg check fails → EUR/USD FX fallback ($1.085) must be used if `open.er-api.com` is unreachable
+- Any chip returns "I don't have access to real-time data" → system prompt must explicitly override this behavior
+
+---
+
+## DO NOT CHANGE
+
+- The 6 chip texts or click behavior
+- The swap, liquidity, or AgentKit route handlers
+- Any database schema or transaction persistence logic
+- The greeting and wallet address display in the chat empty state
+- The chat input bar, send button, voice button

@@ -38,19 +38,32 @@ function setCached(key: string, data: unknown, ttlSeconds = 60): void {
 }
 
 // ── HTTP helper ───────────────────────────────────────────────────────────────
+// The API key is optional — the free public CoinGecko API works without one.
+// If a key is present but returns 401 (invalid key), we fall back to no-key.
 async function cgFetch<T>(path: string, params: Record<string, string> = {}): Promise<T> {
-  const url = new URL(`${BASE_URL}${path}`);
   const apiKey = process.env.COINGECKO_API_KEY;
-  if (apiKey) url.searchParams.set("x_cg_demo_api_key", apiKey);
-  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
-  const cacheKey = url.toString();
+  const buildUrl = (withKey: boolean): URL => {
+    const url = new URL(`${BASE_URL}${path}`);
+    if (withKey && apiKey) url.searchParams.set("x_cg_demo_api_key", apiKey);
+    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+    return url;
+  };
+
+  // Use no-key URL as the canonical cache key (avoids dual-caching same data)
+  const cacheKey = buildUrl(false).toString();
   const cached = getCached<T>(cacheKey);
   if (cached) return cached;
 
-  const res = await fetch(url.toString(), {
-    headers: { Accept: "application/json" },
-  });
+  // Try with key first (if present), fall back to no-key on 401/403
+  const urlWithKey = buildUrl(true);
+  let res = await fetch(urlWithKey.toString(), { headers: { Accept: "application/json" } });
+
+  if ((res.status === 401 || res.status === 403) && apiKey) {
+    // Key is invalid — retry without it using public API
+    const urlNoKey = buildUrl(false);
+    res = await fetch(urlNoKey.toString(), { headers: { Accept: "application/json" } });
+  }
 
   if (res.status === 429) throw new Error("CoinGecko rate limit hit — retry in 60 seconds");
   if (!res.ok) throw new Error(`CoinGecko error: HTTP ${res.status}`);

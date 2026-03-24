@@ -15,7 +15,7 @@ import OpenAI from "openai";
 import { runAgent, getAgentWalletInfo } from "../lib/agentkit";
 import { createStableProtectionPool, swapViaStablePool, getStablePoolId } from "../services/poolService";
 import { detectIntent } from "../services/intentRouter";
-import { getAllTokenPrices, formatTokenPrice } from "../services/coinGeckoService";
+import { getAllTokenPrices, getTokenPriceHistory, formatTokenPrice } from "../services/coinGeckoService";
 
 // OpenAI client using Replit AI integration (same as main chat)
 const openai = new OpenAI({
@@ -98,10 +98,13 @@ router.post("/chat", async (req, res) => {
     return res.status(503).json({ success: false, error: "AI not configured. Please set OPENAI_API_KEY." });
   }
 
-  // Fetch live prices + EUR/USD FX to inject as context
+  // Fetch live prices + EUR/USD FX + EURC 24h history — all in parallel
   let priceContext = "";
   try {
-    const prices = await getAllTokenPrices();
+    const [prices, eurcHistory] = await Promise.all([
+      getAllTokenPrices(),
+      getTokenPriceHistory("EURC", 1).catch(() => null),
+    ]);
 
     // Fetch live EUR/USD rate for EURC peg analysis
     let eurUsd = 1.085; // fallback
@@ -121,22 +124,46 @@ router.post("/chat", async (req, res) => {
     const eurcAbs = Math.abs(eurcDeviation);
     const eurcStatus = eurcAbs < 0.1 ? "within normal range" : eurcAbs < 0.5 ? "slight deviation" : "significant deviation";
 
+    // Build EURC 24h deviation summary from historical prices
+    let eurcHistorySummary = "EURC 24h price history: not available";
+    if (eurcHistory && eurcHistory.prices.length > 1) {
+      const pts = eurcHistory.prices.map(p => p.price);
+      const min24h = Math.min(...pts);
+      const max24h = Math.max(...pts);
+      const open24h = pts[0];
+      const close24h = pts[pts.length - 1];
+      const change24h = ((close24h - open24h) / open24h) * 100;
+      const sign = change24h >= 0 ? "+" : "";
+      // Express deviation from EUR/USD peg for each point
+      const minDev = ((min24h - eurUsd) / eurUsd) * 100;
+      const maxDev = ((max24h - eurUsd) / eurUsd) * 100;
+      eurcHistorySummary =
+        `EURC 24h price history (vs EUR/USD peg $${eurUsd.toFixed(4)}):\n` +
+        `  Price range: $${min24h.toFixed(4)} – $${max24h.toFixed(4)}\n` +
+        `  24h open: $${open24h.toFixed(4)} → close: $${close24h.toFixed(4)} (${sign}${change24h.toFixed(4)}%)\n` +
+        `  Peg deviation range: ${minDev.toFixed(4)}% to ${maxDev.toFixed(4)}%\n` +
+        `  Data points: ${pts.length}`;
+    }
+
     priceContext =
-      "Current live market data (from CoinGecko, mainnet pricing):\n" +
+      "=== LIVE MARKET DATA (CoinGecko, fetched now) ===\n" +
       prices.map(formatTokenPrice).join("\n") + "\n\n" +
+      `=== EURC PEG ANALYSIS ===\n` +
       `EUR/USD FX rate: $${eurUsd.toFixed(4)}\n` +
-      `EURC peg status: $${eurc?.usd.toFixed(4) ?? "N/A"} — ` +
-      `${eurcDirection} peg by ${eurcAbs.toFixed(4)}% (${eurcStatus})\n\n` +
-      "Pool & liquidity context:\n" +
-      `- ETH 24h volume: $${((prices.find(p => p.token === "ETH")?.usd_24h_vol ?? 0) / 1_000_000_000).toFixed(2)}B\n` +
-      `- USDC 24h volume: $${((prices.find(p => p.token === "USDC")?.usd_24h_vol ?? 0) / 1_000_000_000).toFixed(2)}B\n` +
-      `- EURC 24h volume: $${((prices.find(p => p.token === "EURC")?.usd_24h_vol ?? 0) / 1_000_000).toFixed(1)}M\n` +
-      "- Mantua.AI runs on Base Sepolia testnet — pool TVL/liquidity is testnet (no real monetary value)\n" +
-      "- USDC is a USD stablecoin, target price $1.00\n" +
-      "- EURC is a EUR-backed stablecoin. Fair USD value = EUR/USD rate shown above\n" +
-      "- The Stable Protection Hook adjusts fees based on EURC peg deviation (0.5 bps healthy → circuit breaker at >5% deviation)";
+      `EURC current price: $${eurc?.usd.toFixed(4) ?? "N/A"}\n` +
+      `EURC peg status: ${eurcDirection} peg by ${eurcAbs.toFixed(4)}% (${eurcStatus})\n\n` +
+      `=== EURC 24H HISTORY ===\n` +
+      eurcHistorySummary + "\n\n" +
+      "=== POOL & LIQUIDITY CONTEXT ===\n" +
+      `ETH 24h volume (mainnet): $${((prices.find(p => p.token === "ETH")?.usd_24h_vol ?? 0) / 1_000_000_000).toFixed(2)}B\n` +
+      `USDC 24h volume (mainnet): $${((prices.find(p => p.token === "USDC")?.usd_24h_vol ?? 0) / 1_000_000_000).toFixed(2)}B\n` +
+      `EURC 24h volume (mainnet): $${((prices.find(p => p.token === "EURC")?.usd_24h_vol ?? 0) / 1_000_000).toFixed(1)}M\n` +
+      "Mantua.AI pool note: Base Sepolia testnet — pool TVL/liquidity has no real monetary value\n" +
+      "USDC: USD stablecoin, target $1.00\n" +
+      "EURC: EUR-backed stablecoin — fair USD value = EUR/USD rate above\n" +
+      "Stable Protection Hook: 0.5 bps (healthy peg) → circuit breaker at >5% deviation";
   } catch (err: any) {
-    console.warn("[agent/chat] CoinGecko price fetch failed:", err?.message);
+    console.warn("[agent/chat] price context fetch failed:", err?.message);
     priceContext =
       "Live price data is temporarily unavailable (CoinGecko API error). " +
       "Inform the user that prices cannot be fetched right now and ask them to try again in a moment.";
