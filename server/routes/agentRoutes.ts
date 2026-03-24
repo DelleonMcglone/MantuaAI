@@ -98,26 +98,48 @@ router.post("/chat", async (req, res) => {
     return res.status(503).json({ success: false, error: "AI not configured. Please set OPENAI_API_KEY." });
   }
 
-  // Fetch live prices to inject as context
+  // Fetch live prices + EUR/USD FX to inject as context
   let priceContext = "";
   try {
     const prices = await getAllTokenPrices();
+
+    // Fetch live EUR/USD rate for EURC peg analysis
+    let eurUsd = 1.085; // fallback
+    try {
+      const fxRes = await fetch("https://open.er-api.com/v6/latest/EUR");
+      if (fxRes.ok) {
+        const fxData = await fxRes.json() as { rates: { USD: number } };
+        if (fxData?.rates?.USD) eurUsd = fxData.rates.USD;
+      }
+    } catch {
+      // use fallback
+    }
+
+    const eurc = prices.find(p => p.token === "EURC");
+    const eurcDeviation = eurc ? ((eurc.usd - eurUsd) / eurUsd) * 100 : 0;
+    const eurcDirection = eurcDeviation >= 0 ? "above" : "below";
+    const eurcAbs = Math.abs(eurcDeviation);
+    const eurcStatus = eurcAbs < 0.1 ? "within normal range" : eurcAbs < 0.5 ? "slight deviation" : "significant deviation";
+
     priceContext =
       "Current live market data (from CoinGecko, mainnet pricing):\n" +
       prices.map(formatTokenPrice).join("\n") + "\n\n" +
-      "Additional context:\n" +
-      "- EURC is a EUR-pegged stablecoin. Its USD peg is approximately 1 EUR ≈ 1.06–1.10 USD depending on FX.\n" +
-      "- USDC is a USD stablecoin, target price $1.00.\n" +
-      "- Mantua.AI runs on Base Sepolia testnet with a USDC/EURC Stable Protection pool using Uniswap v4 hooks.\n" +
-      "- The Stable Protection Hook adjusts fees based on EURC peg deviation (0.5 bps healthy → circuit breaker at >5% deviation).";
+      `EUR/USD FX rate: $${eurUsd.toFixed(4)}\n` +
+      `EURC peg status: $${eurc?.usd.toFixed(4) ?? "N/A"} — ` +
+      `${eurcDirection} peg by ${eurcAbs.toFixed(4)}% (${eurcStatus})\n\n` +
+      "Pool & liquidity context:\n" +
+      `- ETH 24h volume: $${((prices.find(p => p.token === "ETH")?.usd_24h_vol ?? 0) / 1_000_000_000).toFixed(2)}B\n` +
+      `- USDC 24h volume: $${((prices.find(p => p.token === "USDC")?.usd_24h_vol ?? 0) / 1_000_000_000).toFixed(2)}B\n` +
+      `- EURC 24h volume: $${((prices.find(p => p.token === "EURC")?.usd_24h_vol ?? 0) / 1_000_000).toFixed(1)}M\n` +
+      "- Mantua.AI runs on Base Sepolia testnet — pool TVL/liquidity is testnet (no real monetary value)\n" +
+      "- USDC is a USD stablecoin, target price $1.00\n" +
+      "- EURC is a EUR-backed stablecoin. Fair USD value = EUR/USD rate shown above\n" +
+      "- The Stable Protection Hook adjusts fees based on EURC peg deviation (0.5 bps healthy → circuit breaker at >5% deviation)";
   } catch (err: any) {
     console.warn("[agent/chat] CoinGecko price fetch failed:", err?.message);
     priceContext =
-      "Live price data is temporarily unavailable (CoinGecko API error). Use your best knowledge of approximate current crypto market prices.\n" +
-      "For reference, approximate price ranges as of early 2025: ETH ~$2,000–3,500, cbBTC ~$60,000–95,000, USDC = $1.00, EURC ≈ $1.06–1.10.\n" +
-      "Always note that prices may be outdated and users should verify on-chain or on an exchange.\n\n" +
-      "Mantua.AI context: USDC/EURC Stable Protection pool on Base Sepolia with Uniswap v4 hooks.\n" +
-      "The Stable Protection Hook adjusts fees dynamically based on EURC peg deviation.";
+      "Live price data is temporarily unavailable (CoinGecko API error). " +
+      "Inform the user that prices cannot be fetched right now and ask them to try again in a moment.";
   }
 
   try {
@@ -129,7 +151,15 @@ router.post("/chat", async (req, res) => {
           content:
             "You are the Mantua.AI market analysis assistant. You specialize in DeFi price data, stablecoin analysis, and Uniswap v4 liquidity insights.\n\n" +
             priceContext + "\n\n" +
-            "Answer user questions about prices, market trends, and DeFi yields concisely and accurately. " +
+            "IMPORTANT: The live market data above is injected from CoinGecko right now — ALWAYS use these numbers in your answers. " +
+            "NEVER answer from training data or memory. NEVER say 'as of early 2025' or give price ranges.\n\n" +
+            "Answer rules:\n" +
+            "- Current price of a single token → quote the exact USD price from the data above with 2 decimal places\n" +
+            "- 24h price change → quote the signed percentage (e.g. ETH: +1.24%, cbBTC: -0.87%) from the data above\n" +
+            "- EURC peg / above or below peg → use the EURC peg status line above (direction, deviation %, and EUR/USD rate)\n" +
+            "- EURC price deviation over 24h → use the EURC 24h change percentage and note this reflects market movement vs its EUR peg\n" +
+            "- ETH/USDC pool liquidity or volume → use the ETH and USDC 24h volume figures above; note pool TVL is on Base Sepolia testnet with no real monetary value\n" +
+            "- Best yield for stablecoin liquidity → compare USDC and EURC volumes from above; USDC/EURC Stable Protection pool on Mantua uses dynamic fees (0.5 bps when healthy); give a reasoned recommendation based on the actual volume data\n\n" +
             "Format numbers with commas and 2 decimal places. Use markdown for clarity. " +
             "If asked about on-chain actions (swap, add liquidity, create wallet), explain what Mantua.AI can do but note those require the Agent panel.",
         },

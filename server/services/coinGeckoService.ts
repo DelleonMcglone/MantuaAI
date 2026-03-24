@@ -39,11 +39,9 @@ function setCached(key: string, data: unknown, ttlSeconds = 60): void {
 
 // ── HTTP helper ───────────────────────────────────────────────────────────────
 async function cgFetch<T>(path: string, params: Record<string, string> = {}): Promise<T> {
-  const apiKey = process.env.COINGECKO_API_KEY;
-  if (!apiKey) throw new Error("COINGECKO_API_KEY is not set");
-
   const url = new URL(`${BASE_URL}${path}`);
-  url.searchParams.set("x_cg_demo_api_key", apiKey);
+  const apiKey = process.env.COINGECKO_API_KEY;
+  if (apiKey) url.searchParams.set("x_cg_demo_api_key", apiKey);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
   const cacheKey = url.toString();
