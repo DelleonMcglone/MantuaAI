@@ -168,17 +168,8 @@ export default function MantuaLanding() {
 
       {/* Footer */}
       <footer style={{ padding: '60px 40px 40px', borderTop: `1px solid ${theme.border}`, background: theme.bgSecondary }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 48 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <img src={logo} alt="Mantua.AI" style={{ height: 32 }} />
-              <span style={{ fontFamily: '"Outfit", sans-serif', fontSize: 18, fontWeight: 600, color: theme.textPrimary }}>Mantua.AI</span>
-            </div>
-            <p style={{ fontSize: 14, color: theme.textSecondary, lineHeight: 1.6 }}>Agent driven liquidity for Stablecoins.<br />Hooks for logic. Agents for action. AI for intelligence.</p>
-          </div>
-        </div>
         {/* Recognition Cards */}
-        <div style={{ maxWidth: 1200, margin: '48px auto 0', display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', gap: 20, flexWrap: 'wrap' }}>
           {/* Card 1 — Base Batches 001 */}
           <div style={{ flex: '1 1 260px', background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', border: '1px solid rgba(234,179,8,0.35)', borderRadius: 14, padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>
             <div style={{ fontSize: 36, lineHeight: 1, flexShrink: 0 }}>🏆</div>
