@@ -167,7 +167,7 @@ export default function MantuaLanding() {
       </section>
 
       {/* Footer */}
-      <footer style={{ padding: '60px 40px 40px', borderTop: `1px solid ${theme.border}`, background: theme.bgSecondary }}>
+      <footer style={{ padding: '60px 40px 40px', borderTop: `1px solid ${theme.border}`, background: theme.bgPrimary }}>
         {/* Recognition Cards */}
         <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', gap: 20, flexWrap: 'wrap' }}>
           {/* Card 1 — Base Batches 001 */}
