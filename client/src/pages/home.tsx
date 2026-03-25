@@ -177,7 +177,27 @@ export default function MantuaLanding() {
             <p style={{ fontSize: 14, color: theme.textSecondary, lineHeight: 1.6 }}>Agent driven liquidity for Stablecoins.<br />Hooks for logic. Agents for action. AI for intelligence.</p>
           </div>
         </div>
-        <div style={{ maxWidth: 1200, margin: '48px auto 0', paddingTop: 24, borderTop: `1px solid ${theme.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+        {/* Recognition Cards */}
+        <div style={{ maxWidth: 1200, margin: '48px auto 0', display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+          {/* Card 1 — Base Batches 001 */}
+          <div style={{ flex: '1 1 260px', background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', border: '1px solid rgba(234,179,8,0.35)', borderRadius: 14, padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{ fontSize: 36, lineHeight: 1, flexShrink: 0 }}>🏆</div>
+            <div>
+              <div style={{ fontFamily: '"Outfit", sans-serif', fontSize: 15, fontWeight: 700, color: '#eab308', marginBottom: 4 }}>Base Batches 001</div>
+              <div style={{ fontSize: 12, color: theme.textSecondary, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>DeFi AI Category</div>
+            </div>
+          </div>
+          {/* Card 2 — Atrium Academy */}
+          <div style={{ flex: '1 1 260px', background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)', border: '1px solid rgba(234,179,8,0.35)', borderRadius: 14, padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{ fontSize: 36, lineHeight: 1, flexShrink: 0 }}>🪝</div>
+            <div>
+              <div style={{ fontFamily: '"Outfit", sans-serif', fontSize: 15, fontWeight: 700, color: '#eab308', marginBottom: 4 }}>Atrium Academy UHI8 Hook Incubator</div>
+              <div style={{ fontSize: 12, color: theme.textSecondary, fontWeight: 500 }}>Pioneer of the Stable Protection Hook</div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ maxWidth: 1200, margin: '32px auto 0', paddingTop: 24, borderTop: `1px solid ${theme.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
           <span style={{ fontSize: 13, color: theme.textMuted }}>© 2026 Mantua.AI. All rights reserved.</span>
           <div style={{ display: 'flex', gap: 24 }}>
             <a href="#" style={{ color: theme.textSecondary, textDecoration: 'none', fontSize: 14 }}>Terms</a>
