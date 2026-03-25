@@ -188,7 +188,7 @@ export default function MantuaLanding() {
           </div>
         </div>
 
-        <div style={{ maxWidth: 1200, margin: '32px auto 0', paddingTop: 24, borderTop: `1px solid ${theme.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+        <div style={{ maxWidth: 1200, margin: '32px auto 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
           <span style={{ fontSize: 13, color: theme.textMuted }}>© 2026 Mantua.AI. All rights reserved.</span>
         </div>
       </footer>
