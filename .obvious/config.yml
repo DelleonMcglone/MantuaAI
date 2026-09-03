@@ -1,0 +1,8 @@
+# Repo policy for obvious workers.
+# Auto-detected from GitHub (DelleonMcglone/MantuaAI) on 2026-09-03:
+#   default branch: main; merge commit / rebase / squash all allowed; deleteBranchOnMerge: false.
+defaultBranch: main
+# All three merge methods are permitted by the repo; squash keeps setup PRs single-commit.
+mergeMethod: squash
+# Default-branch setup PRs require a human merge click.
+requireHumanMerge: true
